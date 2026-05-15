@@ -25,6 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copier le code et installer le package
 COPY src ./src
+COPY README.md ./
 COPY app.py ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
@@ -41,9 +42,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer Tectonic (compilateur LaTeX moderne, ~50 Mo)
-RUN curl --proto '=https' --tlsv1.2 -fsSL https://drop-sh.fullyjustified.net | sh \
-    && mv tectonic /usr/local/bin/ \
+# Installer Tectonic (compilateur LaTeX moderne, binaire statique ~50 Mo)
+# Détection d'architecture : Apple Silicon = aarch64, Intel = x86_64
+ARG TECTONIC_VERSION=0.16.9
+RUN ARCH=$(uname -m) \
+    && case "$ARCH" in \
+        x86_64) TARGET="x86_64-unknown-linux-musl" ;; \
+        aarch64) TARGET="aarch64-unknown-linux-musl" ;; \
+        *) echo "Architecture non supportée: $ARCH" && exit 1 ;; \
+    esac \
+    && curl --proto '=https' --tlsv1.2 -fsSL \
+        "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/tectonic-${TECTONIC_VERSION}-${TARGET}.tar.gz" \
+        -o /tmp/tectonic.tar.gz \
+    && tar -xzf /tmp/tectonic.tar.gz -C /tmp \
+    && mv /tmp/tectonic /usr/local/bin/ \
+    && rm /tmp/tectonic.tar.gz \
     && tectonic --version
 
 # Créer un utilisateur non-root pour la sécurité
@@ -62,6 +75,12 @@ ENV PATH="/app/.venv/bin:$PATH" \
     STREAMLIT_SERVER_PORT=8501 \
     STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
     STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+# Skip Streamlit email prompt au premier démarrage
+RUN mkdir -p /home/app/.streamlit \
+    && echo '[general]' > /home/app/.streamlit/credentials.toml \
+    && echo 'email = ""' >> /home/app/.streamlit/credentials.toml \
+    && chown -R app:app /home/app/.streamlit
 
 USER app
 
