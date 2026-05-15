@@ -1,0 +1,27 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ministere-de-l-info:dev
+    container_name: ministere-de-l-info
+    ports:
+      - "8501:8501"
+    volumes:
+      # Hot reload : code source monté en lecture
+      - ./src:/app/src
+      - ./app.py:/app/app.py
+      - ./.streamlit:/app/.streamlit
+      # Persistance des données (named volume, perf optimale sur macOS)
+      - duckdb-data:/app/data
+      # Référentiels (lecture seule)
+      - ./references:/app/references:ro
+    env_file:
+      - .env
+    environment:
+      - STREAMLIT_SERVER_RUN_ON_SAVE=true
+    restart: unless-stopped
+
+volumes:
+  duckdb-data:
+    driver: local

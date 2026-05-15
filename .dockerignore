@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+.venv
+venv
+.python-version
+*.egg-info
+
+# Tests & caches
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+
+# IDE
+.vscode
+.idea
+*.swp
+
+# OS
+.DS_Store
+._*
+
+# Secrets
+.env
+.env.local
+
+# Documentation & notebooks (pas besoin dans l'image)
+docs
+notebooks
+*.ipynb
+
+# Données (montées en volume au runtime)
+data
+
+# Claude
+.claude
+
+# LaTeX artefacts
+*.aux
+*.log
+*.out
