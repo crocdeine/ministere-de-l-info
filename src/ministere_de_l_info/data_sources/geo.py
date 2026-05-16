@@ -1,87 +1,270 @@
-"""Sources géographiques — API geo.api.gouv.fr."""
+"""Sources géographiques — WFS IGN ADMIN-EXPRESS COG (data.geopf.fr)."""
 
 from __future__ import annotations
 
+import json
 import logging
+import time
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Literal
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
-# Estimations INSEE 2024 — population légale, 13 régions métropolitaines
+# Estimations INSEE 2024 — population légale, 13 régions métropolitaines.
+# Conservé pour compatibilité avec les tests (import direct de POPULATION_2024).
 POPULATION_2024: dict[str, int] = {
     "11": 12_271_000,  # Île-de-France
-    "24": 2_607_000,   # Centre-Val de Loire
-    "27": 2_795_000,   # Bourgogne-Franche-Comté
-    "28": 3_352_000,   # Normandie
-    "32": 6_018_000,   # Hauts-de-France
-    "44": 5_559_000,   # Grand Est
-    "52": 3_953_000,   # Pays de la Loire
-    "53": 3_480_000,   # Bretagne
-    "75": 6_194_000,   # Nouvelle-Aquitaine
-    "76": 6_111_000,   # Occitanie
-    "84": 8_106_000,   # Auvergne-Rhône-Alpes
-    "93": 5_165_000,   # Provence-Alpes-Côte d'Azur
-    "94": 357_000,     # Corse
+    "24": 2_607_000,  # Centre-Val de Loire
+    "27": 2_795_000,  # Bourgogne-Franche-Comté
+    "28": 3_352_000,  # Normandie
+    "32": 6_018_000,  # Hauts-de-France
+    "44": 5_559_000,  # Grand Est
+    "52": 3_953_000,  # Pays de la Loire
+    "53": 3_480_000,  # Bretagne
+    "75": 6_194_000,  # Nouvelle-Aquitaine
+    "76": 6_111_000,  # Occitanie
+    "84": 8_106_000,  # Auvergne-Rhône-Alpes
+    "93": 5_165_000,  # Provence-Alpes-Côte d'Azur
+    "94": 357_000,  # Corse
 }
 
 _CODES_METRO: frozenset[str] = frozenset(POPULATION_2024.keys())
 
-# geo.api.gouv.fr ne fournit pas de géométrie de contour pour les régions (limitation de l'API).
-# On utilise le WFS IGN ADMIN-EXPRESS (data.geopf.fr), également source officielle sans auth.
-# Le filtre CQL réduit la réponse aux 13 régions métro et stabilise le chunked-read.
-_CODES_METRO_CQL = "','".join(sorted(_CODES_METRO))
-_WFS_URL = (
-    "https://data.geopf.fr/wfs/ows"
-    "?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature"
-    "&TYPENAMES=ADMINEXPRESS-COG.LATEST:region"
-    "&OUTPUTFORMAT=application/json"
-    "&SRSNAME=EPSG:4326"
-    f"&CQL_FILTER=code_insee IN ('{_CODES_METRO_CQL}')"
-)
-_MAX_RETRIES = 3
+# ── Constantes WFS ────────────────────────────────────────────────────────────
+
+_WFS_BASE = "https://data.geopf.fr/wfs/ows"
+_WFS_COMMON: dict[str, str] = {
+    "SERVICE": "WFS",
+    "VERSION": "2.0.0",
+    "REQUEST": "GetFeature",
+    "OUTPUTFORMAT": "application/json",
+    "SRSNAME": "EPSG:4326",
+}
+
+AdminLevel = Literal[
+    "region", "departement", "epci", "commune", "arrondissement_municipal"
+]
+
+# Filtre CQL serveur pour dom=False (métropole uniquement), par niveau.
+# Noms de champs vérifiés sur GetFeature COUNT=1 le 2026-05-16.
+# epci : None car codes_insee_des_departements_membres est multi-valeur, filtre CQL inapplicable.
+# arrondissement_municipal : None car Paris/Lyon/Marseille sont toujours en métropole.
+_DOM_EXCLUDE_FILTER: dict[str, str | None] = {
+    "region": "code_insee NOT IN ('01','02','03','04','06')",
+    "departement": "code_insee NOT LIKE '97%'",
+    "commune": "code_insee_du_departement NOT LIKE '97%'",
+    "arrondissement_municipal": None,
+    "epci": None,
+}
+
+
+# ── Helpers privés ────────────────────────────────────────────────────────────
+
+
+def _http_retry_get(
+    url: str,
+    params: dict[str, str],
+    timeout: httpx.Timeout,
+    max_retries: int = 3,
+) -> httpx.Response:
+    """Requête GET avec retry et backoff exponentiel (2^n secondes)."""
+    last_exc: Exception | None = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                response = client.get(url, params=params)
+            response.raise_for_status()
+            return response
+        except (
+            httpx.RemoteProtocolError,
+            httpx.ReadError,
+            httpx.HTTPStatusError,
+        ) as exc:
+            logger.warning("Tentative %d/%d échouée : %s", attempt, max_retries, exc)
+            last_exc = exc
+            if attempt < max_retries:
+                time.sleep(2**attempt)
+    raise RuntimeError(
+        f"Requête WFS échouée après {max_retries} tentatives : {url}"
+    ) from last_exc
+
+
+def _batch_file_valid(path: Path) -> bool:
+    """Vérifie qu'un fichier batch GeoJSON est complet et non corrompu."""
+    if not path.exists() or path.stat().st_size == 0:
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data.get("features") is not None
+    except (json.JSONDecodeError, OSError):
+        return False
+
+
+def _wfs_paginate(
+    typenames: str,
+    raw_dir: Path,
+    cql_filter: str | None = None,
+    batch_size: int = 1000,
+    force: bool = False,
+) -> Iterator[Path]:
+    """Pagine le WFS IGN et yield le Path de chaque batch GeoJSON sur disque.
+
+    Chaque batch est écrit atomiquement (.tmp puis rename). En cas de reprise
+    (force=False), les fichiers batch valides sont réutilisés depuis le disque.
+    La pagination s'arrête dès qu'un batch retourne moins de batch_size features.
+    """
+    # Nom de fichier safe : "ADMINEXPRESS-COG.LATEST:commune" → "ADMINEXPRESS-COG.LATEST_commune"
+    safe_name = typenames.replace(":", "_").replace("/", "_")
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    timeout = httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=15.0)
+
+    batch_num = 0
+    start_index = 0
+
+    while True:
+        batch_path = raw_dir / f"{safe_name}_batch_{batch_num:04d}.geojson"
+        tmp_path = raw_dir / f"{safe_name}_batch_{batch_num:04d}.geojson.tmp"
+
+        if not force and _batch_file_valid(batch_path):
+            data = json.loads(batch_path.read_text(encoding="utf-8"))
+            features = data.get("features", [])
+            logger.info(
+                "Batch %04d — reprise disque : %d features (%s)",
+                batch_num,
+                len(features),
+                batch_path.name,
+            )
+            yield batch_path
+            if len(features) < batch_size:
+                break
+            batch_num += 1
+            start_index += batch_size
+            continue
+
+        params: dict[str, str] = {
+            **_WFS_COMMON,
+            "TYPENAMES": typenames,
+            "COUNT": str(batch_size),
+            "STARTINDEX": str(start_index),
+        }
+        if cql_filter:
+            params["CQL_FILTER"] = cql_filter
+
+        logger.info("Batch %04d — téléchargement STARTINDEX=%d", batch_num, start_index)
+        response = _http_retry_get(_WFS_BASE, params, timeout)
+        data = response.json()
+        features = data.get("features", [])
+
+        if not features:
+            logger.info(
+                "Pagination WFS terminée à STARTINDEX=%d (%d batches téléchargés)",
+                start_index,
+                batch_num,
+            )
+            break
+
+        tmp_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        tmp_path.rename(batch_path)
+        logger.info(
+            "Batch %04d — %d features → %s", batch_num, len(features), batch_path.name
+        )
+
+        yield batch_path
+
+        if len(features) < batch_size:
+            break
+
+        batch_num += 1
+        start_index += batch_size
+
+
+# ── API publique ──────────────────────────────────────────────────────────────
+
+
+def fetch_admin_express(
+    level: AdminLevel,
+    dom: bool = True,
+    force: bool = False,
+    batch_size: int = 1000,
+    raw_dir: Path | None = None,
+) -> Iterator[Path]:
+    """Télécharge et pagine une couche ADMIN-EXPRESS COG depuis le WFS IGN.
+
+    Paramètres
+    ----------
+    level:
+        Niveau administratif parmi : region, departement, epci, commune,
+        arrondissement_municipal.
+    dom:
+        True (défaut) — métropole + DROM (971-974, 976). Les COM ne figurent
+        pas dans ADMIN-EXPRESS COG, aucun filtre n'est donc nécessaire.
+        False — métropole uniquement (filtre CQL côté serveur).
+        ⚠ Pour epci, dom=False est ignoré : le champ
+        codes_insee_des_departements_membres est multi-valeur, le filtre
+        serveur CQL n'est pas applicable. Tous les EPCI sont retournés.
+    force:
+        Si True, retélécharge les batches même s'ils existent sur disque.
+    batch_size:
+        Nombre de features par requête (COUNT WFS). Défaut : 1000.
+    raw_dir:
+        Répertoire de sauvegarde des batches GeoJSON.
+        Défaut : <racine_projet>/data/raw/.
+
+    Yields
+    ------
+    Path
+        Chemin vers chaque fichier batch GeoJSON, garanti complet et valide.
+    """
+    if not dom and level == "epci":
+        logger.warning(
+            "dom=False ignoré pour le niveau 'epci' : filtre CQL inapplicable "
+            "sur champ multi-valeur (codes_insee_des_departements_membres). "
+            "Tous les EPCI sont retournés (~1 250, dont ~30 DROM)."
+        )
+
+    if raw_dir is None:
+        raw_dir = Path(__file__).resolve().parents[3] / "data" / "raw"
+
+    typenames = f"ADMINEXPRESS-COG.LATEST:{level}"
+    cql_filter: str | None = _DOM_EXCLUDE_FILTER.get(level) if not dom else None
+
+    return _wfs_paginate(typenames, raw_dir, cql_filter, batch_size, force)
 
 
 def fetch_regions_geojson() -> dict:
-    """Télécharge et filtre le GeoJSON des 13 régions métropolitaines depuis data.geopf.fr (IGN)."""
-    logger.info("Téléchargement contours régions IGN ADMIN-EXPRESS")
-    last_exc: Exception | None = None
-    for attempt in range(1, _MAX_RETRIES + 1):
-        try:
-            with httpx.Client(timeout=httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=15.0)) as client:
-                response = client.get(_WFS_URL)
-            response.raise_for_status()
-            data: dict = response.json()
-            break
-        except (httpx.RemoteProtocolError, httpx.ReadError) as exc:
-            logger.warning("Tentative %d/%d échouée : %s", attempt, _MAX_RETRIES, exc)
-            last_exc = exc
-    else:
-        raise RuntimeError(
-            f"Impossible de télécharger les contours IGN après {_MAX_RETRIES} tentatives."
-        ) from last_exc
+    """Télécharge et filtre le GeoJSON des 13 régions métropolitaines.
 
-    # Normalise les noms de propriétés (IGN → interface interne)
-    # et filtre aux 13 régions métropolitaines
-    features = []
-    for f in data.get("features", []):
-        props = f.get("properties", {})
-        code = props.get("code_insee", "")
-        if code not in _CODES_METRO:
-            continue
-        features.append({
-            "type": "Feature",
-            "properties": {
-                "code": code,
-                "nom": props.get("nom_officiel", ""),
-            },
-            "geometry": f["geometry"],
-        })
+    Alias conservé pour compatibilité avec tests/test_etl_regions.py.
+    Utilise fetch_admin_express("region", dom=False) en interne.
+    """
+    logger.info("Téléchargement contours régions IGN ADMIN-EXPRESS")
+    features: list[dict] = []
+
+    for batch_path in fetch_admin_express("region", dom=False):
+        data = json.loads(batch_path.read_text(encoding="utf-8"))
+        for f in data.get("features", []):
+            props = f.get("properties", {})
+            code = props.get("code_insee", "")
+            if code not in _CODES_METRO:
+                continue
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "code": code,
+                        "nom": props.get("nom_officiel", ""),
+                    },
+                    "geometry": f["geometry"],
+                }
+            )
 
     if len(features) != 13:
         raise ValueError(
             f"Attendu 13 régions métropolitaines, obtenu {len(features)}. "
-            f"Vérifier les codes dans POPULATION_2024."
+            f"Vérifier les codes dans _CODES_METRO."
         )
 
     logger.info("GeoJSON normalisé : %d features", len(features))
