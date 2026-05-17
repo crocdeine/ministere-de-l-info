@@ -22,8 +22,10 @@ Base de données cible
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
+import tempfile
 from pathlib import Path
 
 import duckdb
@@ -469,23 +471,166 @@ def _load_communes(
     (durée estimée 30–60 min). Sauter avec --skip-communes pour le debug.
     Reprise disque : si --force absent et batches data/raw/*commune*batch* présents, skip DL.
     Source : fetch_admin_express("commune", dom=True, batch_size=1000) — WFS IGN.
-    Progress : tqdm sur les batches, log INFO toutes les 1 000 communes.
+    Progress : log INFO toutes les 1 000 communes (un batch = un log).
     Simplification : geometry_simplified_communal (0.0005).
+    Post-load : UPDATE geographies_epci.code_departement_principal depuis communes.
     """
-    pass
+    if skip:
+        logger.info("Chargement communes ignoré (--skip-communes).")
+        return
+
+    print(
+        "\n⚠  Chargement communes (~35 000 lignes) — durée estimée 30–60 min.\n"
+        "   Utilisez --skip-communes pour ignorer cette étape.\n"
+    )
+    try:
+        reponse = input("Continuer ? [oui/non] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        logger.info("Chargement communes annulé (entrée non-interactive ou Ctrl-C).")
+        return
+    if reponse != "oui":
+        logger.info("Chargement communes annulé par l'utilisateur.")
+        return
+
+    raw_dir = ROOT / "data" / "raw"
+    batch_paths = list(
+        fetch_admin_express(
+            "commune", dom=True, force=force, batch_size=1000, raw_dir=raw_dir
+        )
+    )
+
+    con.execute("DROP TABLE IF EXISTS geographies_communes")
+    con.execute("""
+        CREATE TABLE geographies_communes (
+            code_insee                   VARCHAR(5) NOT NULL,
+            nom                          VARCHAR    NOT NULL,
+            code_departement             VARCHAR(3),
+            code_region                  VARCHAR(3),
+            code_epci                    VARCHAR(9),
+            geometry                     GEOMETRY,
+            geometry_simplified_communal GEOMETRY,
+            UNIQUE (code_insee)
+        )
+    """)
+
+    for batch_path in batch_paths:
+        path_sql = str(batch_path).replace("'", "''")
+        con.execute(f"""
+            INSERT INTO geographies_communes
+            SELECT
+                code_insee,
+                nom_officiel              AS nom,
+                code_insee_du_departement AS code_departement,
+                code_insee_de_la_region   AS code_region,
+                codes_siren_des_epci      AS code_epci,
+                geom                      AS geometry,
+                CASE
+                    WHEN ST_IsValid(ST_Simplify(geom, 0.0005)) THEN ST_Simplify(geom, 0.0005)
+                    ELSE geom
+                END AS geometry_simplified_communal
+            FROM ST_Read('{path_sql}')
+        """)
+        running = con.execute("SELECT COUNT(*) FROM geographies_communes").fetchone()[0]
+        logger.info("Batch %s inséré — %d communes cumulées", batch_path.name, running)
+
+    count = con.execute("SELECT COUNT(*) FROM geographies_communes").fetchone()[0]
+    if not (34000 <= count <= 36000):
+        raise RuntimeError(
+            f"Nombre de communes hors fourchette [34000-36000] : {count}. "
+            "Vérifier la source IGN ou utiliser --force pour re-télécharger."
+        )
+    logger.info("Chargé %d communes.", count)
+
+    # Dériver code_departement_principal des EPCI depuis les communes
+    con.execute("""
+        UPDATE geographies_epci
+        SET code_departement_principal = (
+            SELECT c.code_departement
+            FROM geographies_communes c
+            WHERE c.code_epci = geographies_epci.code_siren
+              AND c.code_departement IS NOT NULL
+            GROUP BY c.code_departement
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        )
+    """)
+    updated = con.execute(
+        "SELECT COUNT(*) FROM geographies_epci WHERE code_departement_principal IS NOT NULL"
+    ).fetchone()[0]
+    logger.info("code_departement_principal renseigné pour %d EPCI.", updated)
+
+    con.execute("DELETE FROM _etl_metadata WHERE table_name = 'geographies_communes'")
+    con.execute(
+        "INSERT INTO _etl_metadata VALUES (?, NOW(), 'ADMINEXPRESS-COG.LATEST', ?)",
+        ["geographies_communes", count],
+    )
 
 
 def _load_arrondissements_municipaux(
     con: duckdb.DuckDBPyConnection, force: bool = False
 ) -> None:
-    """Charge les 44 arrondissements municipaux (Paris 20, Lyon 9, Marseille 16).
+    """Charge les 45 arrondissements municipaux (Paris 20, Lyon 9, Marseille 16).
 
     Source : fetch_admin_express("arrondissement_municipal", dom=False) — WFS IGN.
-    code_commune_mere : dérivé du code_insee (75xxx→75056, 69xxx→69123, 13xxx→13055).
+    code_commune_mere : champ WFS code_insee_de_la_commune_de_rattach (ex: 75056).
+    code_departement : LEFT(code_insee, 2) — 75, 69, 13 uniquement.
     Même tolérance de simplification que communes : geometry_simplified_communal (0.0005).
     Écrit dans _etl_metadata après succès.
     """
-    pass
+    raw_dir = ROOT / "data" / "raw"
+    batch_paths = list(
+        fetch_admin_express(
+            "arrondissement_municipal", dom=False, force=force, raw_dir=raw_dir
+        )
+    )
+
+    con.execute("DROP TABLE IF EXISTS geographies_arrondissements_municipaux")
+    con.execute("""
+        CREATE TABLE geographies_arrondissements_municipaux (
+            code_insee                   VARCHAR(5) NOT NULL,
+            nom                          VARCHAR    NOT NULL,
+            code_commune_mere            VARCHAR(5) NOT NULL,
+            code_departement             VARCHAR(3),
+            geometry                     GEOMETRY,
+            geometry_simplified_communal GEOMETRY,
+            UNIQUE (code_insee)
+        )
+    """)
+
+    for batch_path in batch_paths:
+        path_sql = str(batch_path).replace("'", "''")
+        con.execute(f"""
+            INSERT INTO geographies_arrondissements_municipaux
+            SELECT
+                code_insee,
+                nom_officiel                        AS nom,
+                code_insee_de_la_commune_de_rattach AS code_commune_mere,
+                LEFT(code_insee, 2)                 AS code_departement,
+                geom                                AS geometry,
+                CASE
+                    WHEN ST_IsValid(ST_Simplify(geom, 0.0005)) THEN ST_Simplify(geom, 0.0005)
+                    ELSE geom
+                END AS geometry_simplified_communal
+            FROM ST_Read('{path_sql}')
+        """)
+
+    count = con.execute(
+        "SELECT COUNT(*) FROM geographies_arrondissements_municipaux"
+    ).fetchone()[0]
+    if not (44 <= count <= 46):
+        logger.warning(
+            "Nombre d'arrondissements inattendu : %d (attendu 45 = Paris 20 + Lyon 9 + Marseille 16).",
+            count,
+        )
+    logger.info("Chargé %d arrondissements municipaux.", count)
+
+    con.execute(
+        "DELETE FROM _etl_metadata WHERE table_name = 'geographies_arrondissements_municipaux'"
+    )
+    con.execute(
+        "INSERT INTO _etl_metadata VALUES (?, NOW(), 'ADMINEXPRESS-COG.LATEST', ?)",
+        ["geographies_arrondissements_municipaux", count],
+    )
 
 
 def _load_circonscriptions(con: duckdb.DuckDBPyConnection, force: bool = False) -> None:
@@ -495,9 +640,73 @@ def _load_circonscriptions(con: duckdb.DuckDBPyConnection, force: bool = False) 
     Code format : '{dept}-{num:02d}' — ex: '01-04', '971-01'.
     559 features = 539 métro + 20 DROM/SPM (18 hors-scope : FE + COM absents de la source).
     Simplification : geometry_simplified_circo (0.001).
+    Le GeoJSON normalisé est écrit dans un fichier temporaire pour ST_Read.
     Écrit dans _etl_metadata après succès.
     """
-    pass
+    raw_dir = ROOT / "data" / "raw"
+    geojson = fetch_circonscriptions_legislatives(force=force, raw_dir=raw_dir)
+
+    tmp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".geojson",
+            delete=False,
+            encoding="utf-8",
+            dir=raw_dir,
+        ) as f:
+            json.dump(geojson, f, ensure_ascii=False)
+            tmp_path = Path(f.name)
+
+        con.execute("DROP TABLE IF EXISTS geographies_circonscriptions")
+        con.execute("""
+            CREATE TABLE geographies_circonscriptions (
+                code                      VARCHAR(6) NOT NULL,
+                nom                       VARCHAR,
+                code_departement          VARCHAR(3),
+                nom_departement           VARCHAR,
+                geometry                  GEOMETRY,
+                geometry_simplified_circo GEOMETRY,
+                UNIQUE (code)
+            )
+        """)
+
+        path_sql = str(tmp_path).replace("'", "''")
+        con.execute(f"""
+            INSERT INTO geographies_circonscriptions
+            SELECT
+                code,
+                nom,
+                code_departement,
+                nom_departement,
+                geom AS geometry,
+                CASE
+                    WHEN ST_IsValid(ST_Simplify(geom, 0.001)) THEN ST_Simplify(geom, 0.001)
+                    ELSE geom
+                END AS geometry_simplified_circo
+            FROM ST_Read('{path_sql}')
+        """)
+    finally:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+
+    count = con.execute("SELECT COUNT(*) FROM geographies_circonscriptions").fetchone()[
+        0
+    ]
+    if not (550 <= count <= 565):
+        raise RuntimeError(
+            f"Nombre de circonscriptions hors fourchette [550-565] : {count}. "
+            "Vérifier la source ou utiliser --force pour re-télécharger."
+        )
+    logger.info("Chargé %d circonscriptions législatives.", count)
+
+    con.execute(
+        "DELETE FROM _etl_metadata WHERE table_name = 'geographies_circonscriptions'"
+    )
+    con.execute(
+        "INSERT INTO _etl_metadata VALUES (?, NOW(), 'data.gouv.fr/jerome-desboeufs', ?)",
+        ["geographies_circonscriptions", count],
+    )
 
 
 def _load_populations(
@@ -513,7 +722,50 @@ def _load_populations(
     comptee_a_part et totale resteront NULL (PCAP absent de la source, voir TODO v2 insee_populations.py).
     Écrit dans _etl_metadata après chaque millésime chargé.
     """
-    pass
+    raw_dir = ROOT / "data" / "raw"
+
+    for annee in millesimes:
+        existing = con.execute(
+            "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
+        ).fetchone()[0]
+
+        if existing > 0 and not force:
+            logger.info(
+                "Populations %d déjà chargées (%d lignes) — ignoré (--force pour recréer).",
+                annee,
+                existing,
+            )
+            continue
+
+        if force and existing > 0:
+            con.execute(
+                "DELETE FROM populations WHERE annee = ? AND source = 'DS_POPULATIONS_HISTORIQUES'",
+                [annee],
+            )
+            logger.info("Populations %d supprimées pour re-chargement.", annee)
+
+        df = fetch_populations(annee, force=force, raw_dir=raw_dir)
+
+        con.register("_pop_temp", df)
+        con.execute("""
+            INSERT INTO populations (code_insee_commune, annee, municipale, comptee_a_part, totale, source)
+            SELECT code_insee_commune, annee, municipale, comptee_a_part, totale,
+                   'DS_POPULATIONS_HISTORIQUES'
+            FROM _pop_temp
+        """)
+        con.unregister("_pop_temp")
+
+        count = con.execute(
+            "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
+        ).fetchone()[0]
+        logger.info("Populations %d chargées : %d communes.", annee, count)
+
+        meta_key = f"populations_{annee}"
+        con.execute("DELETE FROM _etl_metadata WHERE table_name = ?", [meta_key])
+        con.execute(
+            "INSERT INTO _etl_metadata VALUES (?, NOW(), 'DS_POPULATIONS_HISTORIQUES', ?)",
+            [meta_key, count],
+        )
 
 
 # ── Vues SQL ──────────────────────────────────────────────────────────────────
@@ -530,7 +782,56 @@ def _create_views(con: duckdb.DuckDBPyConnection) -> None:
         v_population_departement — SUM par code_departement
         v_population_epci       — SUM par code_epci (communes avec EPCI uniquement)
     """
-    pass
+    con.execute("""
+        CREATE OR REPLACE VIEW v_population_region AS
+        SELECT
+            r.code_insee          AS code_region,
+            r.nom                 AS nom_region,
+            p.annee,
+            SUM(p.municipale)         AS population_municipale,
+            SUM(p.comptee_a_part)     AS population_comptee_a_part,
+            SUM(p.totale)             AS population_totale
+        FROM geographies_communes c
+        JOIN populations p ON p.code_insee_commune = c.code_insee
+        JOIN geographies_regions r ON r.code_insee = c.code_region
+        GROUP BY r.code_insee, r.nom, p.annee
+    """)
+
+    con.execute("""
+        CREATE OR REPLACE VIEW v_population_departement AS
+        SELECT
+            d.code_insee          AS code_departement,
+            d.nom                 AS nom_departement,
+            p.annee,
+            SUM(p.municipale)         AS population_municipale,
+            SUM(p.comptee_a_part)     AS population_comptee_a_part,
+            SUM(p.totale)             AS population_totale
+        FROM geographies_communes c
+        JOIN populations p ON p.code_insee_commune = c.code_insee
+        JOIN geographies_departements d ON d.code_insee = c.code_departement
+        GROUP BY d.code_insee, d.nom, p.annee
+    """)
+
+    con.execute("""
+        CREATE OR REPLACE VIEW v_population_epci AS
+        SELECT
+            e.code_siren          AS code_epci,
+            e.nom                 AS nom_epci,
+            e.type_epci,
+            p.annee,
+            SUM(p.municipale)         AS population_municipale,
+            SUM(p.comptee_a_part)     AS population_comptee_a_part,
+            SUM(p.totale)             AS population_totale
+        FROM geographies_communes c
+        JOIN populations p ON p.code_insee_commune = c.code_insee
+        JOIN geographies_epci e ON e.code_siren = c.code_epci
+        WHERE c.code_epci IS NOT NULL
+        GROUP BY e.code_siren, e.nom, e.type_epci, p.annee
+    """)
+
+    logger.info(
+        "3 vues créées : v_population_region, v_population_departement, v_population_epci."
+    )
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
