@@ -121,9 +121,8 @@ def _create_schema(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("""
         CREATE TABLE IF NOT EXISTS geographies_arrondissements_municipaux (
             code_insee                   VARCHAR(5) NOT NULL,
-            nom                          VARCHAR    NOT NULL,
             code_commune_mere            VARCHAR(5) NOT NULL,
-            code_departement             VARCHAR(3),
+            nom                          VARCHAR    NOT NULL,
             geometry                     GEOMETRY,
             geometry_simplified_communal GEOMETRY,
             UNIQUE (code_insee)
@@ -571,16 +570,22 @@ def _load_arrondissements_municipaux(
 ) -> None:
     """Charge les 45 arrondissements municipaux (Paris 20, Lyon 9, Marseille 16).
 
-    Source : fetch_admin_express("arrondissement_municipal", dom=False) — WFS IGN.
-    code_commune_mere : champ WFS code_insee_de_la_commune_de_rattach (ex: 75056).
-    code_departement : LEFT(code_insee, 2) — 75, 69, 13 uniquement.
-    Même tolérance de simplification que communes : geometry_simplified_communal (0.0005).
+    Source : fetch_admin_express("arrondissement_municipal", dom=True, batch_size=500) — WFS IGN.
+    Les ARM ne sont PAS des communes INSEE : les communes-mères (75056, 69123, 13055)
+    restent les entités juridiques ; cette table est une subdivision interne.
+    code_commune_mere : champ WFS natif code_insee_de_la_commune_de_rattach.
+    Simplification : geometry_simplified_communal (tol=0.0005).
+    Validation : count exact 45, spot-checks, aucun code_commune_mere NULL.
     Écrit dans _etl_metadata après succès.
     """
     raw_dir = ROOT / "data" / "raw"
     batch_paths = list(
         fetch_admin_express(
-            "arrondissement_municipal", dom=False, force=force, raw_dir=raw_dir
+            "arrondissement_municipal",
+            dom=True,
+            force=force,
+            batch_size=500,
+            raw_dir=raw_dir,
         )
     )
 
@@ -588,9 +593,8 @@ def _load_arrondissements_municipaux(
     con.execute("""
         CREATE TABLE geographies_arrondissements_municipaux (
             code_insee                   VARCHAR(5) NOT NULL,
-            nom                          VARCHAR    NOT NULL,
             code_commune_mere            VARCHAR(5) NOT NULL,
-            code_departement             VARCHAR(3),
+            nom                          VARCHAR    NOT NULL,
             geometry                     GEOMETRY,
             geometry_simplified_communal GEOMETRY,
             UNIQUE (code_insee)
@@ -603,9 +607,8 @@ def _load_arrondissements_municipaux(
             INSERT INTO geographies_arrondissements_municipaux
             SELECT
                 code_insee,
-                nom_officiel                        AS nom,
                 code_insee_de_la_commune_de_rattach AS code_commune_mere,
-                LEFT(code_insee, 2)                 AS code_departement,
+                nom_officiel                        AS nom,
                 geom                                AS geometry,
                 CASE
                     WHEN ST_IsValid(ST_Simplify(geom, 0.0005)) THEN ST_Simplify(geom, 0.0005)
@@ -617,12 +620,59 @@ def _load_arrondissements_municipaux(
     count = con.execute(
         "SELECT COUNT(*) FROM geographies_arrondissements_municipaux"
     ).fetchone()[0]
-    if not (44 <= count <= 46):
-        logger.warning(
-            "Nombre d'arrondissements inattendu : %d (attendu 45 = Paris 20 + Lyon 9 + Marseille 16).",
-            count,
+    if count != 45:
+        raise RuntimeError(
+            f"Nombre d'arrondissements incorrect : {count} (attendu 45 = Paris 20 + Lyon 9 + Marseille 16). "
+            "Utiliser --force pour re-télécharger si le cache est corrompu."
         )
-    logger.info("Chargé %d arrondissements municipaux.", count)
+
+    # Aucun code_commune_mere NULL
+    nulls = con.execute(
+        "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere IS NULL"
+    ).fetchone()[0]
+    if nulls > 0:
+        raise RuntimeError(
+            f"{nulls} ARM avec code_commune_mere NULL — vérifier le WFS IGN."
+        )
+
+    # 3 communes-mères exactes
+    meres = {
+        r[0]
+        for r in con.execute(
+            "SELECT DISTINCT code_commune_mere FROM geographies_arrondissements_municipaux"
+        ).fetchall()
+    }
+    if meres != {"75056", "69123", "13055"}:
+        raise RuntimeError(
+            f"Communes-mères inattendues : {meres} (attendu {{'75056', '69123', '13055'}})."
+        )
+
+    # Spot-checks codes limites
+    _SPOT_CODES = {"75101", "75120", "69381", "69389", "13201", "13216"}
+    presents = {
+        r[0]
+        for r in con.execute(
+            "SELECT code_insee FROM geographies_arrondissements_municipaux "
+            "WHERE code_insee IN ('75101','75120','69381','69389','13201','13216')"
+        ).fetchall()
+    }
+    manquants = _SPOT_CODES - presents
+    if manquants:
+        raise RuntimeError(f"Codes ARM spot-check manquants : {manquants}.")
+
+    logger.info(
+        "Chargé %d ARM — Paris %d, Lyon %d, Marseille %d.",
+        count,
+        con.execute(
+            "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere = '75056'"
+        ).fetchone()[0],
+        con.execute(
+            "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere = '69123'"
+        ).fetchone()[0],
+        con.execute(
+            "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere = '13055'"
+        ).fetchone()[0],
+    )
 
     con.execute(
         "DELETE FROM _etl_metadata WHERE table_name = 'geographies_arrondissements_municipaux'"

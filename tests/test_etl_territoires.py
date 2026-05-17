@@ -210,3 +210,104 @@ def test_epci_metadata(con: duckdb.DuckDBPyConnection) -> None:
     assert row[0] == count_table, (
         f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
     )
+
+
+# ── Arrondissements municipaux ────────────────────────────────────────────────
+
+_ARM_SPOT_CODES = {"75101", "75120", "69381", "69389", "13201", "13216"}
+_ARM_COMMUNES_MERES = {"75056", "69123", "13055"}
+_ARM_COUNTS = {"75056": 20, "69123": 9, "13055": 16}
+
+
+@pytest.fixture(scope="module")
+def arm_skip(con: duckdb.DuckDBPyConnection) -> None:
+    """Passe les tests ARM si la table n'a pas encore été chargée."""
+    try:
+        con.execute("SELECT 1 FROM geographies_arrondissements_municipaux LIMIT 1")
+    except Exception:
+        pytest.skip(
+            "geographies_arrondissements_municipaux introuvable — "
+            "lancer etl_territoires.py --level arrondissement_municipal d'abord"
+        )
+
+
+def test_arm_count(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
+    """Exactement 45 ARM chargés (Paris 20 + Lyon 9 + Marseille 16)."""
+    n = con.execute(
+        "SELECT COUNT(*) FROM geographies_arrondissements_municipaux"
+    ).fetchone()[0]
+    assert n == 45, f"Attendu exactement 45 ARM, obtenu {n}"
+
+
+def test_arm_counts_par_ville(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
+    """20 Paris, 9 Lyon, 16 Marseille."""
+    dist = {
+        r[0]: r[1]
+        for r in con.execute("""
+            SELECT code_commune_mere, COUNT(*)
+            FROM geographies_arrondissements_municipaux
+            GROUP BY code_commune_mere
+        """).fetchall()
+    }
+    for mere, expected in _ARM_COUNTS.items():
+        assert dist.get(mere) == expected, (
+            f"Commune-mère {mere} : attendu {expected} ARM, obtenu {dist.get(mere)}"
+        )
+
+
+def test_arm_codes_spot(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
+    """Présence des codes limites : 75101, 75120, 69381, 69389, 13201, 13216."""
+    presents = {
+        r[0]
+        for r in con.execute("""
+            SELECT code_insee FROM geographies_arrondissements_municipaux
+            WHERE code_insee IN ('75101','75120','69381','69389','13201','13216')
+        """).fetchall()
+    }
+    manquants = _ARM_SPOT_CODES - presents
+    assert not manquants, f"Codes ARM manquants : {manquants}"
+
+
+def test_arm_communes_meres(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
+    """Exactement 3 communes-mères distinctes : 75056, 69123, 13055."""
+    meres = {
+        r[0]
+        for r in con.execute(
+            "SELECT DISTINCT code_commune_mere FROM geographies_arrondissements_municipaux"
+        ).fetchall()
+    }
+    assert meres == _ARM_COMMUNES_MERES, (
+        f"Communes-mères inattendues : {meres} (attendu {_ARM_COMMUNES_MERES})"
+    )
+
+
+def test_arm_no_null_commune_mere(
+    con: duckdb.DuckDBPyConnection, arm_skip: None
+) -> None:
+    """Aucun code_commune_mere NULL."""
+    n = con.execute(
+        "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere IS NULL"
+    ).fetchone()[0]
+    assert n == 0, f"{n} ARM avec code_commune_mere NULL"
+
+
+def test_arm_geometries_valides(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
+    """Aucune géométrie simplifiée invalide (ST_IsValid)."""
+    invalides = con.execute("""
+        SELECT code_insee FROM geographies_arrondissements_municipaux
+        WHERE geometry_simplified_communal IS NOT NULL
+          AND NOT ST_IsValid(geometry_simplified_communal)
+    """).fetchall()
+    assert not invalides, f"Géométries ARM invalides : {[r[0] for r in invalides]}"
+
+
+def test_arm_metadata(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
+    """Entrée _etl_metadata présente avec row_count == 45."""
+    row = con.execute(
+        "SELECT row_count FROM _etl_metadata "
+        "WHERE table_name = 'geographies_arrondissements_municipaux'"
+    ).fetchone()
+    assert row is not None, (
+        "Entrée manquante dans _etl_metadata pour geographies_arrondissements_municipaux"
+    )
+    assert row[0] == 45, f"row_count _etl_metadata ({row[0]}) ≠ 45"
