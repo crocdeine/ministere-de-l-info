@@ -92,3 +92,51 @@ def test_regions_metadata(con: duckdb.DuckDBPyConnection) -> None:
     assert row[0] == count_table, (
         f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
     )
+
+
+# ── Départements ──────────────────────────────────────────────────────────────
+
+_CODES_DEPT_SPOT = {"01", "2A", "2B", "75", "95", "971", "972", "973", "974", "976"}
+_CODES_DEPT_ABSENTS = {"975"}  # Saint-Pierre-et-Miquelon — COM, pas dans ADMIN-EXPRESS
+
+
+def test_departements_count(con: duckdb.DuckDBPyConnection) -> None:
+    """Exactement 101 départements chargés (96 métro + 5 DROM)."""
+    n = con.execute("SELECT COUNT(*) FROM geographies_departements").fetchone()[0]
+    assert n == 101, f"Attendu exactement 101 départements, obtenu {n}"
+
+
+def test_departements_codes(con: duckdb.DuckDBPyConnection) -> None:
+    """Codes spot-check : présence 2A/2B/DROM, absence 975 (COM)."""
+    codes = {
+        r[0]
+        for r in con.execute(
+            "SELECT code_insee FROM geographies_departements"
+        ).fetchall()
+    }
+    manquants = _CODES_DEPT_SPOT - codes
+    assert not manquants, f"Codes attendus manquants : {manquants}"
+    indesirables = _CODES_DEPT_ABSENTS & codes
+    assert not indesirables, f"Codes indésirables présents : {indesirables}"
+
+
+def test_departements_fk_region(con: duckdb.DuckDBPyConnection) -> None:
+    """Tous les code_region référencent une région présente dans geographies_regions."""
+    orphelins = con.execute("""
+        SELECT DISTINCT d.code_region
+        FROM geographies_departements d
+        WHERE d.code_region NOT IN (SELECT code_insee FROM geographies_regions)
+    """).fetchall()
+    assert not orphelins, f"code_region orphelins : {[r[0] for r in orphelins]}"
+
+
+def test_departements_geometries_valides(con: duckdb.DuckDBPyConnection) -> None:
+    """Aucune géométrie simplifiée invalide sur les 2 niveaux."""
+    for col in ("geometry_simplified_national", "geometry_simplified_departemental"):
+        invalides = con.execute(f"""
+            SELECT code_insee FROM geographies_departements
+            WHERE {col} IS NOT NULL AND NOT ST_IsValid({col})
+        """).fetchall()
+        assert not invalides, (
+            f"{col} — géométries invalides : {[r[0] for r in invalides]}"
+        )

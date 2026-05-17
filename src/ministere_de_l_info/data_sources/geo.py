@@ -93,6 +93,45 @@ def _http_retry_get(
     ) from last_exc
 
 
+def _wfs_stream_batch(
+    url: str,
+    params: dict[str, str],
+    timeout: httpx.Timeout,
+    dest: Path,
+    max_retries: int = 8,
+) -> None:
+    """Télécharge un batch WFS avec streaming chunk-by-chunk vers dest.
+
+    Avantage vs _http_retry_get : ne bufferise pas le response complet en mémoire.
+    Le WFS IGN coupe parfois les connexions HTTP chunked pour des payloads ≥50 features ;
+    le streaming + backoff exponentiel (2^n jusqu'à 128s) absorbe ces coupures transitoires.
+    8 retries max = ~4 min de wait total, acceptable pour un ETL one-shot.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                with client.stream("GET", url, params=params) as response:
+                    response.raise_for_status()
+                    with dest.open("wb") as fh:
+                        for chunk in response.iter_bytes(chunk_size=65536):
+                            fh.write(chunk)
+            return
+        except (
+            httpx.RemoteProtocolError,
+            httpx.ReadError,
+            httpx.HTTPStatusError,
+        ) as exc:
+            logger.warning("Tentative %d/%d échouée : %s", attempt, max_retries, exc)
+            last_exc = exc
+            dest.unlink(missing_ok=True)
+            if attempt < max_retries:
+                time.sleep(2**attempt)
+    raise RuntimeError(
+        f"Requête WFS échouée après {max_retries} tentatives : {url}"
+    ) from last_exc
+
+
 def _batch_file_valid(path: Path) -> bool:
     """Vérifie qu'un fichier batch GeoJSON est complet et non corrompu."""
     if not path.exists() or path.stat().st_size == 0:
@@ -118,14 +157,17 @@ def _wfs_paginate(
     La pagination s'arrête dès qu'un batch retourne moins de batch_size features.
     """
     # Nom de fichier safe : "ADMINEXPRESS-COG.LATEST:commune" → "ADMINEXPRESS-COG.LATEST_commune"
-    # Le cql_filter est intégré via un hash sha1[:8] pour éviter les collisions de cache
-    # entre appels dom=True (sans filtre) et dom=False (avec filtre).
-    # Sans filtre → "..._region_batch_0000.geojson" (compat ascendante)
-    # Avec filtre → "..._region_filter_a1b2c3d4_batch_0000.geojson"
+    # cql_filter → hash sha1[:8] pour éviter les collisions dom=True vs dom=False.
+    # batch_size → suffixe _bN quand != 1000 (défaut) pour éviter les collisions
+    # entre des appels d'exploration (batch_size=50) et des appels ETL (batch_size=1000).
+    # Sans filtre, batch_size=1000 → "..._region_batch_0000.geojson" (compat ascendante)
+    # Avec filtre et/ou batch_size ≠ 1000 → suffixes ajoutés dans cet ordre.
     safe_name = typenames.replace(":", "_").replace("/", "_")
     if cql_filter:
         filter_hash = hashlib.sha1(cql_filter.encode()).hexdigest()[:8]
         safe_name = f"{safe_name}_filter_{filter_hash}"
+    if batch_size != 1000:
+        safe_name = f"{safe_name}_b{batch_size}"
     raw_dir.mkdir(parents=True, exist_ok=True)
     timeout = httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=15.0)
 
@@ -162,11 +204,21 @@ def _wfs_paginate(
             params["CQL_FILTER"] = cql_filter
 
         logger.info("Batch %04d — téléchargement STARTINDEX=%d", batch_num, start_index)
-        response = _http_retry_get(_WFS_BASE, params, timeout)
-        data = response.json()
+        _wfs_stream_batch(_WFS_BASE, params, timeout, tmp_path)
+
+        try:
+            data = json.loads(tmp_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            tmp_path.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Batch {batch_num} : JSON invalide après téléchargement — "
+                "relancer avec --force"
+            ) from exc
+
         features = data.get("features", [])
 
         if not features:
+            tmp_path.unlink(missing_ok=True)
             logger.info(
                 "Pagination WFS terminée à STARTINDEX=%d (%d batches téléchargés)",
                 start_index,
@@ -174,7 +226,6 @@ def _wfs_paginate(
             )
             break
 
-        tmp_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
         tmp_path.rename(batch_path)
         logger.info(
             "Batch %04d — %d features → %s", batch_num, len(features), batch_path.name
