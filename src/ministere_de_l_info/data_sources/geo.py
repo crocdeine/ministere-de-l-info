@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import time
@@ -117,7 +118,14 @@ def _wfs_paginate(
     La pagination s'arrête dès qu'un batch retourne moins de batch_size features.
     """
     # Nom de fichier safe : "ADMINEXPRESS-COG.LATEST:commune" → "ADMINEXPRESS-COG.LATEST_commune"
+    # Le cql_filter est intégré via un hash sha1[:8] pour éviter les collisions de cache
+    # entre appels dom=True (sans filtre) et dom=False (avec filtre).
+    # Sans filtre → "..._region_batch_0000.geojson" (compat ascendante)
+    # Avec filtre → "..._region_filter_a1b2c3d4_batch_0000.geojson"
     safe_name = typenames.replace(":", "_").replace("/", "_")
+    if cql_filter:
+        filter_hash = hashlib.sha1(cql_filter.encode()).hexdigest()[:8]
+        safe_name = f"{safe_name}_filter_{filter_hash}"
     raw_dir.mkdir(parents=True, exist_ok=True)
     timeout = httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=15.0)
 
