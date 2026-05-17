@@ -196,9 +196,67 @@ def _load_regions(con: duckdb.DuckDBPyConnection, force: bool = False) -> None:
     Source : fetch_admin_express("region", dom=True) — WFS IGN ADMINEXPRESS-COG.LATEST.
     Stratégie DROP + CREATE : le schéma casse l'ancienne table (suppression colonne population).
     Simplifications : geometry_simplified_national (tol=0.01), geometry_simplified_regional (tol=0.005).
+    Cache : le batch disque ne stocke pas le paramètre dom — utiliser force=True pour garantir
+    les 18 régions (DROM) si le cache contient une version metro seule (13 régions).
     Écrit dans _etl_metadata après succès.
     """
-    pass
+    raw_dir = ROOT / "data" / "raw"
+    batch_paths = list(
+        fetch_admin_express("region", dom=True, force=force, raw_dir=raw_dir)
+    )
+
+    con.execute("DROP TABLE IF EXISTS geographies_regions")
+    con.execute("""
+        CREATE TABLE geographies_regions (
+            code_insee                   VARCHAR(3) NOT NULL,
+            nom                          VARCHAR    NOT NULL,
+            geometry                     GEOMETRY,
+            geometry_simplified_national GEOMETRY,
+            geometry_simplified_regional GEOMETRY,
+            UNIQUE (code_insee)
+        )
+    """)
+
+    for batch_path in batch_paths:
+        path_sql = str(batch_path).replace("'", "''")
+        con.execute(f"""
+            INSERT INTO geographies_regions
+            SELECT
+                code_insee,
+                nom_officiel AS nom,
+                geom AS geometry,
+                CASE
+                    WHEN ST_IsValid(ST_Simplify(geom, 0.01)) THEN ST_Simplify(geom, 0.01)
+                    ELSE geom
+                END AS geometry_simplified_national,
+                CASE
+                    WHEN ST_IsValid(ST_Simplify(geom, 0.005)) THEN ST_Simplify(geom, 0.005)
+                    ELSE geom
+                END AS geometry_simplified_regional
+            FROM ST_Read('{path_sql}')
+        """)
+        logger.debug("Batch inséré : %s", batch_path.name)
+
+    count = con.execute("SELECT COUNT(*) FROM geographies_regions").fetchone()[0]
+    if not (13 <= count <= 20):
+        raise RuntimeError(
+            f"Nombre de régions hors fourchette [13-20] : {count}. "
+            "Vérifier la source IGN ou utiliser --force pour re-télécharger."
+        )
+
+    codes = [
+        r[0]
+        for r in con.execute(
+            "SELECT code_insee FROM geographies_regions ORDER BY code_insee"
+        ).fetchall()
+    ]
+    logger.info("Chargé %d régions (codes : %s … %s)", count, codes[0], codes[-1])
+
+    con.execute("DELETE FROM _etl_metadata WHERE table_name = 'geographies_regions'")
+    con.execute(
+        "INSERT INTO _etl_metadata VALUES (?, NOW(), 'ADMINEXPRESS-COG.LATEST', ?)",
+        ["geographies_regions", count],
+    )
 
 
 def _load_departements(con: duckdb.DuckDBPyConnection, force: bool = False) -> None:
