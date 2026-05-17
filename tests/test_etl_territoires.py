@@ -311,3 +311,70 @@ def test_arm_metadata(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
         "Entrée manquante dans _etl_metadata pour geographies_arrondissements_municipaux"
     )
     assert row[0] == 45, f"row_count _etl_metadata ({row[0]}) ≠ 45"
+
+
+# ── Populations ───────────────────────────────────────────────────────────────
+
+
+@pytest.fixture(scope="module")
+def pop_skip(con: duckdb.DuckDBPyConnection) -> None:
+    """Passe les tests populations si le millésime 2023 n'a pas encore été chargé."""
+    n = con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023").fetchone()[0]
+    if n == 0:
+        pytest.skip(
+            "populations 2023 introuvables — "
+            "lancer etl_territoires.py --millesimes 2023 --skip-communes d'abord"
+        )
+
+
+def test_populations_count(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
+    """Au moins 34 000 communes chargées pour le millésime 2023."""
+    n = con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023").fetchone()[0]
+    assert n >= 34000, f"Populations 2023 : {n} lignes (attendu ≥ 34 000)"
+
+
+def test_populations_plm(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
+    """Paris, Lyon, Marseille présents avec population municipale > 0."""
+    rows = {
+        r[0]: r[1]
+        for r in con.execute("""
+            SELECT code_insee_commune, municipale
+            FROM populations
+            WHERE code_insee_commune IN ('75056', '69123', '13055') AND annee = 2023
+        """).fetchall()
+    }
+    assert "75056" in rows, "Paris (75056) absent des populations 2023"
+    assert "69123" in rows, "Lyon (69123) absent des populations 2023"
+    assert "13055" in rows, "Marseille (13055) absent des populations 2023"
+    for code, pop in rows.items():
+        assert pop > 0, f"Population municipale nulle pour {code}"
+
+
+def test_populations_nulls(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
+    """comptee_a_part et totale sont 100 % NULL (PCAP absent de DS_POPULATIONS_HISTORIQUES)."""
+    non_null_ca = con.execute(
+        "SELECT COUNT(*) FROM populations WHERE annee = 2023 AND comptee_a_part IS NOT NULL"
+    ).fetchone()[0]
+    non_null_tot = con.execute(
+        "SELECT COUNT(*) FROM populations WHERE annee = 2023 AND totale IS NOT NULL"
+    ).fetchone()[0]
+    assert non_null_ca == 0, (
+        f"{non_null_ca} lignes avec comptee_a_part non NULL — PCAP ne devrait pas être chargé"
+    )
+    assert non_null_tot == 0, (
+        f"{non_null_tot} lignes avec totale non NULL — totale dépend de PCAP absent"
+    )
+
+
+def test_populations_metadata(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
+    """Entrée populations_2023 présente dans _etl_metadata avec row_count cohérent."""
+    row = con.execute(
+        "SELECT row_count FROM _etl_metadata WHERE table_name = 'populations_2023'"
+    ).fetchone()
+    assert row is not None, "Entrée manquante dans _etl_metadata pour populations_2023"
+    count_table = con.execute(
+        "SELECT COUNT(*) FROM populations WHERE annee = 2023"
+    ).fetchone()[0]
+    assert row[0] == count_table, (
+        f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
+    )
