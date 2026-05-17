@@ -364,11 +364,98 @@ def _load_epci(con: duckdb.DuckDBPyConnection, force: bool = False) -> None:
     Source : fetch_admin_express("epci", dom=True) — WFS IGN.
     ⚠ dom=True ignoré côté WFS (codes_insee_des_departements_membres multi-valeurs,
     filtre CQL impossible — comportement documenté dans geo.py).
-    code_departement_principal : dérivé post-load communes par UPDATE depuis geographies_communes.
-    type_epci : CA/CC/CU/ME si présent dans le WFS, NULL sinon.
-    Simplification : geometry_simplified_epci (0.0005).
+    Mapping nature → type_epci : CC/CA/ME/CU/EPT (CASE WHEN SQL, 5 valeurs connues 2026-05-17).
+    code_departement_principal : NULL — dérivé post-load via UPDATE depuis geographies_communes.
+    Simplification : geometry_simplified_epci (tol=0.0005).
+    Écrit dans _etl_metadata après succès.
     """
-    pass
+    raw_dir = ROOT / "data" / "raw"
+    batch_paths = list(
+        fetch_admin_express(
+            "epci", dom=True, force=force, batch_size=500, raw_dir=raw_dir
+        )
+    )
+
+    con.execute("DROP TABLE IF EXISTS geographies_epci")
+    con.execute("""
+        CREATE TABLE geographies_epci (
+            code_siren                 VARCHAR(9) NOT NULL,
+            nom                        VARCHAR    NOT NULL,
+            type_epci                  VARCHAR(5),
+            code_departement_principal VARCHAR(3),
+            geometry                   GEOMETRY,
+            geometry_simplified_epci   GEOMETRY,
+            UNIQUE (code_siren)
+        )
+    """)
+
+    for batch_path in batch_paths:
+        path_sql = str(batch_path).replace("'", "''")
+        con.execute(f"""
+            INSERT INTO geographies_epci
+            SELECT
+                code_siren,
+                nom_officiel AS nom,
+                CASE nature
+                    WHEN 'Communauté de communes'          THEN 'CC'
+                    WHEN 'Communauté d''agglomération'     THEN 'CA'
+                    WHEN 'Métropole'                       THEN 'ME'
+                    WHEN 'Communauté urbaine'              THEN 'CU'
+                    WHEN 'Etablissement public territorial' THEN 'EPT'
+                    ELSE NULL
+                END AS type_epci,
+                NULL::VARCHAR AS code_departement_principal,
+                geom AS geometry,
+                CASE
+                    WHEN ST_IsValid(ST_Simplify(geom, 0.0005)) THEN ST_Simplify(geom, 0.0005)
+                    ELSE geom
+                END AS geometry_simplified_epci
+            FROM ST_Read('{path_sql}')
+        """)
+        logger.debug("Batch inséré : %s", batch_path.name)
+
+    count = con.execute("SELECT COUNT(*) FROM geographies_epci").fetchone()[0]
+    if not (1250 <= count <= 1290):
+        raise RuntimeError(
+            f"Nombre d'EPCI hors fourchette [1250-1290] : {count}. "
+            "Vérifier la source IGN ou utiliser --force pour re-télécharger."
+        )
+
+    # Détecter les types inconnus (nature non mappée → type_epci NULL)
+    null_types = con.execute(
+        "SELECT COUNT(*) FROM geographies_epci WHERE type_epci IS NULL"
+    ).fetchone()[0]
+    if null_types > 0:
+        raise RuntimeError(
+            f"{null_types} EPCI avec type_epci NULL — une nouvelle valeur 'nature' "
+            "non mappée est apparue dans le WFS IGN. "
+            "Ajouter la valeur manquante dans le CASE WHEN de _load_epci()."
+        )
+
+    # Vérification SIREN : tous 9 chars numériques
+    mauvais_siren = con.execute("""
+        SELECT code_siren FROM geographies_epci
+        WHERE length(code_siren) != 9 OR regexp_full_match(code_siren, '[^0-9]')
+    """).fetchall()
+    if mauvais_siren:
+        raise RuntimeError(
+            f"SIREN non conformes (attendu 9 chiffres) : {[r[0] for r in mauvais_siren[:10]]}"
+        )
+
+    dist = con.execute(
+        "SELECT type_epci, COUNT(*) FROM geographies_epci GROUP BY type_epci ORDER BY COUNT(*) DESC"
+    ).fetchall()
+    logger.info(
+        "Chargé %d EPCI — distribution types : %s",
+        count,
+        ", ".join(f"{t}={n}" for t, n in dist),
+    )
+
+    con.execute("DELETE FROM _etl_metadata WHERE table_name = 'geographies_epci'")
+    con.execute(
+        "INSERT INTO _etl_metadata VALUES (?, NOW(), 'ADMINEXPRESS-COG.LATEST', ?)",
+        ["geographies_epci", count],
+    )
 
 
 def _load_communes(

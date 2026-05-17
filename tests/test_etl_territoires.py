@@ -140,3 +140,73 @@ def test_departements_geometries_valides(con: duckdb.DuckDBPyConnection) -> None
         assert not invalides, (
             f"{col} — géométries invalides : {[r[0] for r in invalides]}"
         )
+
+
+# ── EPCI ──────────────────────────────────────────────────────────────────────
+
+_TYPES_EPCI_ATTENDUS = {"CC": 989, "CA": 229, "ME": 22, "CU": 14, "EPT": 11}
+_TOLERANCE_TYPES = 10
+
+
+def test_epci_count(con: duckdb.DuckDBPyConnection) -> None:
+    """Entre 1 250 et 1 290 EPCI chargés."""
+    n = con.execute("SELECT COUNT(*) FROM geographies_epci").fetchone()[0]
+    assert 1250 <= n <= 1290, f"Nombre d'EPCI hors fourchette [1250-1290] : {n}"
+
+
+def test_epci_siren_format(con: duckdb.DuckDBPyConnection) -> None:
+    """Tous les SIREN sont exactement 9 chiffres numériques."""
+    invalides = con.execute("""
+        SELECT code_siren FROM geographies_epci
+        WHERE length(code_siren) != 9 OR regexp_full_match(code_siren, '[^0-9]')
+    """).fetchall()
+    assert not invalides, f"SIREN non conformes : {[r[0] for r in invalides[:10]]}"
+
+
+def test_epci_no_null_types(con: duckdb.DuckDBPyConnection) -> None:
+    """Aucun type_epci NULL — toutes les valeurs 'nature' WFS sont mappées."""
+    n = con.execute(
+        "SELECT COUNT(*) FROM geographies_epci WHERE type_epci IS NULL"
+    ).fetchone()[0]
+    assert n == 0, (
+        f"{n} EPCI avec type_epci NULL — une valeur 'nature' WFS non mappée est apparue"
+    )
+
+
+def test_epci_types_distribution(con: duckdb.DuckDBPyConnection) -> None:
+    """Distribution des types EPCI cohérente avec les valeurs IGN 2026-05-17 (±10)."""
+    dist = {
+        r[0]: r[1]
+        for r in con.execute(
+            "SELECT type_epci, COUNT(*) FROM geographies_epci GROUP BY type_epci"
+        ).fetchall()
+    }
+    for type_code, expected in _TYPES_EPCI_ATTENDUS.items():
+        actual = dist.get(type_code, 0)
+        assert abs(actual - expected) <= _TOLERANCE_TYPES, (
+            f"type_epci={type_code!r} : attendu ≈{expected} (±{_TOLERANCE_TYPES}), obtenu {actual}"
+        )
+
+
+def test_epci_geometries_valides(con: duckdb.DuckDBPyConnection) -> None:
+    """Aucune géométrie simplifiée invalide (ST_IsValid)."""
+    invalides = con.execute("""
+        SELECT code_siren FROM geographies_epci
+        WHERE geometry_simplified_epci IS NOT NULL
+          AND NOT ST_IsValid(geometry_simplified_epci)
+    """).fetchall()
+    assert not invalides, (
+        f"Géométries simplifiées invalides : {[r[0] for r in invalides]}"
+    )
+
+
+def test_epci_metadata(con: duckdb.DuckDBPyConnection) -> None:
+    """Entrée geographies_epci présente dans _etl_metadata avec row_count cohérent."""
+    row = con.execute(
+        "SELECT row_count FROM _etl_metadata WHERE table_name = 'geographies_epci'"
+    ).fetchone()
+    assert row is not None, "Entrée manquante dans _etl_metadata pour geographies_epci"
+    count_table = con.execute("SELECT COUNT(*) FROM geographies_epci").fetchone()[0]
+    assert row[0] == count_table, (
+        f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
+    )
