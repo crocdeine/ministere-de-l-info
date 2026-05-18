@@ -39,6 +39,7 @@ _VUE_POP: dict[str, tuple[str, str]] = {
     "region": ("v_population_region", "code_region"),
     "departement": ("v_population_departement", "code_departement"),
     "epci": ("v_population_epci", "code_epci"),
+    "commune": ("v_population_commune", "code_commune"),
 }
 
 _TABLE_CODE: dict[str, tuple[str, str]] = {

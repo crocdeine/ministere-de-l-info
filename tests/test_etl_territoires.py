@@ -39,7 +39,7 @@ _CODES_REGION_TOUS = _CODES_REGION_METRO | _CODES_REGION_DROM
 def con() -> duckdb.DuckDBPyConnection:
     if not DB_PATH.exists():
         pytest.skip("ministere.duckdb introuvable — lancer etl_territoires.py d'abord")
-    c = duckdb.connect(str(DB_PATH))
+    c = duckdb.connect(str(DB_PATH), read_only=True)
     c.execute("LOAD spatial")
     yield c
     c.close()
@@ -364,6 +364,35 @@ def test_populations_nulls(con: duckdb.DuckDBPyConnection, pop_skip: None) -> No
     assert non_null_tot == 0, (
         f"{non_null_tot} lignes avec totale non NULL — totale dépend de PCAP absent"
     )
+
+
+def test_view_population_commune_existe(
+    con: duckdb.DuckDBPyConnection, pop_skip: None
+) -> None:
+    """v_population_commune est présente et retourne des lignes pour 2023."""
+    n = con.execute(
+        "SELECT COUNT(*) FROM v_population_commune WHERE annee = 2023"
+    ).fetchone()[0]
+    assert n > 0, "v_population_commune vide pour 2023"
+
+
+def test_view_population_commune_count(
+    con: duckdb.DuckDBPyConnection, pop_skip: None
+) -> None:
+    """v_population_commune a autant de lignes que populations pour chaque millésime."""
+    rows = con.execute("""
+        SELECT p.annee,
+               COUNT(*) AS pop_count,
+               COUNT(DISTINCT v.code_commune) AS vue_count
+        FROM populations p
+        LEFT JOIN v_population_commune v
+            ON v.code_commune = p.code_insee_commune AND v.annee = p.annee
+        GROUP BY p.annee
+    """).fetchall()
+    for annee, pop_count, vue_count in rows:
+        assert pop_count == vue_count, (
+            f"Millésime {annee} : {pop_count} lignes populations ≠ {vue_count} dans v_population_commune"
+        )
 
 
 def test_populations_metadata(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:

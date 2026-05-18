@@ -78,6 +78,7 @@ _VUE_PAR_NIVEAU: dict[str, str] = {
     "region": "v_population_region",
     "departement": "v_population_departement",
     "epci": "v_population_epci",
+    "commune": "v_population_commune",
 }
 
 # (colonne clé dans table géo, colonne correspondante dans la vue population)
@@ -85,6 +86,7 @@ _CLE_JOIN: dict[str, tuple[str, str]] = {
     "region": ("code_insee", "code_region"),
     "departement": ("code_insee", "code_departement"),
     "epci": ("code_siren", "code_epci"),
+    "commune": ("code_insee", "code_commune"),
 }
 
 # Colonne filtre département dans chaque table géo (None = filtre non applicable)

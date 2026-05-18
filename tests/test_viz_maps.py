@@ -133,6 +133,15 @@ def _create_views(db: duckdb.DuckDBPyConnection) -> None:
         WHERE c.code_epci IS NOT NULL
         GROUP BY e.code_siren, e.nom, e.type_epci, p.annee;
     """)
+    db.execute("""
+        CREATE VIEW v_population_commune AS
+        SELECT code_insee_commune AS code_commune, annee,
+               SUM(municipale)     AS population_municipale,
+               SUM(comptee_a_part) AS population_comptee_a_part,
+               SUM(totale)         AS population_totale
+        FROM populations
+        GROUP BY code_insee_commune, annee;
+    """)
 
 
 def _insert_populations(db: duckdb.DuckDBPyConnection, annee: int = 2023) -> None:
@@ -219,3 +228,22 @@ def test_make_choropleth_mode_contours_force_no_population_needed(con_no_pop):
     """mode='contours' forcé pour un niveau population → aucune erreur, pas de choropleth."""
     result = make_choropleth(con_no_pop, "region", mode="contours")
     assert isinstance(result, folium.Map)
+
+
+def test_make_choropleth_commune_choropleth_avec_population(con_full):
+    """niveau='commune' + filtre_departement + données → carte choropleth."""
+    result = make_choropleth(con_full, "commune", filtre_departement="75", annee=2023)
+    assert isinstance(result, folium.Map)
+
+
+def test_make_choropleth_commune_fallback_contours_sans_population(con_no_pop, caplog):
+    """niveau='commune' sans données population → fallback contours + warning."""
+    with caplog.at_level(logging.WARNING, logger="ministere_de_l_info.viz.maps"):
+        result = make_choropleth(
+            con_no_pop, "commune", filtre_departement="75", mode="auto"
+        )
+    assert isinstance(result, folium.Map)
+    assert any(
+        "fallback" in msg.lower() or "contours" in msg.lower()
+        for msg in caplog.messages
+    )
