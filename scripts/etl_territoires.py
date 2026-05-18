@@ -463,6 +463,7 @@ def _load_communes(
     con: duckdb.DuckDBPyConnection,
     force: bool = False,
     skip: bool = False,
+    yes: bool = False,
 ) -> None:
     """Charge les ~35 000 communes dans geographies_communes.
 
@@ -482,14 +483,17 @@ def _load_communes(
         "\n⚠  Chargement communes (~35 000 lignes) — durée estimée 30–60 min.\n"
         "   Utilisez --skip-communes pour ignorer cette étape.\n"
     )
-    try:
-        reponse = input("Continuer ? [oui/non] ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        logger.info("Chargement communes annulé (entrée non-interactive ou Ctrl-C).")
-        return
-    if reponse != "oui":
-        logger.info("Chargement communes annulé par l'utilisateur.")
-        return
+    if yes:
+        logger.info("Gate communes bypassed (--yes).")
+    else:
+        try:
+            reponse = input("Continuer ? [oui/non] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            logger.info("Chargement communes annulé (entrée non-interactive ou Ctrl-C).")
+            return
+        if reponse != "oui":
+            logger.info("Chargement communes annulé par l'utilisateur.")
+            return
 
     raw_dir = ROOT / "data" / "raw"
     batch_paths = list(
@@ -908,6 +912,11 @@ def main() -> None:
         help="Sauter le chargement communes (~35 000 rows, 30-60 min) — pour debug",
     )
     parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Bypass le gate input() du chargement communes (utile pour nohup/CI)",
+    )
+    parser.add_argument(
         "--millesimes",
         default="2013,2018,2023",
         metavar="ANNEES",
@@ -943,7 +952,7 @@ def main() -> None:
         _load_regions(con, force=args.force)
         _load_departements(con, force=args.force)
         _load_epci(con, force=args.force)
-        _load_communes(con, force=args.force, skip=args.skip_communes)
+        _load_communes(con, force=args.force, skip=args.skip_communes, yes=args.yes)
         _load_arrondissements_municipaux(con, force=args.force)
         _load_circonscriptions(con, force=args.force)
         _load_populations(con, millesimes=millesimes, force=args.force)
@@ -954,7 +963,7 @@ def main() -> None:
             "departement": lambda: _load_departements(con, force=args.force),
             "epci": lambda: _load_epci(con, force=args.force),
             "commune": lambda: _load_communes(
-                con, force=args.force, skip=args.skip_communes
+                con, force=args.force, skip=args.skip_communes, yes=args.yes
             ),
             "arrondissement_municipal": lambda: _load_arrondissements_municipaux(
                 con, force=args.force
