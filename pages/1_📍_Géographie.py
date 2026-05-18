@@ -1,0 +1,252 @@
+"""Page Géographie — carte choroplèthe multi-niveaux."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import duckdb
+import polars as pl
+import streamlit as st
+from streamlit_folium import st_folium
+
+from ministere_de_l_info.viz.maps import make_choropleth
+
+st.set_page_config(page_title="Géographie", page_icon="📍", layout="wide")
+st.title("📍 Géographie territoriale")
+
+_DB_PATH = Path(__file__).parent.parent / "data" / "ministere.duckdb"
+
+_NIVEAU_LABELS: dict[str, str] = {
+    "region": "Régions (18)",
+    "departement": "Départements (101)",
+    "epci": "Intercommunalités EPCI (~1 265)",
+    "arrondissement_municipal": "Arrondissements municipaux (45)",
+    "circonscription": "Circonscriptions législatives (559)",
+    "commune": "Communes (~35 000) ⚠️",
+}
+
+_TABLE_META: dict[str, str] = {
+    "region": "geographies_regions",
+    "departement": "geographies_departements",
+    "epci": "geographies_epci",
+    "arrondissement_municipal": "geographies_arrondissements_municipaux",
+    "circonscription": "geographies_circonscriptions",
+    "commune": "geographies_communes",
+}
+
+# Vues population disponibles et clé de jointure
+_VUE_POP: dict[str, tuple[str, str]] = {
+    "region": ("v_population_region", "code_region"),
+    "departement": ("v_population_departement", "code_departement"),
+    "epci": ("v_population_epci", "code_epci"),
+}
+
+_TABLE_CODE: dict[str, tuple[str, str]] = {
+    "region": ("geographies_regions", "code_insee"),
+    "departement": ("geographies_departements", "code_insee"),
+    "epci": ("geographies_epci", "code_siren"),
+    "arrondissement_municipal": (
+        "geographies_arrondissements_municipaux",
+        "code_insee",
+    ),
+    "circonscription": ("geographies_circonscriptions", "code"),
+    "commune": ("geographies_communes", "code_insee"),
+}
+
+_FILTRE_DEPT_COL: dict[str, str] = {
+    "epci": "code_departement_principal",
+    "circonscription": "code_departement",
+    "commune": "code_departement",
+}
+
+_FILTRE_REGION_COL: dict[str, str] = {
+    "departement": "code_region",
+    "commune": "code_region",
+}
+
+
+@st.cache_resource
+def _get_con() -> duckdb.DuckDBPyConnection:
+    """Connexion DuckDB partagée en lecture seule."""
+    con = duckdb.connect(str(_DB_PATH), read_only=True)
+    con.execute("LOAD spatial;")
+    return con
+
+
+if not _DB_PATH.exists():
+    st.error(
+        "Base de données absente. Lancez d'abord :\n\n"
+        "```bash\nuv run python scripts/etl_regions.py\n```"
+    )
+    st.stop()
+
+con = _get_con()
+
+# ── Sidebar : paramètres ──────────────────────────────────────────────────────
+
+with st.sidebar:
+    st.header("Paramètres")
+
+    niveau = st.selectbox(
+        "Niveau territorial",
+        options=list(_NIVEAU_LABELS),
+        format_func=lambda x: _NIVEAU_LABELS[x],
+    )
+
+    annees = [
+        r[0]
+        for r in con.execute(
+            "SELECT DISTINCT annee FROM populations ORDER BY annee DESC"
+        ).fetchall()
+    ]
+    if not annees:
+        st.warning("Aucune donnée population — carte en mode contours.")
+        annee = 2023
+    else:
+        annee = st.selectbox("Millésime", annees)
+
+    # Filtre département (contextuel)
+    filtre_departement: str | None = None
+    if niveau in _FILTRE_DEPT_COL:
+        depts = con.execute(
+            "SELECT code_insee, nom FROM geographies_departements ORDER BY code_insee"
+        ).fetchall()
+        dept_labels = {d[0]: f"{d[0]} — {d[1]}" for d in depts}
+
+        if niveau == "commune":
+            st.warning("⚠️ Un département doit être sélectionné pour les communes.")
+            filtre_departement = st.selectbox(
+                "Département",
+                options=[d[0] for d in depts],
+                format_func=lambda x: dept_labels.get(x, x),
+            )
+        else:
+            choix = st.selectbox(
+                "Département (optionnel)",
+                options=[None] + [d[0] for d in depts],
+                format_func=lambda x: "Tous" if x is None else dept_labels.get(x, x),
+            )
+            filtre_departement = choix
+
+    # Filtre région (contextuel)
+    filtre_region: str | None = None
+    if niveau in _FILTRE_REGION_COL:
+        regions = con.execute(
+            "SELECT code_insee, nom FROM geographies_regions ORDER BY nom"
+        ).fetchall()
+        region_labels = {r[0]: r[1] for r in regions}
+        choix = st.selectbox(
+            "Région (optionnelle)",
+            options=[None] + [r[0] for r in regions],
+            format_func=lambda x: "Toutes" if x is None else region_labels.get(x, x),
+        )
+        filtre_region = choix
+
+    with st.expander("Options avancées"):
+        mode = st.radio("Mode de rendu", ["auto", "choropleth", "contours"], index=0)
+
+# ── Carte ────────────────────────────────────────────────────────────────────
+
+try:
+    carte = make_choropleth(
+        con,
+        niveau=niveau,
+        annee=annee,
+        filtre_departement=filtre_departement,
+        filtre_region=filtre_region,
+        mode=mode,
+    )
+    st_folium(carte, width="100%", height=600, returned_objects=[])
+except ValueError as e:
+    st.error(f"Paramètres invalides : {e}")
+    st.stop()
+except RuntimeError as e:
+    st.warning(str(e))
+    st.stop()
+except Exception as e:
+    st.error(f"Erreur inattendue : {e}")
+    raise
+
+# ── Métadonnée ───────────────────────────────────────────────────────────────
+
+meta = con.execute(
+    "SELECT loaded_at, source_version, row_count FROM _etl_metadata WHERE table_name = ?",
+    [_TABLE_META[niveau]],
+).fetchone()
+
+if meta:
+    loaded_at, source, row_count = meta
+    st.caption(
+        f"📊 {row_count:,} entités · "
+        f"Dernière mise à jour : {loaded_at:%Y-%m-%d %H:%M} · "
+        f"Source : {source}"
+    )
+else:
+    st.caption("⚠️ Aucune métadonnée ETL pour ce niveau.")
+
+# ── Tableau de données ────────────────────────────────────────────────────────
+
+st.divider()
+
+if niveau in _VUE_POP:
+    vue, vue_code = _VUE_POP[niveau]
+    table, code_col = _TABLE_CODE[niveau]
+
+    params: list = [annee]
+    where: list[str] = []
+
+    dept_col = _FILTRE_DEPT_COL.get(niveau)
+    if filtre_departement and dept_col:
+        where.append(f"g.{dept_col} = ?")
+        params.append(filtre_departement)
+
+    region_col = _FILTRE_REGION_COL.get(niveau)
+    if filtre_region and region_col:
+        where.append(f"g.{region_col} = ?")
+        params.append(filtre_region)
+
+    where_sql = f"AND {' AND '.join(where)}" if where else ""
+
+    rows = con.execute(  # noqa: S608
+        f"SELECT g.{code_col} AS code, g.nom,"
+        f" COALESCE(p.population_municipale, 0) AS pop"
+        f" FROM {table} g"
+        f" LEFT JOIN {vue} p ON g.{code_col} = p.{vue_code} AND p.annee = ?"
+        f" {where_sql}"
+        f" ORDER BY pop DESC NULLS LAST LIMIT 200",
+        params,
+    ).fetchall()
+
+    df = pl.DataFrame(
+        {
+            "Code": [r[0] for r in rows],
+            "Nom": [r[1] for r in rows],
+            f"Population municipale {annee}": [
+                f"{r[2]:,}".replace(",", " ") if r[2] else "—" for r in rows
+            ],
+        }
+    )
+else:
+    # ARM ou circonscriptions : pas de population
+    table, code_col = _TABLE_CODE[niveau]
+    extra_col = (
+        "code_commune_mere"
+        if niveau == "arrondissement_municipal"
+        else "code_departement"
+    )
+    rows = con.execute(  # noqa: S608
+        f"SELECT {code_col}, nom, {extra_col} FROM {table} ORDER BY {code_col} LIMIT 200"
+    ).fetchall()
+
+    extra_label = (
+        "Commune mère" if niveau == "arrondissement_municipal" else "Département"
+    )
+    df = pl.DataFrame(
+        {
+            "Code": [r[0] for r in rows],
+            "Nom": [r[1] for r in rows],
+            extra_label: [r[2] for r in rows],
+        }
+    )
+
+st.dataframe(df, use_container_width=True, hide_index=True)

@@ -1,21 +1,11 @@
-"""Application Streamlit — ministere-de-l-info (test de stack)."""
+"""Page d'accueil — ministere-de-l-info."""
 
 from __future__ import annotations
-
-import logging
-from pathlib import Path
 
 import duckdb
 import geopandas as gpd
 import polars as pl
 import streamlit as st
-from streamlit_folium import st_folium
-
-from ministere_de_l_info.viz.maps import make_choropleth
-
-logger = logging.getLogger(__name__)
-
-_DB_PATH = Path(__file__).parent / "data" / "ministere.duckdb"
 
 st.set_page_config(
     page_title="ministère de l'info",
@@ -43,85 +33,15 @@ with col2:
 with col3:
     st.metric("Polars", pl.__version__)
 
-st.success("✅ Stack opérationnelle. Prochaine étape : import des premières données.")
+st.success("✅ Stack opérationnelle.")
 
-# Mini-test DuckDB
 with st.expander("Test DuckDB"):
     result = duckdb.sql("SELECT 'France' AS pays, 67_000_000 AS habitants").to_df()
-    st.dataframe(result, width="stretch")
+    st.dataframe(result, use_container_width=True)
 
-# Mini-test GeoPandas
 with st.expander("Test GeoPandas"):
     st.write(f"GeoPandas version : {gpd.__version__}")
-    st.write(
-        "GeoPandas est prêt à charger des contours communaux, départementaux et régionaux."
-    )
 
 st.divider()
 
-# ── Carte des régions ─────────────────────────────────────────────────────────
-
-st.header("Carte des régions")
-
-
-@st.cache_resource
-def get_db_connection() -> duckdb.DuckDBPyConnection:
-    """Connexion DuckDB partagée — singleton par session Streamlit."""
-    con = duckdb.connect(str(_DB_PATH))
-    con.execute("INSTALL spatial; LOAD spatial;")
-    return con
-
-
-def _table_regions_existe(con: duckdb.DuckDBPyConnection) -> bool:
-    count = con.execute("""
-        SELECT COUNT(*) FROM information_schema.tables
-        WHERE table_name = 'geographies_regions'
-    """).fetchone()[0]
-    return count > 0
-
-
-if not _DB_PATH.exists():
-    st.warning(
-        "Base de données absente. Lancez d'abord :\n\n"
-        "```bash\npython scripts/etl_regions.py\n```"
-    )
-else:
-    con = get_db_connection()
-
-    if not _table_regions_existe(con):
-        st.warning(
-            "Table `geographies_regions` absente. Lancez d'abord :\n\n"
-            "```bash\npython scripts/etl_regions.py\n```"
-        )
-    else:
-        indicateur = st.selectbox(
-            "Indicateur",
-            ["population_municipale"],
-            format_func=lambda x: x.replace("_", " ").capitalize(),
-        )
-
-        carte = make_choropleth(con, "region", indicateur=indicateur)
-        st_folium(carte, width="100%", height=550, returned_objects=[])
-
-        # ── Tableau de données ───────────────────────────────────────────────
-        rows = con.execute("""
-            SELECT r.code_insee, r.nom,
-                   COALESCE(p.population_municipale, 0) AS population
-            FROM geographies_regions r
-            LEFT JOIN v_population_region p
-              ON p.code_region = r.code_insee AND p.annee = 2023
-            ORDER BY population DESC
-        """).fetchall()
-
-        df_display = pl.DataFrame(
-            {
-                "Région": [r[1] for r in rows],
-                "Code INSEE": [r[0] for r in rows],
-                "Population municipale 2023": [
-                    f"{r[2]:,}".replace(",", " ") if r[2] else "—" for r in rows
-                ],
-            }
-        )
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
-
-        st.caption("Source : data.geopf.fr (IGN ADMIN-EXPRESS COG) — Population INSEE")
+st.info("Utilisez le menu de navigation à gauche pour explorer les visualisations.")
