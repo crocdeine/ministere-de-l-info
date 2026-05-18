@@ -11,7 +11,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info.viz.maps import make_regions_choropleth
+from ministere_de_l_info.viz.maps import make_choropleth
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,9 @@ st.set_page_config(
 )
 
 st.title("🇫🇷 ministère de l'info")
-st.caption("Application de data-visualisation politique, électorale et territoriale française")
+st.caption(
+    "Application de data-visualisation politique, électorale et territoriale française"
+)
 
 st.divider()
 
@@ -46,12 +48,14 @@ st.success("✅ Stack opérationnelle. Prochaine étape : import des premières 
 # Mini-test DuckDB
 with st.expander("Test DuckDB"):
     result = duckdb.sql("SELECT 'France' AS pays, 67_000_000 AS habitants").to_df()
-    st.dataframe(result, width='stretch')
+    st.dataframe(result, width="stretch")
 
 # Mini-test GeoPandas
 with st.expander("Test GeoPandas"):
     st.write(f"GeoPandas version : {gpd.__version__}")
-    st.write("GeoPandas est prêt à charger des contours communaux, départementaux et régionaux.")
+    st.write(
+        "GeoPandas est prêt à charger des contours communaux, départementaux et régionaux."
+    )
 
 st.divider()
 
@@ -92,17 +96,20 @@ else:
     else:
         indicateur = st.selectbox(
             "Indicateur",
-            ["population"],
-            format_func=lambda x: x.capitalize(),
+            ["population_municipale"],
+            format_func=lambda x: x.replace("_", " ").capitalize(),
         )
 
-        carte = make_regions_choropleth(con, indicateur)
+        carte = make_choropleth(con, "region", indicateur=indicateur)
         st_folium(carte, width="100%", height=550, returned_objects=[])
 
         # ── Tableau de données ───────────────────────────────────────────────
         rows = con.execute("""
-            SELECT code_insee, nom, population
-            FROM geographies_regions
+            SELECT r.code_insee, r.nom,
+                   COALESCE(p.population_municipale, 0) AS population
+            FROM geographies_regions r
+            LEFT JOIN v_population_region p
+              ON p.code_region = r.code_insee AND p.annee = 2023
             ORDER BY population DESC
         """).fetchall()
 
@@ -110,13 +117,11 @@ else:
             {
                 "Région": [r[1] for r in rows],
                 "Code INSEE": [r[0] for r in rows],
-                "Population 2024": [
-                    f"{r[2]:,}".replace(",", " ") for r in rows
+                "Population municipale 2023": [
+                    f"{r[2]:,}".replace(",", " ") if r[2] else "—" for r in rows
                 ],
             }
         )
         st.dataframe(df_display, use_container_width=True, hide_index=True)
 
-        st.caption(
-            "Source : data.geopf.fr (IGN ADMIN-EXPRESS COG) — Population INSEE 2024"
-        )
+        st.caption("Source : data.geopf.fr (IGN ADMIN-EXPRESS COG) — Population INSEE")
