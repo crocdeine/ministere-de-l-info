@@ -185,25 +185,20 @@ def test_fk_communes_vers_regions(con):
     )
 
 
-def test_fk_communes_vers_epci_multivalue(con):
-    """Communes avec code_epci multi-valeur (Grand Paris) : < 2% des communes avec EPCI.
+def test_fk_communes_vers_epci(con):
+    """Quasi-aucun orphelin EPCI — seules les communes 'NR' (hors-périmètre) sont acceptées.
 
-    Le WFS IGN stocke codes_siren_des_epci sous forme "SIREN1/SIREN2" pour les communes
-    appartenant à la fois à la MGP (200054781) et un EPT. L'ETL prend la valeur brute.
-    135 communes concernées — anomalie de source documentée, non critique.
+    SPLIT_PART(codes_siren_des_epci, '/', 1) dans l'ETL garantit qu'on stocke un
+    SIREN unique. Les 6 communes avec code_epci='NR' (COM hors ADMIN-EXPRESS) sont
+    les seuls orphelins résiduels attendus.
     """
-    total_avec_epci = con.execute(
-        "SELECT COUNT(*) FROM geographies_communes WHERE code_epci IS NOT NULL"
-    ).fetchone()[0]
     orphelins = con.execute("""
         SELECT COUNT(*) FROM geographies_communes
         WHERE code_epci IS NOT NULL
           AND code_epci NOT IN (SELECT code_siren FROM geographies_epci)
     """).fetchone()[0]
-    ratio = orphelins / max(total_avec_epci, 1)
-    assert ratio < 0.02, (
-        f"{orphelins}/{total_avec_epci} communes ({ratio:.1%}) ont un code_epci non trouvé "
-        "(attendu < 2% — anomalie WFS multi-valeur Grand Paris)"
+    assert orphelins <= 10, (
+        f"{orphelins} communes avec code_epci orphelin (attendu ≤ 10 — uniquement codes 'NR')"
     )
 
 

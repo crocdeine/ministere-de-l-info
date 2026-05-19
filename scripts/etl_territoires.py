@@ -473,6 +473,9 @@ def _load_communes(
     Source : fetch_admin_express("commune", dom=True, batch_size=1000) — WFS IGN.
     Progress : log INFO toutes les 1 000 communes (un batch = un log).
     Simplification : geometry_simplified_communal (0.0005).
+    code_epci : SPLIT_PART(codes_siren_des_epci, '/', 1) — le WFS expose un champ
+    multi-valeur "SIREN1/SIREN2" pour les communes à cheval sur MGP + EPT (Grand Paris).
+    On conserve uniquement le premier SIREN (toujours la MGP 200054781 pour ces communes).
     Post-load : UPDATE geographies_epci.code_departement_principal depuis communes.
     """
     if skip:
@@ -527,7 +530,7 @@ def _load_communes(
                 nom_officiel              AS nom,
                 code_insee_du_departement AS code_departement,
                 code_insee_de_la_region   AS code_region,
-                codes_siren_des_epci      AS code_epci,
+                SPLIT_PART(codes_siren_des_epci, '/', 1) AS code_epci,
                 geom                      AS geometry,
                 CASE
                     WHEN ST_IsValid(ST_Simplify(geom, 0.0005)) THEN ST_Simplify(geom, 0.0005)
