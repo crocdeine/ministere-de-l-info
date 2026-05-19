@@ -407,3 +407,56 @@ def test_populations_metadata(con: duckdb.DuckDBPyConnection, pop_skip: None) ->
     assert row[0] == count_table, (
         f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
     )
+
+
+def test_populations_multi_millesimes(
+    con: duckdb.DuckDBPyConnection, pop_skip: None
+) -> None:
+    """Les 3 millésimes (2013, 2018, 2023) ont chacun ~34 858 communes + sommes cohérentes."""
+    expected = {
+        2013: {"communes": 34858, "pop_lo": 63_000_000, "pop_hi": 67_000_000},
+        2018: {"communes": 34858, "pop_lo": 65_000_000, "pop_hi": 68_000_000},
+        2023: {"communes": 34858, "pop_lo": 67_000_000, "pop_hi": 70_000_000},
+    }
+    rows = con.execute(
+        "SELECT annee, COUNT(*), SUM(municipale) FROM populations GROUP BY annee ORDER BY annee"
+    ).fetchall()
+    annees_chargees = {r[0] for r in rows}
+    for annee, spec in expected.items():
+        if annee not in annees_chargees:
+            pytest.skip(
+                f"Millésime {annee} non chargé — relancer ETL avec --millesimes {annee}"
+            )
+    for annee, n, total in rows:
+        if annee not in expected:
+            continue
+        spec = expected[annee]
+        assert abs(n - spec["communes"]) <= 50, (
+            f"Millésime {annee} : {n} communes (attendu ≈{spec['communes']} ±50)"
+        )
+        assert spec["pop_lo"] <= total <= spec["pop_hi"], (
+            f"Millésime {annee} : somme={total:,} hors [{spec['pop_lo']:,}-{spec['pop_hi']:,}]"
+        )
+
+    # Paris/Lyon/Marseille : croissance monotone ou quasi-monotone sur la période
+    plm = {
+        code: {
+            r[0]: r[1]
+            for r in con.execute(
+                "SELECT annee, municipale FROM populations WHERE code_insee_commune = ? AND annee IN (2013, 2018, 2023)",
+                [code],
+            ).fetchall()
+        }
+        for code in ("75056", "69123", "13055")
+    }
+    # Marseille et Lyon : croissance 2013→2023
+    for code, nom in (("13055", "Marseille"), ("69123", "Lyon")):
+        if 2013 in plm[code] and 2023 in plm[code]:
+            assert plm[code][2013] < plm[code][2023], (
+                f"{nom} : population 2013 ({plm[code][2013]:,}) ≥ 2023 ({plm[code][2023]:,})"
+            )
+    # Paris : décroissance 2013→2023 (tendance documentée INSEE)
+    if 2013 in plm["75056"] and 2023 in plm["75056"]:
+        assert plm["75056"][2013] > plm["75056"][2023], (
+            f"Paris : population 2013 ({plm['75056'][2013]:,}) ≤ 2023 ({plm['75056'][2023]:,})"
+        )

@@ -54,6 +54,40 @@ def test_count_populations_2023(con):
     assert 34000 <= n <= 36000, f"populations 2023 : {n} lignes hors fourchette"
 
 
+@pytest.mark.parametrize("annee", [2013, 2018, 2023])
+def test_count_populations_par_millesime(con, annee):
+    """Chaque millésime chargé a entre 34 000 et 36 000 communes."""
+    n = con.execute(
+        "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
+    ).fetchone()[0]
+    if n == 0:
+        pytest.skip(f"Millésime {annee} non chargé")
+    assert 34000 <= n <= 36000, (
+        f"populations {annee} : {n} lignes hors fourchette [34000-36000]"
+    )
+
+
+@pytest.mark.parametrize(
+    "annee, pop_lo, pop_hi",
+    [
+        (2013, 63_000_000, 67_000_000),
+        (2018, 65_000_000, 68_000_000),
+        (2023, 67_000_000, 70_000_000),
+    ],
+)
+def test_populations_somme_nationale_par_millesime(con, annee, pop_lo, pop_hi):
+    """Somme population municipale par millésime dans la fourchette attendue."""
+    row = con.execute(
+        "SELECT SUM(municipale) FROM populations WHERE annee = ?", [annee]
+    ).fetchone()
+    total = row[0] if row and row[0] else 0
+    if total == 0:
+        pytest.skip(f"Millésime {annee} non chargé")
+    assert pop_lo <= total <= pop_hi, (
+        f"Somme population {annee} : {total:,} hors [{pop_lo:,}-{pop_hi:,}]"
+    )
+
+
 # ── Doublons sur clé primaire ─────────────────────────────────────────────────
 
 
@@ -361,6 +395,22 @@ def test_vue_population_commune_coherente(con):
     ).fetchone()[0]
     assert n_pop == n_vue, (
         f"v_population_commune ({n_vue}) ≠ populations ({n_pop}) pour annee=2023"
+    )
+
+
+@pytest.mark.parametrize("annee", [2013, 2018, 2023])
+def test_vue_population_commune_tous_millesimes(con, annee):
+    """v_population_commune reflète fidèlement la table populations pour chaque millésime."""
+    n_pop = con.execute(
+        "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
+    ).fetchone()[0]
+    if n_pop == 0:
+        pytest.skip(f"Millésime {annee} non chargé")
+    n_vue = con.execute(
+        "SELECT COUNT(*) FROM v_population_commune WHERE annee = ?", [annee]
+    ).fetchone()[0]
+    assert n_pop == n_vue, (
+        f"v_population_commune {annee} : {n_vue} lignes ≠ populations {n_pop}"
     )
 
 
