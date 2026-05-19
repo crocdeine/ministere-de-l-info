@@ -100,6 +100,6 @@ uv run pytest -v
 
 ## Crédits
 
-- **Auteur** : Lucas / BTS NDRC
+- **Auteur** : Mathias
 - **Sources** : IGN ADMIN-EXPRESS-COG · INSEE Mélodi · data.gouv.fr · geo.api.gouv.fr
 - **Licence** : données publiques françaises (Licence Ouverte / Open Licence 2.0)
