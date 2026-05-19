@@ -123,3 +123,29 @@ def test_tableau_departement_filtre_region(con):
     # Île-de-France a 8 départements
     assert len(rows) == 8
     assert all(r[0] in ("75", "77", "78", "91", "92", "93", "94", "95") for r in rows)
+
+
+@pytest.mark.parametrize("annee", [2013, 2018, 2023])
+def test_tableau_region_millesimes(con, annee):
+    """Le tableau régions renvoie des populations différentes selon le millésime."""
+    rows = con.execute(
+        """
+        SELECT g.code_insee AS code,
+               COALESCE(p.population_municipale, 0) AS pop
+        FROM geographies_regions g
+        LEFT JOIN v_population_region p
+            ON g.code_insee = p.code_region AND p.annee = ?
+        ORDER BY pop DESC NULLS LAST LIMIT 18
+        """,
+        [annee],
+    ).fetchall()
+    n_pop = con.execute(
+        "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
+    ).fetchone()[0]
+    if n_pop == 0:
+        pytest.skip(f"Millésime {annee} non chargé")
+    assert len(rows) == 18
+    idf = next((r[1] for r in rows if r[0] == "11"), None)
+    assert idf is not None and idf > 10_000_000, (
+        f"Île-de-France ({annee}) : {idf} — attendu > 10M"
+    )

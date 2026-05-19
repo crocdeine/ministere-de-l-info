@@ -94,17 +94,25 @@ with st.sidebar:
         format_func=lambda x: _NIVEAU_LABELS[x],
     )
 
-    annees = [
+    annees_dispo = [
         r[0]
         for r in con.execute(
             "SELECT DISTINCT annee FROM populations ORDER BY annee DESC"
         ).fetchall()
     ]
-    if not annees:
+    if not annees_dispo:
         st.warning("Aucune donnée population — carte en mode contours.")
         annee = 2023
     else:
-        annee = st.selectbox("Millésime", annees)
+        annee = st.selectbox(
+            "Année de recensement (INSEE)",
+            annees_dispo,
+            help="Population municipale (PMUN) issue de DS_POPULATIONS_HISTORIQUES",
+        )
+        st.caption(
+            f"📊 {len(annees_dispo)} millésime(s) disponible(s) : "
+            f"{', '.join(str(a) for a in sorted(annees_dispo))}"
+        )
 
     # Filtre département (contextuel)
     filtre_departement: str | None = None
@@ -148,6 +156,11 @@ with st.sidebar:
 
 # ── Carte ────────────────────────────────────────────────────────────────────
 
+_a_population = niveau in _VUE_POP and mode != "contours"
+titre_carte = (
+    f"Population municipale {annee}" if _a_population else "Contours territoriaux"
+)
+
 try:
     carte = make_choropleth(
         con,
@@ -155,6 +168,7 @@ try:
         annee=annee,
         filtre_departement=filtre_departement,
         filtre_region=filtre_region,
+        titre=titre_carte,
         mode=mode,
     )
     st_folium(carte, width="100%", height=600, returned_objects=[])
@@ -177,11 +191,8 @@ meta = con.execute(
 
 if meta:
     loaded_at, source, row_count = meta
-    st.caption(
-        f"📊 {row_count:,} entités · "
-        f"Dernière mise à jour : {loaded_at:%Y-%m-%d %H:%M} · "
-        f"Source : {source}"
-    )
+    pop_info = f"Population municipale {annee} (INSEE) · " if _a_population else ""
+    st.caption(f"📊 {row_count:,} entités · {pop_info}Géométries : data.geopf.fr")
 else:
     st.caption("⚠️ Aucune métadonnée ETL pour ce niveau.")
 
