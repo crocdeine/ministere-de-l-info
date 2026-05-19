@@ -97,3 +97,5 @@ htmlcov/
 # ===== Logs =====
 *.log
 logs/
+nohup.out
+/tmp/

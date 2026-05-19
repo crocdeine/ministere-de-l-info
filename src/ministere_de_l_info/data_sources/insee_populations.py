@@ -111,11 +111,7 @@ def _load_csv_from_zip(zip_path: Path) -> pl.LazyFrame:
     """Extrait et lit le CSV data depuis le ZIP, filtre sur GEO_OBJECT=COM et PMUN."""
     with zipfile.ZipFile(zip_path) as zf:
         data_name = next(
-            (
-                n
-                for n in zf.namelist()
-                if n.lower().endswith("_data.csv")
-            ),
+            (n for n in zf.namelist() if n.lower().endswith("_data.csv")),
             None,
         )
         if data_name is None:
