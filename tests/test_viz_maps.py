@@ -172,6 +172,24 @@ def con_full():
     db.close()
 
 
+@pytest.fixture
+def con_multi():
+    """Connexion avec 2 millésimes : 2013 (2.23M) et 2023 (2.05M) — Paris décroissant."""
+    db = _make_db()
+    _create_tables(db)
+    _create_views(db)
+    db.execute(
+        "INSERT INTO populations VALUES (?, ?, ?, ?, ?, ?)",
+        ["75056", 2013, 2_229_621, None, None, "test"],
+    )
+    db.execute(
+        "INSERT INTO populations VALUES (?, ?, ?, ?, ?, ?)",
+        ["75056", 2023, 2_050_000, None, None, "test"],
+    )
+    yield db
+    db.close()
+
+
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
 
@@ -247,3 +265,22 @@ def test_make_choropleth_commune_fallback_contours_sans_population(con_no_pop, c
         "fallback" in msg.lower() or "contours" in msg.lower()
         for msg in caplog.messages
     )
+
+
+def test_make_choropleth_evolution_demographique(con_multi):
+    """annee_ref déclenche le mode évolution — carte Folium avec palette RdYlGn."""
+    result = make_choropleth(con_multi, "region", annee=2023, annee_ref=2013)
+    assert isinstance(result, folium.Map)
+    html = result.get_root().render()
+    # Légende et source doivent mentionner les deux années
+    assert "2013" in html
+    assert "2023" in html
+    # La palette divergente doit apparaître dans le HTML
+    assert "#d73027" in html or "#1a9850" in html  # rouge ou vert RdYlGn
+
+
+def test_make_choropleth_evolution_titre_auto(con_multi):
+    """Titre auto quand annee_ref fourni sans titre explicite."""
+    result = make_choropleth(con_multi, "region", annee=2023, annee_ref=2013)
+    html = result.get_root().render()
+    assert "volution" in html  # "Évolution démographique 2013 → 2023"

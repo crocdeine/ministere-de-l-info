@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from typing import Literal
 
 import branca.colormap as cm
@@ -122,23 +123,39 @@ _COULEURS_YLORD5 = ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"]
 _COULEUR_CONTOURS = "#4292c6"
 _COULEUR_FOND_CONTOURS = "#f7f7f7"
 
+# Palette et seuils pour le mode évolution démographique (RdYlGn divergente)
+# 6 break points → 5 classes : <-3% | -3→-1% | -1→+1% | +1→+3% | >+3%
+_SEUILS_EVOLUTION: list[float] = [-100.0, -3.0, -1.0, 1.0, 3.0, 100.0]
+_COULEURS_RDYLGN5: list[str] = ["#d73027", "#fc8d59", "#ffffbf", "#91cf60", "#1a9850"]
+
 
 def _fmt_fr(n: float) -> str:
     """Formate un nombre en notation française (espace insécable comme séparateur de milliers)."""
     return f"{int(n):,}".replace(",", " ")
 
 
-def _build_legend_html(titre: str, breaks: list[float], colors: list[str]) -> str:
+def _fmt_pct(n: float) -> str:
+    """Formate un pourcentage avec signe (ex : +4.2% ou -1.3%)."""
+    return f"{n:+.1f}%"
+
+
+def _build_legend_html(
+    titre: str,
+    breaks: list[float],
+    colors: list[str],
+    fmt_fn: Callable[[float], str] | None = None,
+) -> str:
     """Construit le HTML d'une légende discrète à fond blanc (contraste WCAG AA)."""
+    _fmt = fmt_fn if fmt_fn is not None else _fmt_fr
     rows = []
     for i, color in enumerate(colors):
         lo, hi = breaks[i], breaks[i + 1]
         if i == 0:
-            label = f"&lt; {_fmt_fr(hi)}"
+            label = f"&lt; {_fmt(hi)}"
         elif i == len(colors) - 1:
-            label = f"&ge; {_fmt_fr(lo)}"
+            label = f"&ge; {_fmt(lo)}"
         else:
-            label = f"{_fmt_fr(lo)}&nbsp;&ndash; {_fmt_fr(hi)}"
+            label = f"{_fmt(lo)}&nbsp;&ndash; {_fmt(hi)}"
         rows.append(
             f'<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">'
             f'<div style="width:20px;height:14px;background:{color};'
@@ -267,6 +284,52 @@ def _build_query_choropleth(
     return sql, params
 
 
+def _build_query_evolution(
+    niveau: str,
+    annee: int,
+    annee_ref: int,
+    geom_col: str,
+    filtre_departement: str | None,
+    filtre_region: str | None,
+) -> tuple[str, list]:
+    """Requête évolution démographique — double JOIN sur la même vue (p_main / p_ref).
+
+    Retourne delta_abs (habitants) et delta_pct (%) entre annee_ref et annee.
+    """
+    table = _TABLE_PAR_NIVEAU[niveau]
+    vue = _VUE_PAR_NIVEAU[niveau]
+    col_geo, col_vue = _CLE_JOIN[niveau]
+
+    params: list = [annee, annee_ref]
+    where: list[str] = []
+
+    dept_col = _FILTRE_DEPARTEMENT_COL[niveau]
+    if filtre_departement and dept_col:
+        where.append(f"g.{dept_col} = ?")
+        params.append(filtre_departement)
+
+    region_col = _FILTRE_REGION_COL[niveau]
+    if filtre_region and region_col:
+        where.append(f"g.{region_col} = ?")
+        params.append(filtre_region)
+
+    where_sql = f" WHERE {' AND '.join(where)}" if where else ""
+
+    sql = (  # noqa: S608
+        f"SELECT g.{col_geo} AS code, g.nom,"
+        f" (p_main.population_municipale - p_ref.population_municipale) AS delta_abs,"
+        f" 100.0 * (p_main.population_municipale - p_ref.population_municipale)"
+        f" / NULLIF(p_ref.population_municipale, 0) AS delta_pct,"
+        f" ST_AsGeoJSON(g.{geom_col}) AS geojson"
+        f" FROM {table} g"
+        f" JOIN {vue} p_main ON g.{col_geo} = p_main.{col_vue} AND p_main.annee = ?"
+        f" JOIN {vue} p_ref ON g.{col_geo} = p_ref.{col_vue} AND p_ref.annee = ?"
+        f"{where_sql}"
+        f" ORDER BY g.nom"
+    )
+    return sql, params
+
+
 def _build_query_contours(
     niveau: str,
     geom_col: str,
@@ -340,6 +403,7 @@ def make_choropleth(
     niveau: str,
     indicateur: str = "population_municipale",
     annee: int = 2023,
+    annee_ref: int | None = None,
     filtre_departement: str | None = None,
     filtre_region: str | None = None,
     titre: str | None = None,
@@ -349,6 +413,8 @@ def make_choropleth(
     """Crée une carte choroplèthe ou de contours Folium pour un niveau territorial donné.
 
     Pour niveau='commune', filtre_departement est obligatoire.
+    Si annee_ref est fourni (et niveau supporte la population), la carte affiche
+    l'évolution démographique (%) entre annee_ref et annee avec une palette RdYlGn.
     mode='auto' bascule automatiquement en contours si les données population sont absentes.
     """
     if niveau not in _NIVEAUX_SUPPORTES:
@@ -364,11 +430,22 @@ def make_choropleth(
     mode_effectif = _resolve_mode(niveau, mode, con, annee)
     zoomed = bool(filtre_departement or filtre_region)
     geom_col = _get_geometry_column(niveau, zoomed=zoomed)
+    is_evolution = annee_ref is not None and niveau in _VUE_PAR_NIVEAU
 
     if mode_effectif == "choropleth":
-        sql, params = _build_query_choropleth(
-            niveau, indicateur, annee, geom_col, filtre_departement, filtre_region
-        )
+        if is_evolution:
+            sql, params = _build_query_evolution(
+                niveau,
+                annee,
+                annee_ref,
+                geom_col,
+                filtre_departement,
+                filtre_region,  # type: ignore[arg-type]
+            )
+        else:
+            sql, params = _build_query_choropleth(
+                niveau, indicateur, annee, geom_col, filtre_departement, filtre_region
+            )
         rows = con.execute(sql, params).fetchall()
         if not rows:
             logger.warning(
@@ -394,21 +471,43 @@ def make_choropleth(
     values: list[float] = []
 
     if mode_effectif == "choropleth":
-        for code, nom, valeur, geojson_str in rows:
-            v = float(valeur) if valeur is not None else 0.0
-            values.append(v)
-            features.append(
-                {
-                    "type": "Feature",
-                    "properties": {
-                        "code": code,
-                        "nom": nom,
-                        "valeur": v,
-                        "valeur_fmt": _fmt_fr(v),
-                    },
-                    "geometry": json.loads(geojson_str),
-                }
-            )
+        if is_evolution:
+            for code, nom, delta_abs, delta_pct, geojson_str in rows:
+                v = float(delta_pct) if delta_pct is not None else 0.0
+                values.append(v)
+                icon = "↗" if v > 1.0 else ("↘" if v < -1.0 else "→")
+                abs_val = int(delta_abs) if delta_abs is not None else 0
+                abs_str = (f"+{abs_val:,}" if abs_val >= 0 else f"{abs_val:,}").replace(
+                    ",", " "
+                )
+                features.append(
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "code": code,
+                            "nom": nom,
+                            "valeur": v,
+                            "valeur_fmt": f"{icon} {v:+.1f}% ({abs_str} hab)",
+                        },
+                        "geometry": json.loads(geojson_str),
+                    }
+                )
+        else:
+            for code, nom, valeur, geojson_str in rows:
+                v = float(valeur) if valeur is not None else 0.0
+                values.append(v)
+                features.append(
+                    {
+                        "type": "Feature",
+                        "properties": {
+                            "code": code,
+                            "nom": nom,
+                            "valeur": v,
+                            "valeur_fmt": _fmt_fr(v),
+                        },
+                        "geometry": json.loads(geojson_str),
+                    }
+                )
     else:
         for code, nom, geojson_str in rows:
             features.append(
@@ -435,13 +534,32 @@ def make_choropleth(
     libelle = _LIBELLES_NIVEAUX[niveau]
 
     if mode_effectif == "choropleth":
-        breaks = _compute_breaks(values)
-        colormap = cm.StepColormap(
-            colors=_COULEURS_YLORD5,
-            index=breaks,
-            vmin=breaks[0],
-            vmax=breaks[-1],
-        )
+        if is_evolution:
+            breaks = _SEUILS_EVOLUTION
+            legend_colors = _COULEURS_RDYLGN5
+            colormap = cm.StepColormap(
+                colors=_COULEURS_RDYLGN5,
+                index=_SEUILS_EVOLUTION,
+                vmin=_SEUILS_EVOLUTION[0],
+                vmax=_SEUILS_EVOLUTION[-1],
+            )
+            tooltip_aliases = [
+                f"{libelle} :",
+                f"Évolution {annee_ref}→{annee} :",
+            ]
+        else:
+            breaks = _compute_breaks(values)
+            legend_colors = _COULEURS_YLORD5
+            colormap = cm.StepColormap(
+                colors=_COULEURS_YLORD5,
+                index=breaks,
+                vmin=breaks[0],
+                vmax=breaks[-1],
+            )
+            tooltip_aliases = [
+                f"{libelle} :",
+                f"{indicateur.replace('_', ' ').capitalize()} :",
+            ]
         style_fn = lambda f, _cm=colormap: {  # noqa: E731
             "fillColor": _cm(f["properties"]["valeur"]),
             "fillOpacity": 0.75,
@@ -449,10 +567,6 @@ def make_choropleth(
             "weight": 0.5,
         }
         tooltip_fields = ["nom", "valeur_fmt"]
-        tooltip_aliases = [
-            f"{libelle} :",
-            f"{indicateur.replace('_', ' ').capitalize()} :",
-        ]
     else:
         style_fn = lambda _f: {  # noqa: E731
             "fillColor": _COULEUR_FOND_CONTOURS,
@@ -477,12 +591,29 @@ def make_choropleth(
 
     if mode_effectif == "choropleth":
         if titre is None:
-            titre = f"{indicateur.replace('_', ' ').capitalize()} — {annee}"
+            titre = (
+                f"Évolution démographique {annee_ref} → {annee}"
+                if is_evolution
+                else f"{indicateur.replace('_', ' ').capitalize()} — {annee}"
+            )
         m.get_root().html.add_child(
-            folium.Element(_build_legend_html(titre, breaks, _COULEURS_YLORD5))
+            folium.Element(
+                _build_legend_html(
+                    titre,
+                    breaks,
+                    legend_colors,
+                    fmt_fn=_fmt_pct if is_evolution else None,
+                )
+            )
         )
 
-    source_txt = f"{_SOURCE}{' ' + str(annee) if mode_effectif == 'choropleth' else ''}"
+    if mode_effectif == "choropleth" and is_evolution:
+        source_suffix = f" ({annee_ref}→{annee})"
+    elif mode_effectif == "choropleth":
+        source_suffix = f" {annee}"
+    else:
+        source_suffix = ""
+    source_txt = f"{_SOURCE}{source_suffix}"
     m.get_root().html.add_child(
         folium.Element(
             '<div style="position:fixed;bottom:12px;right:12px;z-index:1000;background:white;'

@@ -125,6 +125,50 @@ def test_tableau_departement_filtre_region(con):
     assert all(r[0] in ("75", "77", "78", "91", "92", "93", "94", "95") for r in rows)
 
 
+def test_evolution_query_regions_idf(con):
+    """Double JOIN millésime sur v_population_region — Île-de-France croissante 2013→2023."""
+    row = con.execute("""
+        SELECT g.code_insee AS code,
+               (p_main.population_municipale - p_ref.population_municipale) AS delta_abs,
+               100.0 * (p_main.population_municipale - p_ref.population_municipale)
+                   / NULLIF(p_ref.population_municipale, 0) AS delta_pct
+        FROM geographies_regions g
+        LEFT JOIN v_population_region p_main
+            ON g.code_insee = p_main.code_region AND p_main.annee = 2023
+        LEFT JOIN v_population_region p_ref
+            ON g.code_insee = p_ref.code_region AND p_ref.annee = 2013
+        WHERE g.code_insee = '11'
+    """).fetchone()
+    assert row is not None
+    code, delta_abs, delta_pct = row
+    assert code == "11"
+    assert delta_abs is not None and delta_abs > 0, (
+        "Île-de-France : croissance 2013→2023"
+    )
+    assert delta_pct is not None and delta_pct > 2.0, (
+        f"Croissance IdF attendue > 2%, obtenu {delta_pct:.2f}%"
+    )
+
+
+def test_evolution_query_commune_paris_decroissance(con):
+    """Paris (75056) est en décroissance démographique 2013→2023."""
+    row = con.execute("""
+        SELECT (p_main.population_municipale - p_ref.population_municipale) AS delta_abs,
+               100.0 * (p_main.population_municipale - p_ref.population_municipale)
+                   / NULLIF(p_ref.population_municipale, 0) AS delta_pct
+        FROM v_population_commune p_main
+        JOIN v_population_commune p_ref
+            ON p_main.code_commune = p_ref.code_commune
+        WHERE p_main.code_commune = '75056'
+          AND p_main.annee = 2023
+          AND p_ref.annee = 2013
+    """).fetchone()
+    assert row is not None
+    delta_abs, delta_pct = row
+    assert delta_abs < 0, f"Paris : décroissance attendue, obtenu {delta_abs:+,}"
+    assert delta_pct < -2.0, f"Paris : delta > 2% attendu, obtenu {delta_pct:.2f}%"
+
+
 @pytest.mark.parametrize("annee", [2013, 2018, 2023])
 def test_tableau_region_millesimes(con, annee):
     """Le tableau régions renvoie des populations différentes selon le millésime."""

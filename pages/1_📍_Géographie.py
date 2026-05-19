@@ -66,6 +66,16 @@ _FILTRE_REGION_COL: dict[str, str] = {
 }
 
 
+def _format_evolution(delta_abs: float | None, delta_pct: float | None) -> str:
+    """Formate l'évolution démographique : '↗ +4.2% (+503 260 hab)'."""
+    if delta_abs is None or delta_pct is None:
+        return "—"
+    icon = "↗" if delta_pct > 1.0 else ("↘" if delta_pct < -1.0 else "→")
+    abs_val = int(delta_abs)
+    abs_str = (f"+{abs_val:,}" if abs_val >= 0 else f"{abs_val:,}").replace(",", " ")
+    return f"{icon} {delta_pct:+.1f}% ({abs_str} hab)"
+
+
 @st.cache_resource
 def _get_con() -> duckdb.DuckDBPyConnection:
     """Connexion DuckDB partagée en lecture seule."""
@@ -114,6 +124,24 @@ with st.sidebar:
             f"{', '.join(str(a) for a in sorted(annees_dispo))}"
         )
 
+    # Comparaison inter-millésimes (contextuelle)
+    annee_ref: int | None = None
+    indicateur_carte = "Population absolue"
+    if len(annees_dispo) > 1 and niveau in _VUE_POP:
+        annees_compare = sorted(a for a in annees_dispo if a != annee)
+        annee_ref = st.selectbox(
+            "Comparer avec",
+            [None, *annees_compare],
+            format_func=lambda x: "Aucune comparaison" if x is None else str(x),
+            help="Affiche l'évolution démographique par rapport à l'année choisie",
+        )
+        if annee_ref is not None:
+            indicateur_carte = st.radio(
+                "Indicateur cartographique",
+                ["Population absolue", "Évolution démographique"],
+                horizontal=True,
+            )
+
     # Filtre département (contextuel)
     filtre_departement: str | None = None
     if niveau in _FILTRE_DEPT_COL:
@@ -157,15 +185,23 @@ with st.sidebar:
 # ── Carte ────────────────────────────────────────────────────────────────────
 
 _a_population = niveau in _VUE_POP and mode != "contours"
-titre_carte = (
-    f"Population municipale {annee}" if _a_population else "Contours territoriaux"
+_mode_evolution = (
+    indicateur_carte == "Évolution démographique" and annee_ref is not None
 )
+
+if _mode_evolution:
+    titre_carte = f"Évolution démographique {annee_ref} → {annee}"
+elif _a_population:
+    titre_carte = f"Population municipale {annee}"
+else:
+    titre_carte = "Contours territoriaux"
 
 try:
     carte = make_choropleth(
         con,
         niveau=niveau,
         annee=annee,
+        annee_ref=annee_ref if _mode_evolution else None,
         filtre_departement=filtre_departement,
         filtre_region=filtre_region,
         titre=titre_carte,
@@ -191,7 +227,12 @@ meta = con.execute(
 
 if meta:
     loaded_at, source, row_count = meta
-    pop_info = f"Population municipale {annee} (INSEE) · " if _a_population else ""
+    if _mode_evolution:
+        pop_info = f"Évolution {annee_ref}→{annee} (INSEE) · "
+    elif _a_population:
+        pop_info = f"Population municipale {annee} (INSEE) · "
+    else:
+        pop_info = ""
     st.caption(f"📊 {row_count:,} entités · {pop_info}Géométries : data.geopf.fr")
 else:
     st.caption("⚠️ Aucune métadonnée ETL pour ce niveau.")
@@ -204,40 +245,67 @@ if niveau in _VUE_POP:
     vue, vue_code = _VUE_POP[niveau]
     table, code_col = _TABLE_CODE[niveau]
 
-    params: list = [annee]
+    # Filtres géographiques communs
     where: list[str] = []
-
+    geo_params: list = []
     dept_col = _FILTRE_DEPT_COL.get(niveau)
     if filtre_departement and dept_col:
         where.append(f"g.{dept_col} = ?")
-        params.append(filtre_departement)
-
+        geo_params.append(filtre_departement)
     region_col = _FILTRE_REGION_COL.get(niveau)
     if filtre_region and region_col:
         where.append(f"g.{region_col} = ?")
-        params.append(filtre_region)
-
+        geo_params.append(filtre_region)
     where_sql = f"AND {' AND '.join(where)}" if where else ""
 
-    rows = con.execute(  # noqa: S608
-        f"SELECT g.{code_col} AS code, g.nom,"
-        f" COALESCE(p.population_municipale, 0) AS pop"
-        f" FROM {table} g"
-        f" LEFT JOIN {vue} p ON g.{code_col} = p.{vue_code} AND p.annee = ?"
-        f" {where_sql}"
-        f" ORDER BY pop DESC NULLS LAST LIMIT 200",
-        params,
-    ).fetchall()
-
-    df = pl.DataFrame(
-        {
-            "Code": [r[0] for r in rows],
-            "Nom": [r[1] for r in rows],
-            f"Population municipale {annee}": [
-                f"{r[2]:,}".replace(",", " ") if r[2] else "—" for r in rows
-            ],
-        }
-    )
+    if annee_ref is not None:
+        # Double JOIN millesime — ajoute une colonne evolution
+        rows = con.execute(  # noqa: S608
+            f"SELECT g.{code_col} AS code, g.nom,"
+            f" COALESCE(p_main.population_municipale, 0) AS pop_main,"
+            f" (p_main.population_municipale - p_ref.population_municipale) AS delta_abs,"
+            f" 100.0 * (p_main.population_municipale - p_ref.population_municipale)"
+            f" / NULLIF(p_ref.population_municipale, 0) AS delta_pct"
+            f" FROM {table} g"
+            f" LEFT JOIN {vue} p_main"
+            f"   ON g.{code_col} = p_main.{vue_code} AND p_main.annee = ?"
+            f" LEFT JOIN {vue} p_ref"
+            f"   ON g.{code_col} = p_ref.{vue_code} AND p_ref.annee = ?"
+            f" {where_sql}"
+            f" ORDER BY pop_main DESC NULLS LAST LIMIT 200",
+            [annee, annee_ref, *geo_params],
+        ).fetchall()
+        df = pl.DataFrame(
+            {
+                "Code": [r[0] for r in rows],
+                "Nom": [r[1] for r in rows],
+                f"Population municipale {annee}": [
+                    f"{r[2]:,}".replace(",", " ") if r[2] else "—" for r in rows
+                ],
+                f"Évolution {annee_ref}→{annee}": [
+                    _format_evolution(r[3], r[4]) for r in rows
+                ],
+            }
+        )
+    else:
+        rows = con.execute(  # noqa: S608
+            f"SELECT g.{code_col} AS code, g.nom,"
+            f" COALESCE(p.population_municipale, 0) AS pop"
+            f" FROM {table} g"
+            f" LEFT JOIN {vue} p ON g.{code_col} = p.{vue_code} AND p.annee = ?"
+            f" {where_sql}"
+            f" ORDER BY pop DESC NULLS LAST LIMIT 200",
+            [annee, *geo_params],
+        ).fetchall()
+        df = pl.DataFrame(
+            {
+                "Code": [r[0] for r in rows],
+                "Nom": [r[1] for r in rows],
+                f"Population municipale {annee}": [
+                    f"{r[2]:,}".replace(",", " ") if r[2] else "—" for r in rows
+                ],
+            }
+        )
 else:
     # ARM ou circonscriptions : pas de population
     table, code_col = _TABLE_CODE[niveau]
