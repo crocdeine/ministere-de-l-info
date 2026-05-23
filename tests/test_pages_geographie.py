@@ -36,9 +36,7 @@ def test_connection_read_only(con):
 
 def test_populations_query(con):
     """La requête des millésimes disponibles renvoie une liste (vide ou non)."""
-    rows = con.execute(
-        "SELECT DISTINCT annee FROM populations ORDER BY annee DESC"
-    ).fetchall()
+    rows = con.execute("SELECT DISTINCT annee FROM populations ORDER BY annee DESC").fetchall()
     assert isinstance(rows, list)
 
 
@@ -56,9 +54,7 @@ def test_departements_query(con):
 
 def test_regions_query(con):
     """La requête du sélecteur région renvoie 18 lignes (13 métro + 5 DROM)."""
-    rows = con.execute(
-        "SELECT code_insee, nom FROM geographies_regions ORDER BY nom"
-    ).fetchall()
+    rows = con.execute("SELECT code_insee, nom FROM geographies_regions ORDER BY nom").fetchall()
     assert len(rows) == 18
 
 
@@ -142,9 +138,7 @@ def test_evolution_query_regions_idf(con):
     assert row is not None
     code, delta_abs, delta_pct = row
     assert code == "11"
-    assert delta_abs is not None and delta_abs > 0, (
-        "Île-de-France : croissance 2013→2023"
-    )
+    assert delta_abs is not None and delta_abs > 0, "Île-de-France : croissance 2013→2023"
     assert delta_pct is not None and delta_pct > 2.0, (
         f"Croissance IdF attendue > 2%, obtenu {delta_pct:.2f}%"
     )
@@ -183,13 +177,9 @@ def test_tableau_region_millesimes(con, annee):
         """,
         [annee],
     ).fetchall()
-    n_pop = con.execute(
-        "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
-    ).fetchone()[0]
+    n_pop = con.execute("SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]).fetchone()[0]
     if n_pop == 0:
         pytest.skip(f"Millésime {annee} non chargé")
     assert len(rows) == 18
     idf = next((r[1] for r in rows if r[0] == "11"), None)
-    assert idf is not None and idf > 10_000_000, (
-        f"Île-de-France ({annee}) : {idf} — attendu > 10M"
-    )
+    assert idf is not None and idf > 10_000_000, f"Île-de-France ({annee}) : {idf} — attendu > 10M"

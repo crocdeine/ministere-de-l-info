@@ -15,9 +15,7 @@ _CODES_METRO_ATTENDUS = frozenset(POPULATION_2024.keys())
 def test_fetch_geojson_13_features() -> None:
     """L'API renvoie bien 13 régions métropolitaines après filtrage."""
     data = fetch_regions_geojson()
-    assert len(data["features"]) == 13, (
-        f"Attendu 13 features, obtenu {len(data['features'])}"
-    )
+    assert len(data["features"]) == 13, f"Attendu 13 features, obtenu {len(data['features'])}"
 
 
 def test_codes_insee_sont_des_strings_valides() -> None:

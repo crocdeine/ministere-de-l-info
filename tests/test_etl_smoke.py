@@ -57,14 +57,10 @@ def test_count_populations_2023(con):
 @pytest.mark.parametrize("annee", [2013, 2018, 2023])
 def test_count_populations_par_millesime(con, annee):
     """Chaque millésime chargé a entre 34 000 et 36 000 communes."""
-    n = con.execute(
-        "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
-    ).fetchone()[0]
+    n = con.execute("SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]).fetchone()[0]
     if n == 0:
         pytest.skip(f"Millésime {annee} non chargé")
-    assert 34000 <= n <= 36000, (
-        f"populations {annee} : {n} lignes hors fourchette [34000-36000]"
-    )
+    assert 34000 <= n <= 36000, f"populations {annee} : {n} lignes hors fourchette [34000-36000]"
 
 
 @pytest.mark.parametrize(
@@ -77,9 +73,7 @@ def test_count_populations_par_millesime(con, annee):
 )
 def test_populations_somme_nationale_par_millesime(con, annee, pop_lo, pop_hi):
     """Somme population municipale par millésime dans la fourchette attendue."""
-    row = con.execute(
-        "SELECT SUM(municipale) FROM populations WHERE annee = ?", [annee]
-    ).fetchone()
+    row = con.execute("SELECT SUM(municipale) FROM populations WHERE annee = ?", [annee]).fetchone()
     total = row[0] if row and row[0] else 0
     if total == 0:
         pytest.skip(f"Millésime {annee} non chargé")
@@ -135,8 +129,7 @@ def test_no_duplicate_populations_key(con):
 )
 def test_geometries_valides(con, table, geom_col):
     invalides = con.execute(  # noqa: S608
-        f"SELECT COUNT(*) FROM {table}"
-        f" WHERE {geom_col} IS NOT NULL AND NOT ST_IsValid({geom_col})"
+        f"SELECT COUNT(*) FROM {table} WHERE {geom_col} IS NOT NULL AND NOT ST_IsValid({geom_col})"
     ).fetchone()[0]
     assert invalides == 0, f"{table}.{geom_col}: {invalides} géométries invalides"
 
@@ -214,9 +207,7 @@ def test_fk_communes_vers_regions(con):
         SELECT COUNT(*) FROM geographies_communes
         WHERE code_region NOT IN (SELECT code_insee FROM geographies_regions)
     """).fetchone()[0]
-    assert orphelins <= 5, (
-        f"{orphelins} communes avec code_region orphelin (attendu ≤ 5 pour SPM)"
-    )
+    assert orphelins <= 5, f"{orphelins} communes avec code_region orphelin (attendu ≤ 5 pour SPM)"
 
 
 def test_fk_communes_vers_epci(con):
@@ -277,10 +268,7 @@ def test_regions_codes_spot(con):
         "93",
         "94",
     }
-    codes_db = {
-        r[0]
-        for r in con.execute("SELECT code_insee FROM geographies_regions").fetchall()
-    }
+    codes_db = {r[0] for r in con.execute("SELECT code_insee FROM geographies_regions").fetchall()}
     manquants = codes_metro - codes_db
     assert not manquants, f"Régions métro manquantes : {manquants}"
 
@@ -320,9 +308,7 @@ def test_populations_comptee_a_part_null(con):
     non_null = con.execute(
         "SELECT COUNT(*) FROM populations WHERE annee = 2023 AND comptee_a_part IS NOT NULL"
     ).fetchone()[0]
-    assert non_null == 0, (
-        f"{non_null} lignes avec comptee_a_part non NULL — PCAP inattendu chargé"
-    )
+    assert non_null == 0, f"{non_null} lignes avec comptee_a_part non NULL — PCAP inattendu chargé"
 
 
 def test_arm_counts_par_ville(con):
@@ -339,10 +325,7 @@ def test_arm_counts_par_ville(con):
 def test_epci_types_presents(con):
     """Au moins 1 EPT (Grand Paris) et 1 ME (Métropole) parmi les EPCI."""
     types = {
-        r[0]
-        for r in con.execute(
-            "SELECT DISTINCT type_epci FROM geographies_epci"
-        ).fetchall()
+        r[0] for r in con.execute("SELECT DISTINCT type_epci FROM geographies_epci").fetchall()
     }
     assert "EPT" in types, "Aucun EPT trouvé dans geographies_epci"
     assert "ME" in types, "Aucune Métropole (ME) trouvée dans geographies_epci"
@@ -350,9 +333,9 @@ def test_epci_types_presents(con):
 
 def test_epci_ept_sans_departement(con):
     """11 EPT ont code_departement_principal = NULL — anomalie WFS connue."""
-    n_ept = con.execute(
-        "SELECT COUNT(*) FROM geographies_epci WHERE type_epci = 'EPT'"
-    ).fetchone()[0]
+    n_ept = con.execute("SELECT COUNT(*) FROM geographies_epci WHERE type_epci = 'EPT'").fetchone()[
+        0
+    ]
     n_ept_null = con.execute(
         "SELECT COUNT(*) FROM geographies_epci WHERE type_epci = 'EPT' AND code_departement_principal IS NULL"
     ).fetchone()[0]
@@ -367,9 +350,7 @@ def test_epci_ept_sans_departement(con):
 
 def test_vue_population_region_count(con):
     """v_population_region 2023 : 17 lignes (Mayotte region 06 exclue — attendu)."""
-    n = con.execute(
-        "SELECT COUNT(*) FROM v_population_region WHERE annee = 2023"
-    ).fetchone()[0]
+    n = con.execute("SELECT COUNT(*) FROM v_population_region WHERE annee = 2023").fetchone()[0]
     assert n == 17, (
         f"v_population_region 2023 : {n} lignes (attendu 17 — Mayotte hors source INSEE)"
     )
@@ -377,9 +358,9 @@ def test_vue_population_region_count(con):
 
 def test_vue_population_departement_count(con):
     """v_population_departement 2023 : 100 lignes (Mayotte dpt 976 exclu — attendu)."""
-    n = con.execute(
-        "SELECT COUNT(*) FROM v_population_departement WHERE annee = 2023"
-    ).fetchone()[0]
+    n = con.execute("SELECT COUNT(*) FROM v_population_departement WHERE annee = 2023").fetchone()[
+        0
+    ]
     assert n == 100, (
         f"v_population_departement 2023 : {n} lignes (attendu 100 — Mayotte hors source INSEE)"
     )
@@ -387,31 +368,23 @@ def test_vue_population_departement_count(con):
 
 def test_vue_population_commune_coherente(con):
     """v_population_commune 2023 : même count que populations pour annee=2023."""
-    n_pop = con.execute(
-        "SELECT COUNT(*) FROM populations WHERE annee = 2023"
-    ).fetchone()[0]
-    n_vue = con.execute(
-        "SELECT COUNT(*) FROM v_population_commune WHERE annee = 2023"
-    ).fetchone()[0]
-    assert n_pop == n_vue, (
-        f"v_population_commune ({n_vue}) ≠ populations ({n_pop}) pour annee=2023"
-    )
+    n_pop = con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023").fetchone()[0]
+    n_vue = con.execute("SELECT COUNT(*) FROM v_population_commune WHERE annee = 2023").fetchone()[
+        0
+    ]
+    assert n_pop == n_vue, f"v_population_commune ({n_vue}) ≠ populations ({n_pop}) pour annee=2023"
 
 
 @pytest.mark.parametrize("annee", [2013, 2018, 2023])
 def test_vue_population_commune_tous_millesimes(con, annee):
     """v_population_commune reflète fidèlement la table populations pour chaque millésime."""
-    n_pop = con.execute(
-        "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
-    ).fetchone()[0]
+    n_pop = con.execute("SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]).fetchone()[0]
     if n_pop == 0:
         pytest.skip(f"Millésime {annee} non chargé")
     n_vue = con.execute(
         "SELECT COUNT(*) FROM v_population_commune WHERE annee = ?", [annee]
     ).fetchone()[0]
-    assert n_pop == n_vue, (
-        f"v_population_commune {annee} : {n_vue} lignes ≠ populations {n_pop}"
-    )
+    assert n_pop == n_vue, f"v_population_commune {annee} : {n_vue} lignes ≠ populations {n_pop}"
 
 
 def test_vue_population_region_somme_totale(con):
@@ -480,7 +453,5 @@ def test_etl_metadata_populations_2023(con):
         "SELECT row_count FROM _etl_metadata WHERE table_name = 'populations_2023'"
     ).fetchone()
     assert meta is not None, "_etl_metadata : entrée 'populations_2023' absente"
-    count_pop = con.execute(
-        "SELECT COUNT(*) FROM populations WHERE annee = 2023"
-    ).fetchone()[0]
+    count_pop = con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023").fetchone()[0]
     assert meta[0] == count_pop, f"populations_2023 metadata : {meta[0]} ≠ {count_pop}"

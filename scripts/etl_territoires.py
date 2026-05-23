@@ -183,9 +183,7 @@ def _create_schema(con: duckdb.DuckDBPyConnection) -> None:
         [_SCHEMA_VERSION],
     )
 
-    logger.info(
-        "Schéma v%d créé/vérifié : 9 tables (7 métier + 2 méta)", _SCHEMA_VERSION
-    )
+    logger.info("Schéma v%d créé/vérifié : 9 tables (7 métier + 2 méta)", _SCHEMA_VERSION)
 
 
 # ── Chargeurs (stubs — implémentés aux étapes 5–12) ──────────────────────────
@@ -202,9 +200,7 @@ def _load_regions(con: duckdb.DuckDBPyConnection, force: bool = False) -> None:
     Écrit dans _etl_metadata après succès.
     """
     raw_dir = ROOT / "data" / "raw"
-    batch_paths = list(
-        fetch_admin_express("region", dom=True, force=force, raw_dir=raw_dir)
-    )
+    batch_paths = list(fetch_admin_express("region", dom=True, force=force, raw_dir=raw_dir))
 
     con.execute("DROP TABLE IF EXISTS geographies_regions")
     con.execute("""
@@ -273,9 +269,7 @@ def _load_departements(con: duckdb.DuckDBPyConnection, force: bool = False) -> N
     """
     raw_dir = ROOT / "data" / "raw"
     batch_paths = list(
-        fetch_admin_express(
-            "departement", dom=True, force=force, batch_size=50, raw_dir=raw_dir
-        )
+        fetch_admin_express("departement", dom=True, force=force, batch_size=50, raw_dir=raw_dir)
     )
 
     con.execute("DROP TABLE IF EXISTS geographies_departements")
@@ -350,9 +344,7 @@ def _load_departements(con: duckdb.DuckDBPyConnection, force: bool = False) -> N
     ]
     logger.info("Chargé %d départements (codes : %s … %s)", count, codes[0], codes[-1])
 
-    con.execute(
-        "DELETE FROM _etl_metadata WHERE table_name = 'geographies_departements'"
-    )
+    con.execute("DELETE FROM _etl_metadata WHERE table_name = 'geographies_departements'")
     con.execute(
         "INSERT INTO _etl_metadata VALUES (?, NOW(), 'ADMINEXPRESS-COG.LATEST', ?)",
         ["geographies_departements", count],
@@ -372,9 +364,7 @@ def _load_epci(con: duckdb.DuckDBPyConnection, force: bool = False) -> None:
     """
     raw_dir = ROOT / "data" / "raw"
     batch_paths = list(
-        fetch_admin_express(
-            "epci", dom=True, force=force, batch_size=500, raw_dir=raw_dir
-        )
+        fetch_admin_express("epci", dom=True, force=force, batch_size=500, raw_dir=raw_dir)
     )
 
     con.execute("DROP TABLE IF EXISTS geographies_epci")
@@ -492,9 +482,7 @@ def _load_communes(
         try:
             reponse = input("Continuer ? [oui/non] ").strip().lower()
         except (EOFError, KeyboardInterrupt):
-            logger.info(
-                "Chargement communes annulé (entrée non-interactive ou Ctrl-C)."
-            )
+            logger.info("Chargement communes annulé (entrée non-interactive ou Ctrl-C).")
             return
         if reponse != "oui":
             logger.info("Chargement communes annulé par l'utilisateur.")
@@ -502,9 +490,7 @@ def _load_communes(
 
     raw_dir = ROOT / "data" / "raw"
     batch_paths = list(
-        fetch_admin_express(
-            "commune", dom=True, force=force, batch_size=1000, raw_dir=raw_dir
-        )
+        fetch_admin_express("commune", dom=True, force=force, batch_size=1000, raw_dir=raw_dir)
     )
 
     con.execute("DROP TABLE IF EXISTS geographies_communes")
@@ -574,9 +560,7 @@ def _load_communes(
     )
 
 
-def _load_arrondissements_municipaux(
-    con: duckdb.DuckDBPyConnection, force: bool = False
-) -> None:
+def _load_arrondissements_municipaux(con: duckdb.DuckDBPyConnection, force: bool = False) -> None:
     """Charge les 45 arrondissements municipaux (Paris 20, Lyon 9, Marseille 16).
 
     Source : fetch_admin_express("arrondissement_municipal", dom=True, batch_size=500) — WFS IGN.
@@ -626,9 +610,7 @@ def _load_arrondissements_municipaux(
             FROM ST_Read('{path_sql}')
         """)
 
-    count = con.execute(
-        "SELECT COUNT(*) FROM geographies_arrondissements_municipaux"
-    ).fetchone()[0]
+    count = con.execute("SELECT COUNT(*) FROM geographies_arrondissements_municipaux").fetchone()[0]
     if count != 45:
         raise RuntimeError(
             f"Nombre d'arrondissements incorrect : {count} (attendu 45 = Paris 20 + Lyon 9 + Marseille 16). "
@@ -640,9 +622,7 @@ def _load_arrondissements_municipaux(
         "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere IS NULL"
     ).fetchone()[0]
     if nulls > 0:
-        raise RuntimeError(
-            f"{nulls} ARM avec code_commune_mere NULL — vérifier le WFS IGN."
-        )
+        raise RuntimeError(f"{nulls} ARM avec code_commune_mere NULL — vérifier le WFS IGN.")
 
     # 3 communes-mères exactes
     meres = {
@@ -749,9 +729,7 @@ def _load_circonscriptions(con: duckdb.DuckDBPyConnection, force: bool = False) 
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
 
-    count = con.execute("SELECT COUNT(*) FROM geographies_circonscriptions").fetchone()[
-        0
-    ]
+    count = con.execute("SELECT COUNT(*) FROM geographies_circonscriptions").fetchone()[0]
     if not (550 <= count <= 565):
         raise RuntimeError(
             f"Nombre de circonscriptions hors fourchette [550-565] : {count}. "
@@ -759,9 +737,7 @@ def _load_circonscriptions(con: duckdb.DuckDBPyConnection, force: bool = False) 
         )
     logger.info("Chargé %d circonscriptions législatives.", count)
 
-    con.execute(
-        "DELETE FROM _etl_metadata WHERE table_name = 'geographies_circonscriptions'"
-    )
+    con.execute("DELETE FROM _etl_metadata WHERE table_name = 'geographies_circonscriptions'")
     con.execute(
         "INSERT INTO _etl_metadata VALUES (?, NOW(), 'data.gouv.fr/jerome-desboeufs', ?)",
         ["geographies_circonscriptions", count],
@@ -814,9 +790,9 @@ def _load_populations(
         """)
         con.unregister("_pop_temp")
 
-        count = con.execute(
-            "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
-        ).fetchone()[0]
+        count = con.execute("SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]).fetchone()[
+            0
+        ]
         logger.info("Populations %d chargées : %d communes.", annee, count)
 
         meta_key = f"populations_{annee}"
@@ -960,9 +936,7 @@ def main() -> None:
     try:
         millesimes = [int(m.strip()) for m in args.millesimes.split(",")]
     except ValueError:
-        parser.error(
-            f"--millesimes invalide : {args.millesimes!r} — attendu ex: '2013,2018,2023'"
-        )
+        parser.error(f"--millesimes invalide : {args.millesimes!r} — attendu ex: '2013,2018,2023'")
 
     con = _open_connection()
     _create_schema(con)

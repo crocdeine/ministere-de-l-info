@@ -214,10 +214,7 @@ def test_make_choropleth_fallback_contours_when_no_populations(con_no_pop, caplo
         result = make_choropleth(con_no_pop, "region", mode="auto")
 
     assert isinstance(result, folium.Map)
-    assert any(
-        "fallback" in msg.lower() or "contours" in msg.lower()
-        for msg in caplog.messages
-    )
+    assert any("fallback" in msg.lower() or "contours" in msg.lower() for msg in caplog.messages)
 
 
 def test_make_choropleth_mode_choropleth_force_raises_if_no_data(con_no_pop):
@@ -257,14 +254,9 @@ def test_make_choropleth_commune_choropleth_avec_population(con_full):
 def test_make_choropleth_commune_fallback_contours_sans_population(con_no_pop, caplog):
     """niveau='commune' sans données population → fallback contours + warning."""
     with caplog.at_level(logging.WARNING, logger="ministere_de_l_info.viz.maps"):
-        result = make_choropleth(
-            con_no_pop, "commune", filtre_departement="75", mode="auto"
-        )
+        result = make_choropleth(con_no_pop, "commune", filtre_departement="75", mode="auto")
     assert isinstance(result, folium.Map)
-    assert any(
-        "fallback" in msg.lower() or "contours" in msg.lower()
-        for msg in caplog.messages
-    )
+    assert any("fallback" in msg.lower() or "contours" in msg.lower() for msg in caplog.messages)
 
 
 def test_make_choropleth_evolution_demographique(con_multi):

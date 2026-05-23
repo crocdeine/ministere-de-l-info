@@ -13,7 +13,7 @@ import duckdb
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))  # noqa: E402
 
-from ministere_de_l_info.data_sources.geo import POPULATION_2024, fetch_regions_geojson  # noqa: E402
+from ministere_de_l_info.data_sources.geo import POPULATION_2024, fetch_regions_geojson  # noqa: E402, I001
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)
@@ -29,9 +29,7 @@ def download_if_needed(force: bool) -> None:
         return
     RAW_PATH.parent.mkdir(parents=True, exist_ok=True)
     data = fetch_regions_geojson()
-    RAW_PATH.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    RAW_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     logger.info("Sauvegardé : %s", RAW_PATH)
 
 
@@ -42,9 +40,7 @@ def load_into_duckdb() -> None:
     con.execute("INSTALL spatial; LOAD spatial;")
 
     # Clause VALUES pour la population — données internes, pas de risque d'injection
-    pop_values = ", ".join(
-        f"('{code}', {pop})" for code, pop in POPULATION_2024.items()
-    )
+    pop_values = ", ".join(f"('{code}', {pop})" for code, pop in POPULATION_2024.items())
     geojson_path = str(RAW_PATH).replace("'", "''")  # échappement SQL du chemin
 
     con.execute(f"""
@@ -66,9 +62,7 @@ def load_into_duckdb() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="ETL contours des régions françaises")
-    parser.add_argument(
-        "--force", action="store_true", help="Forcer le re-téléchargement"
-    )
+    parser.add_argument("--force", action="store_true", help="Forcer le re-téléchargement")
     args = parser.parse_args()
 
     download_if_needed(args.force)

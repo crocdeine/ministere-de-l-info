@@ -29,13 +29,9 @@ _NIVEAUX_SUPPORTES: frozenset[str] = frozenset(
     }
 )
 # Niveaux pour lesquels une vue population existe
-_NIVEAUX_POPULATION: frozenset[str] = frozenset(
-    {"region", "departement", "epci", "commune"}
-)
+_NIVEAUX_POPULATION: frozenset[str] = frozenset({"region", "departement", "epci", "commune"})
 # Niveaux sans agrégation population possible — contours est le comportement normal
-_NIVEAUX_CONTOURS: frozenset[str] = frozenset(
-    {"arrondissement_municipal", "circonscription"}
-)
+_NIVEAUX_CONTOURS: frozenset[str] = frozenset({"arrondissement_municipal", "circonscription"})
 
 _TABLE_PAR_NIVEAU: dict[str, str] = {
     "region": "geographies_regions",
@@ -193,9 +189,7 @@ def _get_geometry_column(niveau: str, *, zoomed: bool) -> str:
     return _GEOMETRIE_NATIONALE[niveau]
 
 
-def _check_population_disponible(
-    con: duckdb.DuckDBPyConnection, niveau: str, annee: int
-) -> bool:
+def _check_population_disponible(con: duckdb.DuckDBPyConnection, niveau: str, annee: int) -> bool:
     """Retourne True si la vue population contient des données pour l'année demandée."""
     vue = _VUE_PAR_NIVEAU.get(niveau)
     if vue is None:
@@ -455,9 +449,7 @@ def make_choropleth(
             mode_effectif = "contours"
 
     if mode_effectif == "contours":
-        sql, params = _build_query_contours(
-            niveau, geom_col, filtre_departement, filtre_region
-        )
+        sql, params = _build_query_contours(niveau, geom_col, filtre_departement, filtre_region)
         rows = con.execute(sql, params).fetchall()
 
     if not rows:
@@ -477,9 +469,7 @@ def make_choropleth(
                 values.append(v)
                 icon = "↗" if v > 1.0 else ("↘" if v < -1.0 else "→")
                 abs_val = int(delta_abs) if delta_abs is not None else 0
-                abs_str = (f"+{abs_val:,}" if abs_val >= 0 else f"{abs_val:,}").replace(
-                    ",", " "
-                )
+                abs_str = (f"+{abs_val:,}" if abs_val >= 0 else f"{abs_val:,}").replace(",", " ")
                 features.append(
                     {
                         "type": "Feature",
@@ -520,14 +510,10 @@ def make_choropleth(
 
     geojson_data = {"type": "FeatureCollection", "features": features}
 
-    m = folium.Map(
-        location=_CENTRE_FRANCE, zoom_start=_ZOOM_DEPART, tiles="CartoDB positron"
-    )
+    m = folium.Map(location=_CENTRE_FRANCE, zoom_start=_ZOOM_DEPART, tiles="CartoDB positron")
 
     if zoomed:
-        bounds = _fit_bounds_for_filter(
-            con, niveau, geom_col, filtre_departement, filtre_region
-        )
+        bounds = _fit_bounds_for_filter(con, niveau, geom_col, filtre_departement, filtre_region)
         if bounds:
             m.fit_bounds(bounds)
 

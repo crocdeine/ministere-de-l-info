@@ -45,9 +45,7 @@ _WFS_COMMON: dict[str, str] = {
     "SRSNAME": "EPSG:4326",
 }
 
-AdminLevel = Literal[
-    "region", "departement", "epci", "commune", "arrondissement_municipal"
-]
+AdminLevel = Literal["region", "departement", "epci", "commune", "arrondissement_municipal"]
 
 # Filtre CQL serveur pour dom=False (métropole uniquement), par niveau.
 # Noms de champs vérifiés sur GetFeature COUNT=1 le 2026-05-16.
@@ -88,9 +86,7 @@ def _http_retry_get(
             last_exc = exc
             if attempt < max_retries:
                 time.sleep(2**attempt)
-    raise RuntimeError(
-        f"Requête WFS échouée après {max_retries} tentatives : {url}"
-    ) from last_exc
+    raise RuntimeError(f"Requête WFS échouée après {max_retries} tentatives : {url}") from last_exc
 
 
 def _wfs_stream_batch(
@@ -110,12 +106,14 @@ def _wfs_stream_batch(
     last_exc: Exception | None = None
     for attempt in range(1, max_retries + 1):
         try:
-            with httpx.Client(timeout=timeout) as client:
-                with client.stream("GET", url, params=params) as response:
-                    response.raise_for_status()
-                    with dest.open("wb") as fh:
-                        for chunk in response.iter_bytes(chunk_size=65536):
-                            fh.write(chunk)
+            with (
+                httpx.Client(timeout=timeout) as client,
+                client.stream("GET", url, params=params) as response,
+            ):
+                response.raise_for_status()
+                with dest.open("wb") as fh:
+                    for chunk in response.iter_bytes(chunk_size=65536):
+                        fh.write(chunk)
             return
         except (
             httpx.RemoteProtocolError,
@@ -127,9 +125,7 @@ def _wfs_stream_batch(
             dest.unlink(missing_ok=True)
             if attempt < max_retries:
                 time.sleep(2**attempt)
-    raise RuntimeError(
-        f"Requête WFS échouée après {max_retries} tentatives : {url}"
-    ) from last_exc
+    raise RuntimeError(f"Requête WFS échouée après {max_retries} tentatives : {url}") from last_exc
 
 
 def _batch_file_valid(path: Path) -> bool:
@@ -211,8 +207,7 @@ def _wfs_paginate(
         except (json.JSONDecodeError, OSError) as exc:
             tmp_path.unlink(missing_ok=True)
             raise RuntimeError(
-                f"Batch {batch_num} : JSON invalide après téléchargement — "
-                "relancer avec --force"
+                f"Batch {batch_num} : JSON invalide après téléchargement — relancer avec --force"
             ) from exc
 
         features = data.get("features", [])
@@ -227,9 +222,7 @@ def _wfs_paginate(
             break
 
         tmp_path.rename(batch_path)
-        logger.info(
-            "Batch %04d — %d features → %s", batch_num, len(features), batch_path.name
-        )
+        logger.info("Batch %04d — %d features → %s", batch_num, len(features), batch_path.name)
 
         yield batch_path
 

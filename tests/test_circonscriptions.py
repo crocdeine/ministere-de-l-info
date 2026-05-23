@@ -36,9 +36,7 @@ def test_count() -> None:
     """Le dataset doit contenir entre 550 et 580 features (fourchette tolérante)."""
     data = fetch_circonscriptions_legislatives()
     count = len(data["features"])
-    assert 550 <= count <= 580, (
-        f"Nombre de features hors fourchette [550-580] : {count}"
-    )
+    assert 550 <= count <= 580, f"Nombre de features hors fourchette [550-580] : {count}"
 
 
 def test_code_format() -> None:
@@ -52,11 +50,7 @@ def test_code_format() -> None:
 def test_drom_present() -> None:
     """Au moins une feature avec code_departement commençant par '97'."""
     data = fetch_circonscriptions_legislatives()
-    drom = [
-        f
-        for f in data["features"]
-        if f["properties"]["code_departement"].startswith("97")
-    ]
+    drom = [f for f in data["features"] if f["properties"]["code_departement"].startswith("97")]
     assert len(drom) >= 19, f"Attendu ≥19 features DROM, obtenu {len(drom)}"
 
 
@@ -66,8 +60,6 @@ def test_reprise_disque() -> None:
     fetch_circonscriptions_legislatives(force=False)
 
     # Second appel : httpx ne doit pas être appelé
-    with patch(
-        "ministere_de_l_info.data_sources.circonscriptions._http_retry_get"
-    ) as mock_http:
+    with patch("ministere_de_l_info.data_sources.circonscriptions._http_retry_get") as mock_http:
         fetch_circonscriptions_legislatives(force=False)
         mock_http.assert_not_called()

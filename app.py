@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
+import logging
+import os
+
 import duckdb
 import geopandas as gpd
 import polars as pl
 import streamlit as st
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 st.set_page_config(
     page_title="ministère de l'info",
@@ -14,9 +23,7 @@ st.set_page_config(
 )
 
 st.title("🇫🇷 ministère de l'info")
-st.caption(
-    "Application de data-visualisation politique, électorale et territoriale française"
-)
+st.caption("Application de data-visualisation politique, électorale et territoriale française")
 
 st.divider()
 

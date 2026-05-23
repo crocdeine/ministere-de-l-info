@@ -185,9 +185,7 @@ with st.sidebar:
 # ── Carte ────────────────────────────────────────────────────────────────────
 
 _a_population = niveau in _VUE_POP and mode != "contours"
-_mode_evolution = (
-    indicateur_carte == "Évolution démographique" and annee_ref is not None
-)
+_mode_evolution = indicateur_carte == "Évolution démographique" and annee_ref is not None
 
 if _mode_evolution:
     titre_carte = f"Évolution démographique {annee_ref} → {annee}"
@@ -282,9 +280,7 @@ if niveau in _VUE_POP:
                 f"Population municipale {annee}": [
                     f"{r[2]:,}".replace(",", " ") if r[2] else "—" for r in rows
                 ],
-                f"Évolution {annee_ref}→{annee}": [
-                    _format_evolution(r[3], r[4]) for r in rows
-                ],
+                f"Évolution {annee_ref}→{annee}": [_format_evolution(r[3], r[4]) for r in rows],
             }
         )
     else:
@@ -309,18 +305,12 @@ if niveau in _VUE_POP:
 else:
     # ARM ou circonscriptions : pas de population
     table, code_col = _TABLE_CODE[niveau]
-    extra_col = (
-        "code_commune_mere"
-        if niveau == "arrondissement_municipal"
-        else "code_departement"
-    )
+    extra_col = "code_commune_mere" if niveau == "arrondissement_municipal" else "code_departement"
     rows = con.execute(  # noqa: S608
         f"SELECT {code_col}, nom, {extra_col} FROM {table} ORDER BY {code_col} LIMIT 200"
     ).fetchall()
 
-    extra_label = (
-        "Commune mère" if niveau == "arrondissement_municipal" else "Département"
-    )
+    extra_label = "Commune mère" if niveau == "arrondissement_municipal" else "Département"
     df = pl.DataFrame(
         {
             "Code": [r[0] for r in rows],

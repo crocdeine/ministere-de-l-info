@@ -56,16 +56,11 @@ def test_regions_count(con: duckdb.DuckDBPyConnection) -> None:
 
 def test_regions_codes_format(con: duckdb.DuckDBPyConnection) -> None:
     """Tous les codes région appartiennent à la liste officielle IGN."""
-    codes = {
-        r[0]
-        for r in con.execute("SELECT code_insee FROM geographies_regions").fetchall()
-    }
+    codes = {r[0] for r in con.execute("SELECT code_insee FROM geographies_regions").fetchall()}
     inconnus = codes - _CODES_REGION_TOUS
     assert not inconnus, f"Codes région inconnus : {inconnus}"
     metro_presents = codes & _CODES_REGION_METRO
-    assert len(metro_presents) == 13, (
-        f"Seulement {len(metro_presents)}/13 régions métro présentes"
-    )
+    assert len(metro_presents) == 13, f"Seulement {len(metro_presents)}/13 régions métro présentes"
 
 
 def test_regions_geometries_valides(con: duckdb.DuckDBPyConnection) -> None:
@@ -75,9 +70,7 @@ def test_regions_geometries_valides(con: duckdb.DuckDBPyConnection) -> None:
         WHERE geometry_simplified_national IS NOT NULL
           AND NOT ST_IsValid(geometry_simplified_national)
     """).fetchall()
-    assert not invalides, (
-        f"Géométries simplifiées invalides : {[r[0] for r in invalides]}"
-    )
+    assert not invalides, f"Géométries simplifiées invalides : {[r[0] for r in invalides]}"
 
 
 def test_regions_metadata(con: duckdb.DuckDBPyConnection) -> None:
@@ -85,9 +78,7 @@ def test_regions_metadata(con: duckdb.DuckDBPyConnection) -> None:
     row = con.execute(
         "SELECT row_count FROM _etl_metadata WHERE table_name = 'geographies_regions'"
     ).fetchone()
-    assert row is not None, (
-        "Entrée manquante dans _etl_metadata pour geographies_regions"
-    )
+    assert row is not None, "Entrée manquante dans _etl_metadata pour geographies_regions"
     count_table = con.execute("SELECT COUNT(*) FROM geographies_regions").fetchone()[0]
     assert row[0] == count_table, (
         f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
@@ -109,10 +100,7 @@ def test_departements_count(con: duckdb.DuckDBPyConnection) -> None:
 def test_departements_codes(con: duckdb.DuckDBPyConnection) -> None:
     """Codes spot-check : présence 2A/2B/DROM, absence 975 (COM)."""
     codes = {
-        r[0]
-        for r in con.execute(
-            "SELECT code_insee FROM geographies_departements"
-        ).fetchall()
+        r[0] for r in con.execute("SELECT code_insee FROM geographies_departements").fetchall()
     }
     manquants = _CODES_DEPT_SPOT - codes
     assert not manquants, f"Codes attendus manquants : {manquants}"
@@ -137,9 +125,7 @@ def test_departements_geometries_valides(con: duckdb.DuckDBPyConnection) -> None
             SELECT code_insee FROM geographies_departements
             WHERE {col} IS NOT NULL AND NOT ST_IsValid({col})
         """).fetchall()
-        assert not invalides, (
-            f"{col} — géométries invalides : {[r[0] for r in invalides]}"
-        )
+        assert not invalides, f"{col} — géométries invalides : {[r[0] for r in invalides]}"
 
 
 # ── EPCI ──────────────────────────────────────────────────────────────────────
@@ -165,12 +151,8 @@ def test_epci_siren_format(con: duckdb.DuckDBPyConnection) -> None:
 
 def test_epci_no_null_types(con: duckdb.DuckDBPyConnection) -> None:
     """Aucun type_epci NULL — toutes les valeurs 'nature' WFS sont mappées."""
-    n = con.execute(
-        "SELECT COUNT(*) FROM geographies_epci WHERE type_epci IS NULL"
-    ).fetchone()[0]
-    assert n == 0, (
-        f"{n} EPCI avec type_epci NULL — une valeur 'nature' WFS non mappée est apparue"
-    )
+    n = con.execute("SELECT COUNT(*) FROM geographies_epci WHERE type_epci IS NULL").fetchone()[0]
+    assert n == 0, f"{n} EPCI avec type_epci NULL — une valeur 'nature' WFS non mappée est apparue"
 
 
 def test_epci_types_distribution(con: duckdb.DuckDBPyConnection) -> None:
@@ -195,9 +177,7 @@ def test_epci_geometries_valides(con: duckdb.DuckDBPyConnection) -> None:
         WHERE geometry_simplified_epci IS NOT NULL
           AND NOT ST_IsValid(geometry_simplified_epci)
     """).fetchall()
-    assert not invalides, (
-        f"Géométries simplifiées invalides : {[r[0] for r in invalides]}"
-    )
+    assert not invalides, f"Géométries simplifiées invalides : {[r[0] for r in invalides]}"
 
 
 def test_epci_metadata(con: duckdb.DuckDBPyConnection) -> None:
@@ -233,9 +213,7 @@ def arm_skip(con: duckdb.DuckDBPyConnection) -> None:
 
 def test_arm_count(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
     """Exactement 45 ARM chargés (Paris 20 + Lyon 9 + Marseille 16)."""
-    n = con.execute(
-        "SELECT COUNT(*) FROM geographies_arrondissements_municipaux"
-    ).fetchone()[0]
+    n = con.execute("SELECT COUNT(*) FROM geographies_arrondissements_municipaux").fetchone()[0]
     assert n == 45, f"Attendu exactement 45 ARM, obtenu {n}"
 
 
@@ -281,9 +259,7 @@ def test_arm_communes_meres(con: duckdb.DuckDBPyConnection, arm_skip: None) -> N
     )
 
 
-def test_arm_no_null_commune_mere(
-    con: duckdb.DuckDBPyConnection, arm_skip: None
-) -> None:
+def test_arm_no_null_commune_mere(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
     """Aucun code_commune_mere NULL."""
     n = con.execute(
         "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere IS NULL"
@@ -366,19 +342,13 @@ def test_populations_nulls(con: duckdb.DuckDBPyConnection, pop_skip: None) -> No
     )
 
 
-def test_view_population_commune_existe(
-    con: duckdb.DuckDBPyConnection, pop_skip: None
-) -> None:
+def test_view_population_commune_existe(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
     """v_population_commune est présente et retourne des lignes pour 2023."""
-    n = con.execute(
-        "SELECT COUNT(*) FROM v_population_commune WHERE annee = 2023"
-    ).fetchone()[0]
+    n = con.execute("SELECT COUNT(*) FROM v_population_commune WHERE annee = 2023").fetchone()[0]
     assert n > 0, "v_population_commune vide pour 2023"
 
 
-def test_view_population_commune_count(
-    con: duckdb.DuckDBPyConnection, pop_skip: None
-) -> None:
+def test_view_population_commune_count(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
     """v_population_commune a autant de lignes que populations pour chaque millésime."""
     rows = con.execute("""
         SELECT p.annee,
@@ -401,17 +371,13 @@ def test_populations_metadata(con: duckdb.DuckDBPyConnection, pop_skip: None) ->
         "SELECT row_count FROM _etl_metadata WHERE table_name = 'populations_2023'"
     ).fetchone()
     assert row is not None, "Entrée manquante dans _etl_metadata pour populations_2023"
-    count_table = con.execute(
-        "SELECT COUNT(*) FROM populations WHERE annee = 2023"
-    ).fetchone()[0]
+    count_table = con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023").fetchone()[0]
     assert row[0] == count_table, (
         f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
     )
 
 
-def test_populations_multi_millesimes(
-    con: duckdb.DuckDBPyConnection, pop_skip: None
-) -> None:
+def test_populations_multi_millesimes(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
     """Les 3 millésimes (2013, 2018, 2023) ont chacun ~34 858 communes + sommes cohérentes."""
     expected = {
         2013: {"communes": 34858, "pop_lo": 63_000_000, "pop_hi": 67_000_000},
@@ -422,11 +388,9 @@ def test_populations_multi_millesimes(
         "SELECT annee, COUNT(*), SUM(municipale) FROM populations GROUP BY annee ORDER BY annee"
     ).fetchall()
     annees_chargees = {r[0] for r in rows}
-    for annee, spec in expected.items():
+    for annee, _spec in expected.items():
         if annee not in annees_chargees:
-            pytest.skip(
-                f"Millésime {annee} non chargé — relancer ETL avec --millesimes {annee}"
-            )
+            pytest.skip(f"Millésime {annee} non chargé — relancer ETL avec --millesimes {annee}")
     for annee, n, total in rows:
         if annee not in expected:
             continue

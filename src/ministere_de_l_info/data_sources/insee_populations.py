@@ -36,9 +36,7 @@ from ministere_de_l_info.data_sources.geo import _http_retry_get
 logger = logging.getLogger(__name__)
 
 _MELODI_URL = (
-    "https://api.insee.fr/melodi/file"
-    "/DS_POPULATIONS_HISTORIQUES"
-    "/DS_POPULATIONS_HISTORIQUES_CSV_FR"
+    "https://api.insee.fr/melodi/file/DS_POPULATIONS_HISTORIQUES/DS_POPULATIONS_HISTORIQUES_CSV_FR"
 )
 _ZIP_FILENAME = "ds_populations_historiques.zip"
 
@@ -116,8 +114,7 @@ def _load_csv_from_zip(zip_path: Path) -> pl.LazyFrame:
         )
         if data_name is None:
             raise RuntimeError(
-                f"Aucun fichier *data*.csv trouvé dans {zip_path.name}. "
-                f"Contenu : {zf.namelist()}"
+                f"Aucun fichier *data*.csv trouvé dans {zip_path.name}. Contenu : {zf.namelist()}"
             )
         with zf.open(data_name) as f:
             raw_bytes = f.read()

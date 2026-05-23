@@ -50,9 +50,7 @@ def test_schema_colonnes() -> None:
 def test_comptee_a_part_et_totale_sont_null() -> None:
     """comptee_a_part et totale sont intentionnellement NULL (PCAP non disponible)."""
     df = fetch_populations(2022)
-    assert df["comptee_a_part"].is_null().all(), (
-        "comptee_a_part doit être entièrement NULL"
-    )
+    assert df["comptee_a_part"].is_null().all(), "comptee_a_part doit être entièrement NULL"
     assert df["totale"].is_null().all(), "totale doit être entièrement NULL"
 
 
@@ -97,8 +95,6 @@ def test_annee_dans_dataframe() -> None:
 def test_reprise_disque() -> None:
     """Un second appel force=False ne retélécharge pas le ZIP."""
     fetch_populations(2022, force=False)  # s'assure que le fichier existe
-    with patch(
-        "ministere_de_l_info.data_sources.insee_populations._http_retry_get"
-    ) as mock_http:
+    with patch("ministere_de_l_info.data_sources.insee_populations._http_retry_get") as mock_http:
         fetch_populations(2022, force=False)
         mock_http.assert_not_called()
