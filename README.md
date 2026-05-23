@@ -1,5 +1,7 @@
 # 🇫🇷 Ministère de l'Info
 
+[![CI](https://github.com/crocdeine/ministere-de-l-info/actions/workflows/ci.yml/badge.svg)](https://github.com/crocdeine/ministere-de-l-info/actions/workflows/ci.yml)
+
 Application de data-visualisation politique, électorale et territoriale française.
 
 ## Description

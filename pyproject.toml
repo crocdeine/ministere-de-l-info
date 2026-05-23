@@ -46,6 +46,7 @@ addopts = [
     "--cov=src/ministere_de_l_info",
     "--cov-report=term-missing",
     "--cov-report=html",
+    "--cov-report=xml",
     "--cov-fail-under=60",
 ]
 testpaths = ["tests"]
