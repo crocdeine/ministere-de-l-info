@@ -48,9 +48,6 @@ logger = logging.getLogger(__name__)
 _DB_PATH = ROOT / "data" / "ministere.duckdb"
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="ETL territorial complet : IGN ADMIN-EXPRESS + INSEE populations → DuckDB",
