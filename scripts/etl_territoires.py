@@ -38,155 +38,17 @@ from ministere_de_l_info.data_sources.circonscriptions import (  # noqa: F401, E
 )
 from ministere_de_l_info.data_sources.geo import fetch_admin_express  # noqa: F401, E402
 from ministere_de_l_info.data_sources.insee_populations import fetch_populations  # noqa: F401, E402
+from ministere_de_l_info.etl._common import open_connection  # noqa: E402
+from ministere_de_l_info.etl.schema import create_schema  # noqa: E402
+from ministere_de_l_info.etl.views import create_views  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)
 
 _DB_PATH = ROOT / "data" / "ministere.duckdb"
-_SCHEMA_VERSION = 1
 
 
-# ── Connexion ─────────────────────────────────────────────────────────────────
-
-
-def _open_connection(db_path: Path = _DB_PATH) -> duckdb.DuckDBPyConnection:
-    """Ouvre la connexion DuckDB et charge l'extension spatial."""
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    con = duckdb.connect(str(db_path))
-    con.execute("INSTALL spatial; LOAD spatial;")
-    logger.debug("Connexion DuckDB ouverte : %s", db_path)
-    return con
-
-
-# ── Schéma ────────────────────────────────────────────────────────────────────
-
-
-def _create_schema(con: duckdb.DuckDBPyConnection) -> None:
-    """Crée les 7 tables métier, 2 tables méta et les index UNIQUE.
-
-    Idempotent : CREATE TABLE IF NOT EXISTS partout, jamais de DROP.
-    geographies_regions existante (ancien schéma, colonne 'population') sera
-    remplacée par _load_regions() avec DROP + CREATE — pas ici.
-    Les vues sont créées par _create_views() après chargement des données.
-    """
-    # ── Tables géographiques ──────────────────────────────────────────────────
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS geographies_regions (
-            code_insee                   VARCHAR(3) NOT NULL,
-            nom                          VARCHAR    NOT NULL,
-            geometry                     GEOMETRY,
-            geometry_simplified_national GEOMETRY,
-            geometry_simplified_regional GEOMETRY,
-            UNIQUE (code_insee)
-        )
-    """)
-
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS geographies_departements (
-            code_insee                        VARCHAR(3) NOT NULL,
-            nom                               VARCHAR    NOT NULL,
-            code_region                       VARCHAR(3),
-            geometry                          GEOMETRY,
-            geometry_simplified_national      GEOMETRY,
-            geometry_simplified_departemental GEOMETRY,
-            UNIQUE (code_insee)
-        )
-    """)
-
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS geographies_epci (
-            code_siren                 VARCHAR(9) NOT NULL,
-            nom                        VARCHAR    NOT NULL,
-            type_epci                  VARCHAR(5),
-            code_departement_principal VARCHAR(3),
-            geometry                   GEOMETRY,
-            geometry_simplified_epci   GEOMETRY,
-            UNIQUE (code_siren)
-        )
-    """)
-
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS geographies_communes (
-            code_insee                   VARCHAR(5) NOT NULL,
-            nom                          VARCHAR    NOT NULL,
-            code_departement             VARCHAR(3),
-            code_region                  VARCHAR(3),
-            code_epci                    VARCHAR(9),
-            geometry                     GEOMETRY,
-            geometry_simplified_communal GEOMETRY,
-            UNIQUE (code_insee)
-        )
-    """)
-
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS geographies_arrondissements_municipaux (
-            code_insee                   VARCHAR(5) NOT NULL,
-            code_commune_mere            VARCHAR(5) NOT NULL,
-            nom                          VARCHAR    NOT NULL,
-            geometry                     GEOMETRY,
-            geometry_simplified_communal GEOMETRY,
-            UNIQUE (code_insee)
-        )
-    """)
-
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS geographies_circonscriptions (
-            code                      VARCHAR(6) NOT NULL,
-            nom                       VARCHAR,
-            code_departement          VARCHAR(3),
-            nom_departement           VARCHAR,
-            geometry                  GEOMETRY,
-            geometry_simplified_circo GEOMETRY,
-            UNIQUE (code)
-        )
-    """)
-
-    # ── Table populations ─────────────────────────────────────────────────────
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS populations (
-            code_insee_commune VARCHAR(5) NOT NULL,
-            annee              INTEGER    NOT NULL,
-            municipale         INTEGER    NOT NULL,
-            comptee_a_part     INTEGER,
-            totale             INTEGER,
-            source             VARCHAR    NOT NULL DEFAULT 'DS_POPULATIONS_HISTORIQUES'
-        )
-    """)
-    con.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS ux_populations_code_annee_source
-            ON populations(code_insee_commune, annee, source)
-    """)
-
-    # ── Tables méta ──────────────────────────────────────────────────────────
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS _etl_metadata (
-            table_name     VARCHAR   NOT NULL,
-            loaded_at      TIMESTAMP NOT NULL,
-            source_version VARCHAR,
-            row_count      INTEGER   NOT NULL,
-            UNIQUE (table_name)
-        )
-    """)
-
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS _schema_version (
-            version    INTEGER   NOT NULL,
-            applied_at TIMESTAMP NOT NULL
-        )
-    """)
-    con.execute(
-        """
-        INSERT INTO _schema_version (version, applied_at)
-        SELECT ?, NOW()
-        WHERE (SELECT COUNT(*) FROM _schema_version) = 0
-        """,
-        [_SCHEMA_VERSION],
-    )
-
-    logger.info("Schéma v%d créé/vérifié : 9 tables (7 métier + 2 méta)", _SCHEMA_VERSION)
-
-
-# ── Chargeurs (stubs — implémentés aux étapes 5–12) ──────────────────────────
+# ── Chargeurs ─────────────────────────────────────────────────────────────────
 
 
 def _load_regions(con: duckdb.DuckDBPyConnection, force: bool = False) -> None:
@@ -803,86 +665,6 @@ def _load_populations(
         )
 
 
-# ── Vues SQL ──────────────────────────────────────────────────────────────────
-
-
-def _create_views(con: duckdb.DuckDBPyConnection) -> None:
-    """Crée les 4 vues d'agrégation population → territoire.
-
-    Appelée après tous les _load_* : dépend de geographies_communes + populations.
-    SUM(comptee_a_part) et SUM(totale) retournent NULL tant que PCAP absent.
-
-    Vues :
-        v_population_commune     — alias direct populations (1 ligne/commune/an)
-        v_population_region      — SUM par code_region
-        v_population_departement — SUM par code_departement
-        v_population_epci        — SUM par code_epci (communes avec EPCI uniquement)
-    """
-    con.execute("""
-        CREATE OR REPLACE VIEW v_population_commune AS
-        SELECT
-            code_insee_commune AS code_commune,
-            annee,
-            SUM(municipale)         AS population_municipale,
-            SUM(comptee_a_part)     AS population_comptee_a_part,
-            SUM(totale)             AS population_totale
-        FROM populations
-        GROUP BY code_insee_commune, annee
-    """)
-
-    con.execute("""
-        CREATE OR REPLACE VIEW v_population_region AS
-        SELECT
-            r.code_insee          AS code_region,
-            r.nom                 AS nom_region,
-            p.annee,
-            SUM(p.municipale)         AS population_municipale,
-            SUM(p.comptee_a_part)     AS population_comptee_a_part,
-            SUM(p.totale)             AS population_totale
-        FROM geographies_communes c
-        JOIN populations p ON p.code_insee_commune = c.code_insee
-        JOIN geographies_regions r ON r.code_insee = c.code_region
-        GROUP BY r.code_insee, r.nom, p.annee
-    """)
-
-    con.execute("""
-        CREATE OR REPLACE VIEW v_population_departement AS
-        SELECT
-            d.code_insee          AS code_departement,
-            d.nom                 AS nom_departement,
-            p.annee,
-            SUM(p.municipale)         AS population_municipale,
-            SUM(p.comptee_a_part)     AS population_comptee_a_part,
-            SUM(p.totale)             AS population_totale
-        FROM geographies_communes c
-        JOIN populations p ON p.code_insee_commune = c.code_insee
-        JOIN geographies_departements d ON d.code_insee = c.code_departement
-        GROUP BY d.code_insee, d.nom, p.annee
-    """)
-
-    con.execute("""
-        CREATE OR REPLACE VIEW v_population_epci AS
-        SELECT
-            e.code_siren          AS code_epci,
-            e.nom                 AS nom_epci,
-            e.type_epci,
-            p.annee,
-            SUM(p.municipale)         AS population_municipale,
-            SUM(p.comptee_a_part)     AS population_comptee_a_part,
-            SUM(p.totale)             AS population_totale
-        FROM geographies_communes c
-        JOIN populations p ON p.code_insee_commune = c.code_insee
-        JOIN geographies_epci e ON e.code_siren = c.code_epci
-        WHERE c.code_epci IS NOT NULL
-        GROUP BY e.code_siren, e.nom, e.type_epci, p.annee
-    """)
-
-    logger.info(
-        "4 vues créées : v_population_commune, v_population_region, "
-        "v_population_departement, v_population_epci."
-    )
-
-
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
@@ -938,8 +720,8 @@ def main() -> None:
     except ValueError:
         parser.error(f"--millesimes invalide : {args.millesimes!r} — attendu ex: '2013,2018,2023'")
 
-    con = _open_connection()
-    _create_schema(con)
+    con = open_connection(_DB_PATH)
+    create_schema(con)
 
     if args.level is None:
         _load_regions(con, force=args.force)
@@ -949,7 +731,7 @@ def main() -> None:
         _load_arrondissements_municipaux(con, force=args.force)
         _load_circonscriptions(con, force=args.force)
         _load_populations(con, millesimes=millesimes, force=args.force)
-        _create_views(con)
+        create_views(con)
     else:
         _level_dispatch: dict[str, object] = {
             "region": lambda: _load_regions(con, force=args.force),
