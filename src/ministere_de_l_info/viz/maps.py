@@ -12,108 +12,25 @@ import duckdb
 import folium
 import folium.features
 
-logger = logging.getLogger(__name__)
-
-_CENTRE_FRANCE = [46.5, 2.5]
-_ZOOM_DEPART = 5
-_SOURCE = "Source : data.geopf.fr (IGN ADMIN-EXPRESS COG) — Population INSEE"
-
-_NIVEAUX_SUPPORTES: frozenset[str] = frozenset(
-    {
-        "region",
-        "departement",
-        "epci",
-        "arrondissement_municipal",
-        "circonscription",
-        "commune",
-    }
+from ministere_de_l_info.viz._config import (
+    _CENTRE_FRANCE,
+    _CLE_JOIN,
+    _COLONNE_CODE,
+    _FILTRE_DEPARTEMENT_COL,
+    _FILTRE_REGION_COL,
+    _GEOMETRIE_NATIONALE,
+    _GEOMETRIE_ZOOM,
+    _LIBELLES_NIVEAUX,
+    _NIVEAUX_CONTOURS,
+    _NIVEAUX_POPULATION,
+    _NIVEAUX_SUPPORTES,
+    _SOURCE,
+    _TABLE_PAR_NIVEAU,
+    _VUE_PAR_NIVEAU,
+    _ZOOM_DEPART,
 )
-# Niveaux pour lesquels une vue population existe
-_NIVEAUX_POPULATION: frozenset[str] = frozenset({"region", "departement", "epci", "commune"})
-# Niveaux sans agrégation population possible — contours est le comportement normal
-_NIVEAUX_CONTOURS: frozenset[str] = frozenset({"arrondissement_municipal", "circonscription"})
 
-_TABLE_PAR_NIVEAU: dict[str, str] = {
-    "region": "geographies_regions",
-    "departement": "geographies_departements",
-    "epci": "geographies_epci",
-    "arrondissement_municipal": "geographies_arrondissements_municipaux",
-    "circonscription": "geographies_circonscriptions",
-    "commune": "geographies_communes",
-}
-
-_COLONNE_CODE: dict[str, str] = {
-    "region": "code_insee",
-    "departement": "code_insee",
-    "epci": "code_siren",
-    "arrondissement_municipal": "code_insee",
-    "circonscription": "code",
-    "commune": "code_insee",
-}
-
-# Géométrie utilisée en vue nationale (pas de filtre actif)
-_GEOMETRIE_NATIONALE: dict[str, str] = {
-    "region": "geometry_simplified_national",
-    "departement": "geometry_simplified_national",
-    "epci": "geometry_simplified_epci",
-    "arrondissement_municipal": "geometry_simplified_communal",
-    "circonscription": "geometry_simplified_circo",
-    "commune": "geometry_simplified_communal",
-}
-
-# Géométrie plus détaillée quand un filtre géographique est actif
-_GEOMETRIE_ZOOM: dict[str, str] = {
-    "region": "geometry_simplified_regional",
-    "departement": "geometry_simplified_departemental",
-    "epci": "geometry_simplified_epci",
-    "arrondissement_municipal": "geometry_simplified_communal",
-    "circonscription": "geometry_simplified_circo",
-    "commune": "geometry_simplified_communal",
-}
-
-_VUE_PAR_NIVEAU: dict[str, str] = {
-    "region": "v_population_region",
-    "departement": "v_population_departement",
-    "epci": "v_population_epci",
-    "commune": "v_population_commune",
-}
-
-# (colonne clé dans table géo, colonne correspondante dans la vue population)
-_CLE_JOIN: dict[str, tuple[str, str]] = {
-    "region": ("code_insee", "code_region"),
-    "departement": ("code_insee", "code_departement"),
-    "epci": ("code_siren", "code_epci"),
-    "commune": ("code_insee", "code_commune"),
-}
-
-# Colonne filtre département dans chaque table géo (None = filtre non applicable)
-_FILTRE_DEPARTEMENT_COL: dict[str, str | None] = {
-    "region": None,
-    "departement": None,
-    "epci": "code_departement_principal",
-    "arrondissement_municipal": None,  # ARM : code_commune_mere seulement, pas de col. dpt
-    "circonscription": "code_departement",
-    "commune": "code_departement",
-}
-
-# Colonne filtre région dans chaque table géo
-_FILTRE_REGION_COL: dict[str, str | None] = {
-    "region": None,
-    "departement": "code_region",
-    "epci": None,
-    "arrondissement_municipal": None,
-    "circonscription": None,
-    "commune": "code_region",
-}
-
-_LIBELLES_NIVEAUX: dict[str, str] = {
-    "region": "Région",
-    "departement": "Département",
-    "epci": "EPCI",
-    "arrondissement_municipal": "Arrondissement municipal",
-    "circonscription": "Circonscription",
-    "commune": "Commune",
-}
+logger = logging.getLogger(__name__)
 
 _COULEURS_YLORD5 = ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"]
 _COULEUR_CONTOURS = "#4292c6"
