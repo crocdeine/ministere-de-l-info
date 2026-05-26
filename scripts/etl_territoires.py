@@ -41,8 +41,9 @@ from ministere_de_l_info.etl.loaders import (  # noqa: E402
 )
 from ministere_de_l_info.etl.schema import create_schema  # noqa: E402
 from ministere_de_l_info.etl.views import create_views  # noqa: E402
+from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
+configure_logging()
 logger = logging.getLogger(__name__)
 
 _DB_PATH = ROOT / "data" / "ministere.duckdb"
