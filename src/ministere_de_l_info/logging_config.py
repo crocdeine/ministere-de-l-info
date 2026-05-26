@@ -19,9 +19,10 @@ class JsonFormatter(logging.Formatter):
     """Formatte chaque log record en une ligne JSON."""
 
     def format(self, record: logging.LogRecord) -> str:
-        ts = datetime.fromtimestamp(record.created, tz=UTC).strftime(
-            "%Y-%m-%dT%H:%M:%S.%f"
-        )[:-3] + "Z"
+        ts = (
+            datetime.fromtimestamp(record.created, tz=UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
+            + "Z"
+        )
         payload: dict[str, object] = {
             "ts": ts,
             "level": record.levelname,
