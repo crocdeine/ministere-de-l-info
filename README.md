@@ -91,6 +91,21 @@ ministere-de-l-info/
 uv run pytest -v
 ```
 
+### Pre-commit hooks
+
+Le projet utilise pre-commit pour automatiser lint et format avant chaque commit.
+
+Installation après clone :
+```bash
+uv sync
+uv run pre-commit install
+```
+
+Lancement manuel :
+```bash
+uv run pre-commit run --all-files
+```
+
 ## Limitations connues
 
 | Limitation | Cause | Contournement |
