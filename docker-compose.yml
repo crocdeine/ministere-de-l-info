@@ -14,12 +14,15 @@ services:
       - ./.streamlit:/app/.streamlit
       # Persistance des données (named volume, perf optimale sur macOS)
       - duckdb-data:/app/data
+      # Pages Streamlit (hot reload)
+      - ./pages:/app/pages:ro
       # Référentiels (lecture seule)
       - ./references:/app/references:ro
     env_file:
       - .env
     environment:
       - STREAMLIT_SERVER_RUN_ON_SAVE=true
+      - LOG_FORMAT=json
     restart: unless-stopped
 
 volumes:

@@ -6,13 +6,15 @@
 FROM python:3.12-slim-bookworm AS builder
 
 # Install uv depuis l'image officielle Astral
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /uvx /bin/
 
 # Dépendances système nécessaires à GeoPandas (GDAL) et build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
+
+ENV UV_LINK_MODE=copy
 
 WORKDIR /app
 
@@ -25,6 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copier le code et installer le package
 COPY src ./src
+COPY pages ./pages
 COPY README.md ./
 COPY app.py ./
 RUN --mount=type=cache,target=/root/.cache/uv \
