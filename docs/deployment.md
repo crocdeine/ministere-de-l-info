@@ -58,7 +58,37 @@ Durée : 3–5 min en premier build, ~30 sec ensuite (couches en cache).
 
 ### 2. Initialisation du volume avec la DB
 
-#### Option A — DB locale existante (recommandé)
+#### Option C — Télécharger la DB depuis GitHub Releases (recommandé)
+
+Si tu n'as pas la DB en local et que tu ne veux pas exécuter l'ETL :
+
+```bash
+# 1. Configurer le token GitHub dans .env
+echo "GITHUB_TOKEN=ghp_xxxxxxxx" >> .env
+
+# 2. Télécharger la dernière release
+./scripts/download_db.sh
+
+# 3. Copier dans le volume Docker
+docker compose -f docker-compose.prod.yml up --no-start
+docker run --rm \
+  -v ministere-info_duckdb-data:/data \
+  -v $(pwd)/data:/source:ro \
+  alpine cp /source/ministere.duckdb /data/
+
+# 4. Démarrer
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Durée : 2–5 min selon la connexion (DB compressée ~200–300 MB à télécharger).
+
+Pour une release spécifique :
+
+```bash
+./scripts/download_db.sh db-2026-05
+```
+
+#### Option A — DB locale existante
 
 Si `data/ministere.duckdb` existe déjà sur l'hôte (ETL exécuté en local) :
 
@@ -157,6 +187,28 @@ docker compose -f docker-compose.prod.yml up -d --force-recreate
 ```
 
 Le volume DB est préservé pendant la mise à jour.
+
+### Publier une nouvelle release de DB
+
+Quand l'ETL produit une DB à jour (nouveaux millésimes, corrections), tu peux la
+publier sur GitHub Releases pour que les autres déploiements puissent la récupérer.
+
+```bash
+# 1. Régénérer la DB depuis l'ETL (sur l'hôte)
+uv run python scripts/etl_territoires.py --millesimes 2013 2018 2023 --yes --force
+
+# 2. Préparer la release (compression + SHA256)
+./scripts/publish_db.sh
+
+# 3. Le script affiche la commande gh release create — l'exécuter
+# Format du tag : db-YYYY-MM
+```
+
+Le script `publish_db.sh` :
+- Compresse `data/ministere.duckdb` en `.gz` (gain ~3–5×)
+- Génère un fichier `.sha256` pour vérification d'intégrité
+- Affiche la commande `gh release create` à exécuter
+- Vérifie que la taille reste sous 2 GB (limite GitHub Releases)
 
 ### Rafraîchissement des données
 
