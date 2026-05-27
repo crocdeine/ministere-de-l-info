@@ -53,6 +53,28 @@ uv run streamlit run app.py
 
 > **Note** : le flag `--yes` bypasse la confirmation interactive pour le téléchargement des ~35 000 communes.
 
+## Déploiement production
+
+Pour un déploiement en mode self-hosted (OrbStack, serveur dédié, etc.) :
+
+```bash
+# 1. Construire l'image
+docker build -t ministere-info:latest .
+
+# 2. Lancer en mode production
+docker compose -f docker-compose.prod.yml up -d
+
+# 3. Vérifier la santé
+curl http://localhost:8501/_stcore/health
+docker compose -f docker-compose.prod.yml logs -f
+
+# 4. Mise à jour (après git pull)
+docker build -t ministere-info:latest .
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Voir docs/deployment.md pour plus de détails (backups, monitoring, troubleshooting).
+
 ## Architecture
 
 ```

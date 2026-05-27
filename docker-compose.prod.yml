@@ -1,0 +1,42 @@
+# Configuration de production
+# Usage : docker compose -f docker-compose.prod.yml up -d
+# Build préalable : docker build -t ministere-info:latest .
+
+services:
+  ministere:
+    image: ministere-info:latest
+    container_name: ministere-info
+    ports:
+      - "8501:8501"
+    volumes:
+      # DB persistante (named volume — survit aux rebuilds)
+      - duckdb-data:/app/data
+      # Référentiels read-only (utilisés par les skills)
+      - ./references:/app/references:ro
+    env_file:
+      - .env
+    environment:
+      # Overrides production : pas de hot-reload, logs structurés
+      STREAMLIT_SERVER_RUN_ON_SAVE: "false"
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      APP_ENV: production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8501/_stcore/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # Limites de ressources optionnelles (à ajuster selon le Mac mini)
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+volumes:
+  duckdb-data:
+    name: ministere-info_duckdb-data
+    driver: local
