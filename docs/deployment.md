@@ -183,28 +183,64 @@ docker compose -f docker-compose.prod.yml up -d
 
 ### Backups
 
-Backup manuel de la DB :
+#### Backup automatique (recommandé)
+
+Un script `scripts/backup_db.sh` gère les sauvegardes quotidiennes avec rotation 7 jours.
+
+Activer le backup automatique via launchd (macOS) :
 
 ```bash
-mkdir -p data/backups
-docker run --rm \
-  -v ministere-info_duckdb-data:/data:ro \
-  -v $(pwd)/data/backups:/backup \
-  alpine cp /data/ministere.duckdb /backup/ministere-$(date +%Y%m%d).duckdb
+# Copier le plist dans LaunchAgents
+cp scripts/com.crocdeine.ministere-info.backup.plist ~/Library/LaunchAgents/
+
+# Activer
+launchctl load ~/Library/LaunchAgents/com.crocdeine.ministere-info.backup.plist
+
+# Vérifier qu'il est chargé
+launchctl list | grep ministere-info
 ```
 
-Restauration depuis une sauvegarde :
+Le backup s'exécute automatiquement chaque jour à 3h00. Logs dans `data/backups/`.
+
+#### Backup manuel
+
+```bash
+./scripts/backup_db.sh
+```
+
+#### Restauration depuis une sauvegarde
 
 ```bash
 docker compose -f docker-compose.prod.yml down
+
 docker run --rm \
   -v ministere-info_duckdb-data:/data \
   -v $(pwd)/data/backups:/backup:ro \
-  alpine cp /backup/ministere-20260527.duckdb /data/ministere.duckdb
+  alpine cp /backup/ministere-2026-05-27_0300.duckdb /data/ministere.duckdb
+
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Les fichiers de sauvegarde (~900 MB) sont gitignorés — ne pas les versionner.
+Remplacer le nom du fichier par le backup souhaité (voir `ls data/backups/`).
+
+#### Désactiver le backup automatique
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.crocdeine.ministere-info.backup.plist
+rm ~/Library/LaunchAgents/com.crocdeine.ministere-info.backup.plist
+```
+
+#### Surveiller les backups
+
+```bash
+# Voir le log des backups
+tail -f data/backups/backup.log
+
+# Lister les backups actuels
+ls -lh data/backups/*.duckdb
+```
+
+Les fichiers de backup (~900 MB chacun) sont gitignorés — ne pas les versionner.
 
 ## Monitoring
 

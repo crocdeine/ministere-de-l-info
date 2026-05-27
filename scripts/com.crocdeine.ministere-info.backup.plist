@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Identifiant unique du job launchd -->
+    <key>Label</key>
+    <string>com.crocdeine.ministere-info.backup</string>
+
+    <!-- Script à exécuter -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/crocdeine/Documents/Docker/ministere-de-l-info/scripts/backup_db.sh</string>
+    </array>
+
+    <!-- Variables d'environnement pour que docker soit trouvé -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Déclenchement quotidien à 3h00 -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- Logs stdout/stderr -->
+    <key>StandardOutPath</key>
+    <string>/Users/crocdeine/Documents/Docker/ministere-de-l-info/data/backups/launchd.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/crocdeine/Documents/Docker/ministere-de-l-info/data/backups/launchd.err.log</string>
+
+    <!-- Si le Mac était endormi à 3h, NE PAS exécuter au chargement -->
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
