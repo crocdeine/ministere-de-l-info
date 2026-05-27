@@ -87,6 +87,9 @@ RUN mkdir -p /home/app/.streamlit \
 
 USER app
 
+# Pré-installation des extensions DuckDB nécessaires (évite le téléchargement runtime)
+RUN python -c "import duckdb; con = duckdb.connect(':memory:'); con.execute('INSTALL spatial')"
+
 EXPOSE 8501
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
