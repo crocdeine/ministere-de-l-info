@@ -2,7 +2,7 @@
 
 Période : 2026-05-21 à 2026-05-27
 Branche : main
-Commit final : 1087c9e
+Commit final : 2038123
 
 ## Objectif initial
 
@@ -18,7 +18,7 @@ de nouveaux modules. Pas de nouvelle fonctionnalité — uniquement consolidatio
 | A3 | CI GitHub Actions | 04bb473 |
 | A4.1 | Décomposition etl_territoires.py (999L → 138L + modules etl/) | 039635b → f316f7a |
 | A4.2 | Décomposition maps.py (611L → 262L + 3 sous-modules viz/) | 56a85cd → e57bf9c |
-| A5 | Logging structuré JSON/text (configure_logging centralisé) | 486bb9b |
+| A5 | Logging structuré JSON/text (configure_logging centralisé) | 486bb9b → 479f792 |
 | A6.1 | Pre-commit hooks (ruff + standard checks) | 2eded25 |
 | A6.2 | Documentation architecture + 4 ADR | 1087c9e |
 
