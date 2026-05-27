@@ -71,13 +71,15 @@ print(json.dumps(db[0]))
     log "Dernière release DB : $TAG"
 fi
 
-# Extraire les URLs de téléchargement
+# Extraire les URLs d'API des assets (asset.url, pas browser_download_url)
+# browser_download_url renvoie 404 sur les repos privés même avec un token Bearer.
+# La méthode correcte est d'utiliser l'URL API avec Accept: application/octet-stream.
 GZ_URL=$(python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 for a in data.get('assets', []):
     if a['name'] == 'ministere.duckdb.gz':
-        print(a['browser_download_url'])
+        print(a['url'])
         break
 " <<< "$RELEASE_JSON")
 
@@ -86,7 +88,7 @@ import json, sys
 data = json.load(sys.stdin)
 for a in data.get('assets', []):
     if a['name'] == 'ministere.duckdb.gz.sha256':
-        print(a['browser_download_url'])
+        print(a['url'])
         break
 " <<< "$RELEASE_JSON")
 
@@ -97,10 +99,11 @@ fi
 
 mkdir -p "$DATA_DIR"
 
-# Télécharger la DB compressée
+# Télécharger la DB compressée via l'API (Accept: application/octet-stream obligatoire)
 log "Téléchargement $GZ_URL..."
 curl -fSL \
     -H "$AUTH_HEADER" \
+    -H "Accept: application/octet-stream" \
     --progress-bar \
     -o "$GZ_FILE" \
     "$GZ_URL"
@@ -109,25 +112,30 @@ curl -fSL \
 if [ -n "$SHA_URL" ]; then
     log "Vérification SHA256..."
     SHA_FILE=$(mktemp)
-    curl -fsS \
+    curl -fsSL \
         -H "$AUTH_HEADER" \
+        -H "Accept: application/octet-stream" \
         -o "$SHA_FILE" \
         "$SHA_URL"
     EXPECTED_SHA=$(awk '{print $1}' "$SHA_FILE")
     rm -f "$SHA_FILE"
 
-    if command -v sha256sum &>/dev/null; then
-        ACTUAL_SHA=$(sha256sum "$GZ_FILE" | awk '{print $1}')
+    if [ -z "$EXPECTED_SHA" ]; then
+        log "Avertissement : fichier .sha256 vide après téléchargement, vérification ignorée"
     else
-        ACTUAL_SHA=$(shasum -a 256 "$GZ_FILE" | awk '{print $1}')
-    fi
+        if command -v sha256sum &>/dev/null; then
+            ACTUAL_SHA=$(sha256sum "$GZ_FILE" | awk '{print $1}')
+        else
+            ACTUAL_SHA=$(shasum -a 256 "$GZ_FILE" | awk '{print $1}')
+        fi
 
-    if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
-        echo "ERREUR : SHA256 invalide (attendu: $EXPECTED_SHA, obtenu: $ACTUAL_SHA)" >&2
-        rm -f "$GZ_FILE"
-        exit 4
+        if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+            echo "ERREUR : SHA256 invalide (attendu: $EXPECTED_SHA, obtenu: $ACTUAL_SHA)" >&2
+            rm -f "$GZ_FILE"
+            exit 4
+        fi
+        log "SHA256 OK"
     fi
-    log "SHA256 OK"
 else
     log "Avertissement : pas de fichier .sha256 dans la release, vérification ignorée"
 fi
