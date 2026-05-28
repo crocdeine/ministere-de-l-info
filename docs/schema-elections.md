@@ -108,28 +108,37 @@ Ces colonnes seront ajoutées en version C2c lors de l'extension aux autres scru
 
 ## Table `blocs_politiques`
 
-Référentiel des blocs politiques utilisés pour la visualisation.
+Référentiel des **6 blocs de clivages officiels** du Ministère de l'Intérieur.
+
+**Origine** : circulaire IOMA2322276J du 16 août 2023 (sénatoriales 2023), première
+circulaire à formaliser ce regroupement. Pour les scrutins antérieurs à 2023, les blocs
+sont reconstruits selon la logique officielle, avec classement "de l'époque"
+(voir [ADR-0005](adr/0005-nuances-et-blocs-officiels.md) et
+[index des circulaires archivées](sources-officielles/nuances/index.md)).
 
 | Colonne | Type | Description |
 |---------|------|-------------|
-| `bloc` | `VARCHAR` PK | Identifiant interne (`extreme_gauche`, `gauche`, `ecologistes`, `centre`, `droite`, `extreme_droite`, `divers`) |
+| `bloc` | `VARCHAR` PK | Code officiel du Ministère : `EXG`, `GAU`, `DIV`, `CENT`, `DTE`, `EXD` |
 | `libelle` | `VARCHAR` NN | Libellé affiché (`'Extrême gauche'`, `'Gauche'`, …) |
 | `couleur` | `VARCHAR` NN | Couleur hexadécimale pour les cartes et graphiques |
-| `ordre` | `INTEGER` NN | Position sur l'axe gauche→droite (1 à 6, 99 pour divers) |
+| `ordre` | `INTEGER` NN | Position sur l'axe gauche→droite (1 à 6) |
 
 **Blocs et couleurs** :
 
-| Bloc | Libellé | Couleur | Ordre |
+| Code | Libellé | Couleur | Ordre |
 |------|---------|---------|-------|
-| `extreme_gauche` | Extrême gauche | `#8B0000` | 1 |
-| `gauche` | Gauche | `#E63946` | 2 |
-| `ecologistes` | Écologistes | `#4CAF50` | 3 |
-| `centre` | Centre | `#FFD700` | 4 |
-| `droite` | Droite | `#2196F3` | 5 |
-| `extreme_droite` | Extrême droite | `#1A237E` | 6 |
-| `divers` | Divers / Autres | `#9E9E9E` | 99 |
+| `EXG` | Extrême gauche | `#8B0000` | 1 |
+| `GAU` | Gauche | `#E84C61` | 2 |
+| `DIV` | Divers | `#9E9E9E` | 3 |
+| `CENT` | Centre | `#F5B800` | 4 |
+| `DTE` | Droite | `#3B7DD8` | 5 |
+| `EXD` | Extrême droite | `#1F3864` | 6 |
 
 Les couleurs sont indicatives et ajustables sans toucher au schéma.
+
+**Note** : la grille officielle ne comporte pas de bloc "écologistes" distinct.
+Les formations écologistes sont classées selon leur position sur l'axe gauche-droite
+(EELV/Verts → `GAU` ; écologie centriste type Cap21 → `CENT`).
 
 ---
 
@@ -155,16 +164,22 @@ partisans utilisés par les autres scrutins (ex. `RN`, `SOC`, `LR`).
 ## Table `candidats_presidentielle`
 
 Mapping `(nom, annee) → bloc` pour les présidentielles **sans nuances** (2017 et 2022).
+Chaque entrée porte le parti d'appartenance et la justification sourcée du classement.
 
 | Colonne | Type | Description |
 |---------|------|-------------|
 | `annee` | `INTEGER` PK | Année de la présidentielle |
 | `nom` | `VARCHAR` PK | Nom de famille EXACT du Parquet (MAJUSCULES, ex. `'LE PEN'`) |
 | `prenom` | `VARCHAR` | Prénom |
-| `bloc` | `VARCHAR` NN | FK → `blocs_politiques.bloc` |
+| `parti` | `VARCHAR` | Parti / formation politique à la date du scrutin |
+| `bloc` | `VARCHAR` NN | Code officiel FK → `blocs_politiques.bloc` (ex. `'EXD'`) |
 | `libelle` | `VARCHAR` | Nom complet lisible (`'Marine Le Pen'`) |
+| `source_bloc` | `VARCHAR` | Justification datée du classement (circulaire ou décision CE) |
 
 **Couverture** : 11 candidats 2017 + 12 candidats 2022 = 23 entrées.
+
+**En attente de validation** (C2a-bis) : les classements avec parti et source_bloc
+sont soumis à validation avant population de la table.
 
 ---
 
@@ -217,20 +232,26 @@ La même nuance peut désigner des formations différentes selon l'année. La cl
 
 ---
 
-## Choix éditoriaux — blocs politiques
+## Classements — blocs politiques
 
-Le classement de chaque candidat ou nuance dans un bloc est une **décision éditoriale**.
-Plusieurs cas sont ambigus et pourraient être classés différemment selon le prisme utilisé :
+Le classement de chaque candidat ou nuance dans un bloc repose sur la **nomenclature
+officielle du Ministère de l'Intérieur**, avec le principe du "classement de l'époque" :
+un parti est classé dans le bloc qui lui était attribué à la date du scrutin.
 
-| Candidat / Nuance | Classé en | Alternative défendable |
-|-------------------|-----------|----------------------|
-| MÉLENCHON (2012, 2017, 2022) | `gauche` | `extreme_gauche` (FI/Front de Gauche) |
-| ROUSSEL Fabien (2022) | `gauche` | `extreme_gauche` (PCF) |
-| DUPONT-AIGNAN (2012, 2017, 2022) | `droite` | `extreme_droite` (Debout la France) |
-| VILL / Villiers (2007) | `droite` | `extreme_droite` (MPF, souverainiste conservateur) |
-| BOVE / Bové (2007) | `gauche` | `extreme_gauche` (altermondialiste) |
-| LEPA / Lepage (2002) | `ecologistes` | `centre` (Cap21, libéralisme écologique) |
-| ASSELINEAU (2017) | `divers` | `droite` (UPR, souverainiste) |
+Voir [ADR-0005](adr/0005-nuances-et-blocs-officiels.md) pour le raisonnement complet
+et [l'index des circulaires](sources-officielles/nuances/index.md) pour les sources.
 
-Ces choix sont délibérément documentés ici pour pouvoir être révisés collectivement.
-Toute modification doit être discutée et tracée (commit + commentaire dans le code).
+**Cas notables documentés** :
+
+| Candidat / Nuance | Bloc retenu | Justification |
+|-------------------|-------------|---------------|
+| MÉLENCHON (2012, 2017, 2022) | `GAU` | LFI classé GAU par circulaire IOMA2322276J (2023) ; bascule EXG seulement avec INTP2602966C (2026) |
+| ROUSSEL Fabien (2022) | `GAU` | PCF = nuance gauche dans logique officielle |
+| DUPONT-AIGNAN (2012, 2017, 2022) | `DTE` | DLR/DLF = souverainiste gaulliste droite ; CE 31/01/2020 n°437675 suspend classement EXD |
+| de VILLIERS (2007) | `DTE` | MPF = nuance DVDR (divers droite) dans logiques de l'époque |
+| BOVÉ (2007) | `GAU` | Écologie de gauche ; nuances Verts classées GAU dans logique officielle |
+| LEPAGE (2002) | `CENT` | Cap21 = écologie centriste libérale ; pas de bloc écolo officiel |
+| MAMÈRE (2002), VOYNET (2007), JOLY (2012) | `GAU` | Verts/EELV = allié PS, nuances classées GAU |
+| ASSELINEAU (2017) | `DIV` | UPR = souverainiste inclassable, nuance DIVC |
+
+Toute modification doit être tracée (commit motivé + mise à jour de `source_bloc`).

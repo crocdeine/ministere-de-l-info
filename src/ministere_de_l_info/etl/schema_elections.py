@@ -18,9 +18,13 @@ jointure sur geographies_communes.code_region.
 
 Blocs politiques
 ----------------
-Le classement de chaque candidat/nuance dans un bloc est un CHOIX ÉDITORIAL.
-Les cas ambigus sont marqués « [ambigu] » en commentaire et documentés dans
-docs/schema-elections.md. Ne pas modifier sans mettre à jour l'ADR correspondant.
+Nomenclature officielle du Ministère de l'Intérieur : 6 blocs (EXG, GAU, DIV, CENT,
+DTE, EXD), introduits par la circulaire IOMA2322276J (sénatoriales 2023).
+Le classement "officiel de l'époque" s'applique : un parti est classé selon le bloc
+qui lui était attribué à la date du scrutin. Chaque entrée porte une colonne
+source_bloc indiquant la circulaire ou décision CE de référence.
+Voir docs/adr/0005-nuances-et-blocs-officiels.md et
+docs/sources-officielles/nuances/index.md.
 """
 
 from __future__ import annotations
@@ -120,120 +124,266 @@ def _build_elections() -> list[tuple[str, str, int, int, str]]:
 _ELECTIONS: list[tuple[str, str, int, int, str]] = _build_elections()
 
 # ── Blocs politiques ──────────────────────────────────────────────────────────
+# Nomenclature officielle Ministère de l'Intérieur — 6 blocs, codes en majuscules.
+# Source : circulaire IOMA2322276J (sénatoriales 2023, 1re occurrence du regroupement).
 # (bloc, libelle, couleur_hex, ordre_gauche_droite)
-# Couleurs indicatives ; à affiner lors de la conception de la viz.
 
 _BLOCS: list[tuple[str, str, str, int]] = [
-    ("extreme_gauche", "Extrême gauche", "#8B0000", 1),
-    ("gauche", "Gauche", "#E63946", 2),
-    ("ecologistes", "Écologistes", "#4CAF50", 3),
-    ("centre", "Centre", "#FFD700", 4),
-    ("droite", "Droite", "#2196F3", 5),
-    ("extreme_droite", "Extrême droite", "#1A237E", 6),
-    ("divers", "Divers / Autres", "#9E9E9E", 99),
+    ("EXG", "Extrême gauche", "#8B0000", 1),
+    ("GAU", "Gauche", "#E84C61", 2),
+    ("DIV", "Divers", "#9E9E9E", 3),
+    ("CENT", "Centre", "#F5B800", 4),
+    ("DTE", "Droite", "#3B7DD8", 5),
+    ("EXD", "Extrême droite", "#1F3864", 6),
 ]
 
 # ── Nuances → blocs, présidentielles 2002 / 2007 / 2012 ──────────────────────
 # Pour ces scrutins, la colonne 'nuance' du Parquet est un code-candidat
 # (CHIR = Chirac, JOSP = Jospin, etc.), contrairement aux scrutins de liste
 # qui utilisent des codes partisans (RN, SOC, LDVG, …).
+# Blocs officiels Ministère (reconstruction ante-2023 selon ADR-0005).
 # (nuance, annee, bloc)
-
+#
 _NUANCES_PRES: list[tuple[str, int, str]] = [
     # ── 2002 (16 candidats) ────────────────────────────────────────────────
-    ("BAYR", 2002, "centre"),  # Bayrou – UDF
-    ("BESA", 2002, "extreme_gauche"),  # Besancenot – LCR
-    ("BOUT", 2002, "droite"),  # Boutin – FRS (conservatisme chrétien)
-    ("CHEV", 2002, "gauche"),  # Chevènement – MDC
-    ("CHIR", 2002, "droite"),  # Chirac – RPR
-    ("GLUC", 2002, "extreme_gauche"),  # Gluckstein – PT (trotskiste)
-    ("HUE", 2002, "gauche"),  # Hue – PCF
-    ("JOSP", 2002, "gauche"),  # Jospin – PS
-    ("LAGU", 2002, "extreme_gauche"),  # Laguiller – LO
-    ("LEPA", 2002, "ecologistes"),  # Lepage – Cap21 [ambigu : centre ou écolo]
-    ("LEPE", 2002, "extreme_droite"),  # Le Pen – FN
-    ("MADE", 2002, "droite"),  # Madelin – DL (libéral)
-    ("MAME", 2002, "ecologistes"),  # Mamère – Verts
-    ("MEGR", 2002, "extreme_droite"),  # Mégret – MNR (scissionniste FN)
-    ("SAIN", 2002, "divers"),  # Saint-Josse – CPNT
-    ("TAUB", 2002, "gauche"),  # Taubira – PRG
+    ("BAYR", 2002, "CENT"),  # Bayrou – UDF → CENT
+    ("BESA", 2002, "EXG"),  # Besancenot – LCR trotskiste → EXG
+    (
+        "BOUT",
+        2002,
+        "DTE",
+    ),  # Boutin – FRS conservateur chrétien, floue DTE/EXD ; retenu DTE par cohérence nomenclature Ministère
+    ("CHEV", 2002, "GAU"),  # Chevènement – MDC (socialiste dissident ex-PS) → GAU
+    ("CHIR", 2002, "DTE"),  # Chirac – RPR gaulliste → DTE
+    ("GLUC", 2002, "EXG"),  # Gluckstein – PT trotskiste → EXG
+    ("HUE", 2002, "GAU"),  # Hue – PCF → GAU (logique officielle Ministère, pas EXG)
+    ("JOSP", 2002, "GAU"),  # Jospin – PS → GAU
+    ("LAGU", 2002, "EXG"),  # Laguiller – LO → EXG
+    (
+        "LEPA",
+        2002,
+        "CENT",
+    ),  # Lepage – Cap21 (écologie libérale centriste) → CENT ; pas de bloc écolo officiel
+    ("LEPE", 2002, "EXD"),  # Le Pen J.-M. – FN → EXD
+    ("MADE", 2002, "DTE"),  # Madelin – DL (libéral-conservateur) → DTE
+    ("MAME", 2002, "GAU"),  # Mamère – Verts (nuance DVGV) → GAU
+    ("MEGR", 2002, "EXD"),  # Mégret – MNR (scissionniste FN) → EXD
+    ("SAIN", 2002, "DIV"),  # Saint-Josse – CPNT → DIV
+    ("TAUB", 2002, "GAU"),  # Taubira – PRG (allié PS) → GAU
     # ── 2007 (12 candidats) ────────────────────────────────────────────────
-    ("BAYR", 2007, "centre"),  # Bayrou – MoDem
-    ("BESA", 2007, "extreme_gauche"),  # Besancenot – LCR
-    ("BOVE", 2007, "gauche"),  # Bové – altermondialiste [ambigu : extrême gauche]
-    ("BUFF", 2007, "gauche"),  # Buffet – PCF
-    ("LAGU", 2007, "extreme_gauche"),  # Laguiller – LO
-    ("LEPE", 2007, "extreme_droite"),  # Le Pen – FN
-    ("NIHO", 2007, "divers"),  # Nihous – CPNT
-    ("ROYA", 2007, "gauche"),  # Royal – PS
-    ("SARK", 2007, "droite"),  # Sarkozy – UMP
-    ("SCHI", 2007, "extreme_gauche"),  # Schivardi – PT (trotskiste, successeur Gluckstein)
-    ("VILL", 2007, "droite"),  # Villiers – MPF [ambigu : extrême droite]
-    ("VOYN", 2007, "ecologistes"),  # Voynet – Verts
+    ("BAYR", 2007, "CENT"),  # Bayrou – MoDem → CENT
+    ("BESA", 2007, "EXG"),  # Besancenot – LCR → EXG
+    ("BOVE", 2007, "GAU"),  # Bové – altermondialiste/soutien Verts (DVGV) → GAU
+    ("BUFF", 2007, "GAU"),  # Buffet – PCF → GAU
+    ("LAGU", 2007, "EXG"),  # Laguiller – LO → EXG
+    ("LEPE", 2007, "EXD"),  # Le Pen J.-M. – FN → EXD
+    ("NIHO", 2007, "DIV"),  # Nihous – CPNT → DIV
+    ("ROYA", 2007, "GAU"),  # Royal – PS → GAU
+    ("SARK", 2007, "DTE"),  # Sarkozy – UMP → DTE
+    ("SCHI", 2007, "EXG"),  # Schivardi – PT trotskiste → EXG
+    (
+        "VILL",
+        2007,
+        "DTE",
+    ),  # de Villiers – MPF (nuance DVDR) → DTE ; CE 31/01/2020 n°437675 conforte DTE
+    ("VOYN", 2007, "GAU"),  # Voynet – Verts (nuance DVGV) → GAU
     # ── 2012 (10 candidats) ────────────────────────────────────────────────
-    ("ARTH", 2012, "extreme_gauche"),  # Arthaud – LO
-    ("BAYR", 2012, "centre"),  # Bayrou – MoDem
-    ("CHEM", 2012, "divers"),  # Cheminade – Solidarité et Progrès
-    ("DUPO", 2012, "droite"),  # Dupont-Aignan – DLR [ambigu : extrême droite]
-    ("HOLL", 2012, "gauche"),  # Hollande – PS
-    ("JOLY", 2012, "ecologistes"),  # Joly – EELV
-    ("LEPE", 2012, "extreme_droite"),  # Le Pen Marine – FN
-    ("MELE", 2012, "gauche"),  # Mélenchon – Front de Gauche [ambigu : extrême gauche]
-    ("POUT", 2012, "extreme_gauche"),  # Poutou – NPA
-    ("SARK", 2012, "droite"),  # Sarkozy – UMP
+    ("ARTH", 2012, "EXG"),  # Arthaud – LO → EXG
+    ("BAYR", 2012, "CENT"),  # Bayrou – MoDem → CENT
+    ("CHEM", 2012, "DIV"),  # Cheminade – Solidarité et Progrès → DIV
+    ("DUPO", 2012, "DTE"),  # Dupont-Aignan – DLR (nuance DVDR) → DTE ; CE 31/01/2020 n°437675
+    ("HOLL", 2012, "GAU"),  # Hollande – PS → GAU
+    ("JOLY", 2012, "GAU"),  # Joly – EELV (nuance DVGV) → GAU ; pas de bloc écolo officiel
+    ("LEPE", 2012, "EXD"),  # Le Pen Marine – FN → EXD
+    (
+        "MELE",
+        2012,
+        "GAU",
+    ),  # Mélenchon – Front de Gauche → GAU ; LFI bascule EXG en 2026 (INTP2602966C) seulement
+    ("POUT", 2012, "EXG"),  # Poutou – NPA (héritage LCR) → EXG
+    ("SARK", 2012, "DTE"),  # Sarkozy – UMP → DTE
 ]
 
 # ── Candidats présidentiels 2017 / 2022 ──────────────────────────────────────
 # La colonne 'nuance' est NULL pour ces scrutins dans le Parquet.
 # Le classement se fait via le nom de famille EXACT tel qu'il apparaît dans le
 # Parquet (vérifié par requête DISTINCT sur general-results.parquet).
-# (annee, nom_parquet, prenom, bloc, libelle)
-
-_CANDIDATS_PRES_2017: list[tuple[int, str, str, str, str]] = [
-    (2017, "ARTHAUD", "Nathalie", "extreme_gauche", "Nathalie Arthaud"),
+# Blocs officiels Ministère et "classement de l'époque" (ADR-0005).
+# (annee, nom_parquet, prenom, parti, bloc, libelle, source_bloc)
+#
+_CANDIDATS_PRES_2017: list[tuple[int, str, str, str, str, str, str]] = [
+    # (annee, nom_parquet, prenom, parti, bloc, libelle, source_bloc)
+    (
+        2017,
+        "ARTHAUD",
+        "Nathalie",
+        "Lutte Ouvrière",
+        "EXG",
+        "Nathalie Arthaud",
+        "Logique officielle EXG — LO",
+    ),
     (
         2017,
         "ASSELINEAU",
         "François",
-        "divers",
+        "Union Populaire Républicaine",
+        "DIV",
         "François Asselineau",
-    ),  # UPR, souverainiste inclassable
-    (2017, "CHEMINADE", "Jacques", "divers", "Jacques Cheminade"),
+        "Logique officielle DIV — souverainiste inclassable",
+    ),
+    (
+        2017,
+        "CHEMINADE",
+        "Jacques",
+        "Solidarité et Progrès",
+        "DIV",
+        "Jacques Cheminade",
+        "Logique officielle DIV",
+    ),
     (
         2017,
         "DUPONT-AIGNAN",
         "Nicolas",
-        "droite",
+        "Debout la France",
+        "DTE",
         "Nicolas Dupont-Aignan",
-    ),  # [ambigu : extrême droite]
-    (2017, "FILLON", "François", "droite", "François Fillon"),
-    (2017, "HAMON", "Benoît", "gauche", "Benoît Hamon"),
-    (2017, "LASSALLE", "Jean", "divers", "Jean Lassalle"),
-    (2017, "LE PEN", "Marine", "extreme_droite", "Marine Le Pen"),
-    (2017, "MACRON", "Emmanuel", "centre", "Emmanuel Macron"),
-    (2017, "MÉLENCHON", "Jean-Luc", "gauche", "Jean-Luc Mélenchon"),  # [ambigu : extrême gauche]
-    (2017, "POUTOU", "Philippe", "extreme_gauche", "Philippe Poutou"),
+        "Nuance DVDR — CE 31/01/2020 n°437675 conforte DTE",
+    ),
+    (
+        2017,
+        "FILLON",
+        "François",
+        "Les Républicains",
+        "DTE",
+        "François Fillon",
+        "LR — nuance LR → DTE",
+    ),
+    (2017, "HAMON", "Benoît", "Parti Socialiste", "GAU", "Benoît Hamon", "PS — nuance PS → GAU"),
+    (
+        2017,
+        "LASSALLE",
+        "Jean",
+        "Résistons!",
+        "DIV",
+        "Jean Lassalle",
+        "Logique officielle DIV — mouvement régionaliste",
+    ),
+    (
+        2017,
+        "LE PEN",
+        "Marine",
+        "FN",
+        "EXD",
+        "Marine Le Pen",
+        "FN → EXD — CE 21/09/2023 n°488379, CE 11/03/2024 n°488378 (rebranding RN en juin 2018, après le scrutin)",
+    ),
+    (2017, "MACRON", "Emmanuel", "En Marche", "CENT", "Emmanuel Macron", "LREM → CENT"),
+    (
+        2017,
+        "MÉLENCHON",
+        "Jean-Luc",
+        "La France Insoumise",
+        "GAU",
+        "Jean-Luc Mélenchon",
+        "LFI → GAU en 2017 (IOMA2322276J 2023 confirme) — bascule EXG en 2026 seulement (INTP2602966C)",
+    ),
+    (
+        2017,
+        "POUTOU",
+        "Philippe",
+        "Nouveau Parti Anticapitaliste",
+        "EXG",
+        "Philippe Poutou",
+        "NPA → EXG — logique officielle",
+    ),
 ]
 
-_CANDIDATS_PRES_2022: list[tuple[int, str, str, str, str]] = [
-    (2022, "ARTHAUD", "Nathalie", "extreme_gauche", "Nathalie Arthaud"),
+_CANDIDATS_PRES_2022: list[tuple[int, str, str, str, str, str, str]] = [
+    # (annee, nom_parquet, prenom, parti, bloc, libelle, source_bloc)
+    (
+        2022,
+        "ARTHAUD",
+        "Nathalie",
+        "Lutte Ouvrière",
+        "EXG",
+        "Nathalie Arthaud",
+        "Logique officielle EXG — LO",
+    ),
     (
         2022,
         "DUPONT-AIGNAN",
         "Nicolas",
-        "droite",
+        "Debout la France",
+        "DTE",
         "Nicolas Dupont-Aignan",
-    ),  # [ambigu : extrême droite]
-    (2022, "HIDALGO", "Anne", "gauche", "Anne Hidalgo"),
-    (2022, "JADOT", "Yannick", "ecologistes", "Yannick Jadot"),
-    (2022, "LASSALLE", "Jean", "divers", "Jean Lassalle"),
-    (2022, "LE PEN", "Marine", "extreme_droite", "Marine Le Pen"),
-    (2022, "MACRON", "Emmanuel", "centre", "Emmanuel Macron"),
-    (2022, "MÉLENCHON", "Jean-Luc", "gauche", "Jean-Luc Mélenchon"),  # [ambigu : extrême gauche]
-    (2022, "POUTOU", "Philippe", "extreme_gauche", "Philippe Poutou"),
-    (2022, "PÉCRESSE", "Valérie", "droite", "Valérie Pécresse"),
-    (2022, "ROUSSEL", "Fabien", "gauche", "Fabien Roussel"),  # PCF [ambigu : extrême gauche]
-    (2022, "ZEMMOUR", "Éric", "extreme_droite", "Éric Zemmour"),
+        "Nuance DVDR — CE 31/01/2020 n°437675 conforte DTE",
+    ),
+    (2022, "HIDALGO", "Anne", "Parti Socialiste", "GAU", "Anne Hidalgo", "PS — nuance PS → GAU"),
+    (
+        2022,
+        "JADOT",
+        "Yannick",
+        "EELV",
+        "GAU",
+        "Yannick Jadot",
+        "EELV, nuance ECO (INTA2212053C 2022) ; classement GAU selon logique officielle Ministère post-2023 (blocs inexistants en 2022)",
+    ),
+    (2022, "LASSALLE", "Jean", "Résistons!", "DIV", "Jean Lassalle", "Logique officielle DIV"),
+    (
+        2022,
+        "LE PEN",
+        "Marine",
+        "Rassemblement National",
+        "EXD",
+        "Marine Le Pen",
+        "RN → EXD — CE 21/09/2023 n°488379, CE 11/03/2024 n°488378",
+    ),
+    (
+        2022,
+        "MACRON",
+        "Emmanuel",
+        "La République En Marche / Renaissance",
+        "CENT",
+        "Emmanuel Macron",
+        "LREM → CENT",
+    ),
+    (
+        2022,
+        "MÉLENCHON",
+        "Jean-Luc",
+        "La France Insoumise / NUPES",
+        "GAU",
+        "Jean-Luc Mélenchon",
+        "LFI → GAU en 2022 (IOMA2322276J 2023 confirme) — bascule EXG en 2026 seulement (INTP2602966C)",
+    ),
+    (
+        2022,
+        "POUTOU",
+        "Philippe",
+        "Nouveau Parti Anticapitaliste",
+        "EXG",
+        "Philippe Poutou",
+        "NPA → EXG — logique officielle",
+    ),
+    (2022, "PÉCRESSE", "Valérie", "Les Républicains", "DTE", "Valérie Pécresse", "LR → DTE"),
+    (
+        2022,
+        "ROUSSEL",
+        "Fabien",
+        "Parti Communiste Français",
+        "GAU",
+        "Fabien Roussel",
+        "PCF → GAU dans logique officielle Ministère",
+    ),
+    (
+        2022,
+        "ZEMMOUR",
+        "Éric",
+        "Reconquête",
+        "EXD",
+        "Éric Zemmour",
+        "Reconquête, nuance REC (INTA2212053C 2022) ; bloc EXD selon logique officielle IOMA2322276J (2023)",
+    ),
 ]
 
 
@@ -304,14 +454,20 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
 
     con.execute("""
         CREATE TABLE IF NOT EXISTS candidats_presidentielle (
-            annee   INTEGER NOT NULL,
-            nom     VARCHAR NOT NULL,
-            prenom  VARCHAR,
-            bloc    VARCHAR NOT NULL,
-            libelle VARCHAR,
+            annee        INTEGER NOT NULL,
+            nom          VARCHAR NOT NULL,
+            prenom       VARCHAR,
+            parti        VARCHAR,
+            bloc         VARCHAR NOT NULL,
+            libelle      VARCHAR,
+            source_bloc  VARCHAR,
             PRIMARY KEY (annee, nom)
         )
     """)
+    # Migration C2a-bis : ajout des colonnes parti et source_bloc si absentes
+    # (nécessaire si la table existait déjà avec l'ancien schéma à 5 colonnes)
+    con.execute("ALTER TABLE candidats_presidentielle ADD COLUMN IF NOT EXISTS parti VARCHAR")
+    con.execute("ALTER TABLE candidats_presidentielle ADD COLUMN IF NOT EXISTS source_bloc VARCHAR")
 
     logger.info("Schéma électoral créé/vérifié : 6 tables")
 
@@ -340,10 +496,17 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
     logger.info("elections : %d scrutins", len(_ELECTIONS))
 
     # nuances_harmonisees (présidentielles avec nuances : 2002, 2007, 2012)
-    con.executemany("INSERT INTO nuances_harmonisees VALUES (?, ?, ?)", _NUANCES_PRES)
+    if _NUANCES_PRES:
+        con.executemany("INSERT INTO nuances_harmonisees VALUES (?, ?, ?)", _NUANCES_PRES)
     logger.info("nuances_harmonisees : %d entrées (pres 2002/2007/2012)", len(_NUANCES_PRES))
 
     # candidats_presidentielle (présidentielles sans nuances : 2017, 2022)
     candidats = _CANDIDATS_PRES_2017 + _CANDIDATS_PRES_2022
-    con.executemany("INSERT INTO candidats_presidentielle VALUES (?, ?, ?, ?, ?)", candidats)
+    if candidats:
+        con.executemany(
+            """INSERT INTO candidats_presidentielle
+               (annee, nom, prenom, parti, bloc, libelle, source_bloc)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            candidats,
+        )
     logger.info("candidats_presidentielle : %d candidats (2017 + 2022)", len(candidats))

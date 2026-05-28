@@ -5,10 +5,10 @@ Usage
     uv run python scripts/init_elections_schema.py
 
 Crée les 6 tables électorales (idempotent) et remplit les 4 référentiels :
-- blocs_politiques (7 blocs avec couleurs)
+- blocs_politiques (6 blocs officiels Ministère : EXG, GAU, DIV, CENT, DTE, EXD)
 - elections (56 scrutins 1999-2026)
 - nuances_harmonisees (présidentielles 2002/2007/2012 avec nuances)
-- candidats_presidentielle (présidentielles 2017/2022 sans nuances)
+- candidats_presidentielle (présidentielles 2017/2022 sans nuances, avec parti et source_bloc)
 
 Les tables de résultats (resultats_participation, resultats_candidats) sont créées
 vides. Le chargement des Parquet se fait en C2b (scripts/load_elections.py).
