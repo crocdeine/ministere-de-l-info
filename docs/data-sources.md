@@ -77,6 +77,80 @@ plus récents. À remplacer par un export officiel AN dès disponibilité.
 
 ---
 
+---
+
+## Données des élections agrégées (data.gouv.fr / Ministère de l'Intérieur)
+
+| Aspect | Valeur |
+|--------|--------|
+| URL dataset | `https://www.data.gouv.fr/datasets/donnees-des-elections-agregees/` |
+| Producteur | Ministère de l'Intérieur / data.gouv.fr |
+| Format | Parquet (téléchargement direct) |
+| Auth | Aucune |
+| Granularité | Bureau de vote |
+| Couverture | 56 scrutins de 1999 à 2026 (euro, pres, legi, regi, muni, dpmt, cant) |
+| Volume | ~28 M lignes / 222 MB (deux fichiers Parquet) |
+| Filtrage | Hauts-de-France uniquement (code_region = '32') au chargement |
+| Module cible | `scripts/load_elections.py` (C2b) |
+
+Le dataset est distribué en deux fichiers Parquet au nommage contre-intuitif :
+
+### PIÈGE 1 — Nommage inversé des fichiers (CRITIQUE)
+
+| Fichier source | Contenu réel | Table DuckDB cible |
+|---------------|-------------|-------------------|
+| `general-results.parquet` | Résultats **par candidat** (nom, nuance, voix par bureau) | `resultats_candidats` |
+| `candidats-results.parquet` | Données de **participation** (inscrits, votants, abstentions…) | `resultats_participation` |
+
+Ne pas se fier aux noms des fichiers sources. Toujours utiliser les noms de tables DuckDB.
+
+### PIÈGE 2 — Nuances absentes pour les présidentielles récentes
+
+La colonne `nuance` (code partisan) est **entièrement NULL** pour 5 scrutins :
+
+| Élection | Lignes |
+|----------|--------|
+| 2017_pres_t1 | 761 662 |
+| 2017_pres_t2 | 138 484 |
+| 2019_euro_t1 | 2 356 098 |
+| 2022_pres_t1 | 836 184 |
+| 2022_pres_t2 | 139 364 |
+
+Pour les présidentielles 2017 et 2022, le classement par bloc politique est réalisé via la
+table `candidats_presidentielle` (jointure sur `nom`). Pour les présidentielles 2002/2007/2012,
+la colonne `nuance` contient un **code-candidat** (ex. `CHIR` = Chirac) ; la table
+`nuances_harmonisees` assure la correspondance avec les blocs politiques.
+
+### Format des identifiants électoraux
+
+```
+id_election = {YYYY}_{type}_{tN}
+Exemples :
+  2022_pres_t1   → Présidentielle 2022 — 1er tour
+  2024_legi_t2   → Législatives 2024 — 2e tour
+  1999_euro_t1   → Européennes 1999 — 1er tour
+```
+
+Types : `pres`, `legi`, `euro`, `regi`, `muni`, `dpmt`, `cant`.
+
+### Codes INSEE dans le Parquet
+
+- `code_commune` : VARCHAR 5 caractères avec zéro-padding (`'01001'`, `'59606'`) — compatible
+  avec `geographies_communes.code_insee`
+- `code_departement` : VARCHAR sans padding (`'59'`, `'2A'`, `'971'`)
+
+### Filtrage Hauts-de-France
+
+Le chargement (C2b) jointure sur `geographies_communes.code_region = '32'` pour ne
+conserver que les communes des 5 départements HdF (02, 59, 60, 62, 80). Ce filtrage
+réduit le volume d'un facteur ~10.
+
+**Référence** : `reports/exploration-elections.md` — analyse structurelle complète des Parquet.
+
+**Schéma détaillé** : `docs/schema-elections.md`.
+
+---
+
 ## Sources prévues (modules futurs)
 
 | Source | Module cible | Données |
@@ -84,7 +158,6 @@ plus récents. À remplacer par un export officiel AN dès disponibilité.
 | INSEE Sirene (`portail-api.insee.fr`) | `Économie` | Établissements, entreprises |
 | PISTE — Légifrance / JORF (`api.piste.gouv.fr`) | `Législatif` | Textes de loi, JO, décrets |
 | Banque de France Webstat | `Économie` | Séries macroéconomiques |
-| data.gouv.fr / Ministère de l'Intérieur | `Élections` | Résultats électoraux par bureau de vote |
 | HATVP open-data (`hatvp.fr/open-data`) | `Élus` | Déclarations d'intérêts, patrimoines |
 | data.assemblee-nationale.fr | `Législatif` | Votes, amendements, dossiers législatifs |
 | NosDéputés / NosSénateurs (Regards Citoyens) | `Élus` | Mandats, présences, groupes |
