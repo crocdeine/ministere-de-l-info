@@ -137,6 +137,33 @@ _BLOCS: list[tuple[str, str, str, int]] = [
     ("EXD", "Extrême droite", "#1F3864", 6),
 ]
 
+# ── Circo 21 Nord (Valenciennes) — 20 communes ───────────────────────────────
+# Codes INSEE validés par jointure spatiale ST_Within sur geographies_circonscriptions
+# (code = '59-21'). Source : IGN ADMIN-EXPRESS-COG, millésime 2025.
+
+_CIRCO21_CODES: tuple[str, ...] = (
+    "59027",  # Aubry-du-Hainaut
+    "59064",  # Bellaing
+    "59153",  # Condé-sur-l'Escaut
+    "59160",  # Crespin
+    "59166",  # Curgies
+    "59215",  # Estreux
+    "59383",  # Marly
+    "59447",  # Onnaing
+    "59459",  # Petite-Forêt
+    "59471",  # Préseau
+    "59479",  # Quarouble
+    "59484",  # Quiévrechain
+    "59505",  # Rombies-et-Marchipont
+    "59530",  # Saint-Aybert
+    "59544",  # Saint-Saulve
+    "59557",  # Saultain
+    "59559",  # Sebourg
+    "59591",  # Thivencelle
+    "59606",  # Valenciennes
+    "59632",  # Wallers
+)
+
 # ── Nuances → blocs, présidentielles 2002 / 2007 / 2012 ──────────────────────
 # Pour ces scrutins, la colonne 'nuance' du Parquet est un code-candidat
 # (CHIR = Chirac, JOSP = Jospin, etc.), contrairement aux scrutins de liste
@@ -510,3 +537,102 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
             candidats,
         )
     logger.info("candidats_presidentielle : %d candidats (2017 + 2022)", len(candidats))
+
+
+# ── Vues d'agrégation ─────────────────────────────────────────────────────────
+
+
+def create_elections_views(con: duckdb.DuckDBPyConnection) -> None:
+    """Crée les 5 vues d'agrégation électorales. Idempotent (CREATE OR REPLACE).
+
+    Résolution du bloc politique :
+    - 2002/2007/2012 : nuance (code-candidat) → nuances_harmonisees
+    - 2017/2022      : nom (nuance NULL)       → candidats_presidentielle
+    COALESCE(nh.bloc, cp.bloc) couvre les deux cas en un seul SELECT.
+    """
+    # ── Vue 1 — résultats par BV avec bloc résolu ─────────────────────────
+    con.execute("""
+        CREATE OR REPLACE VIEW v_resultats_candidats_avec_bloc AS
+        SELECT
+            rc.id_election,
+            e.type_scrutin,
+            e.annee,
+            e.tour,
+            rc.code_departement,
+            rc.code_commune,
+            rc.code_bv,
+            rc.no_panneau,
+            rc.nom,
+            rc.prenom,
+            rc.nuance,
+            rc.voix,
+            COALESCE(nh.bloc, cp.bloc) AS bloc
+        FROM resultats_candidats rc
+        JOIN elections e ON e.id_election = rc.id_election
+        LEFT JOIN nuances_harmonisees nh
+            ON nh.nuance = rc.nuance AND nh.annee = e.annee
+        LEFT JOIN candidats_presidentielle cp
+            ON cp.nom = rc.nom AND cp.annee = e.annee
+    """)
+
+    # ── Vue 2 — scores par commune, présidentielles ───────────────────────
+    con.execute("""
+        CREATE OR REPLACE VIEW v_scores_commune_pres AS
+        SELECT
+            r.id_election,
+            r.annee,
+            r.tour,
+            r.code_departement,
+            r.code_commune,
+            r.bloc,
+            SUM(r.voix) AS voix
+        FROM v_resultats_candidats_avec_bloc r
+        WHERE r.type_scrutin = 'pres'
+        GROUP BY r.id_election, r.annee, r.tour, r.code_departement, r.code_commune, r.bloc
+    """)
+
+    # ── Vue 3 — participation par commune, présidentielles ────────────────
+    con.execute("""
+        CREATE OR REPLACE VIEW v_participation_commune_pres AS
+        SELECT
+            rp.id_election,
+            e.annee,
+            e.tour,
+            rp.code_departement,
+            rp.code_commune,
+            SUM(rp.inscrits)                                                        AS inscrits,
+            SUM(rp.votants)                                                         AS votants,
+            SUM(rp.exprimes)                                                        AS exprimes,
+            SUM(rp.blancs)                                                          AS blancs,
+            SUM(rp.nuls)                                                            AS nuls,
+            SUM(rp.abstentions)                                                     AS abstentions,
+            ROUND(100.0 * SUM(rp.votants) / NULLIF(SUM(rp.inscrits), 0), 2)        AS taux_participation_pct
+        FROM resultats_participation rp
+        JOIN elections e ON e.id_election = rp.id_election
+        WHERE e.type_scrutin = 'pres'
+        GROUP BY rp.id_election, e.annee, e.tour, rp.code_departement, rp.code_commune
+    """)
+
+    # ── Vue 4 — focus circo 21 Nord (Valenciennes, 20 communes) ──────────
+    circo21_sql = ", ".join(f"'{c}'" for c in _CIRCO21_CODES)
+    con.execute(f"""
+        CREATE OR REPLACE VIEW v_scores_circo21_pres AS
+        SELECT *
+        FROM v_scores_commune_pres
+        WHERE code_commune IN ({circo21_sql})
+    """)
+
+    # ── Vue 5 — évolution blocs dans le temps, circo 21 ──────────────────
+    con.execute("""
+        CREATE OR REPLACE VIEW v_evolution_blocs_circo21 AS
+        SELECT
+            annee,
+            tour,
+            bloc,
+            SUM(voix) AS voix_total
+        FROM v_scores_circo21_pres
+        GROUP BY annee, tour, bloc
+        ORDER BY annee, tour, bloc
+    """)
+
+    logger.info("Vues d'agrégation créées/mises à jour : 5 vues")

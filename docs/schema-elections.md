@@ -178,17 +178,17 @@ Chaque entrée porte le parti d'appartenance et la justification sourcée du cla
 
 **Couverture** : 11 candidats 2017 + 12 candidats 2022 = 23 entrées.
 
-**En attente de validation** (C2a-bis) : les classements avec parti et source_bloc
-sont soumis à validation avant population de la table.
-
 ---
 
 ## Jointure bloc pour la visualisation
 
-Pour obtenir le bloc de chaque résultat, la requête varie selon le scrutin :
+En pratique, utiliser directement la vue `v_resultats_candidats_avec_bloc` (C2b)
+qui résout le bloc via `COALESCE(nh.bloc, cp.bloc)` en un seul SELECT.
+
+Pour référence, la logique manuelle équivalente :
 
 ```sql
--- Scrutins avec nuances (hors présidentielles 2017/2022)
+-- Scrutins avec nuances (2002/2007/2012)
 SELECT rc.*, nh.bloc
 FROM resultats_candidats rc
 JOIN nuances_harmonisees nh
@@ -255,3 +255,72 @@ et [l'index des circulaires](sources-officielles/nuances/index.md) pour les sour
 | ASSELINEAU (2017) | `DIV` | UPR = souverainiste inclassable, nuance DIVC |
 
 Toute modification doit être tracée (commit motivé + mise à jour de `source_bloc`).
+
+---
+
+## Vues d'agrégation (C2b)
+
+Cinq vues créées par `create_elections_views()` dans `schema_elections.py`,
+appelée par `scripts/init_elections_schema.py`. Idempotentes (`CREATE OR REPLACE`).
+
+### `v_resultats_candidats_avec_bloc`
+
+Résultats au bureau de vote avec le **bloc politique résolu** pour chaque candidat.
+Couvre les présidentielles 2002–2022 (et tout autre scrutin chargé ultérieurement).
+
+Résolution du bloc via `COALESCE(nh.bloc, cp.bloc)` :
+- 2002/2007/2012 : jointure `nuances_harmonisees` sur `(nuance, annee)`
+- 2017/2022 : jointure `candidats_presidentielle` sur `(nom, annee)` (nuance NULL)
+
+| Colonne | Description |
+|---------|-------------|
+| `id_election`, `type_scrutin`, `annee`, `tour` | Identifiants du scrutin |
+| `code_departement`, `code_commune`, `code_bv` | Localisation géographique |
+| `no_panneau`, `nom`, `prenom`, `nuance` | Identification du candidat |
+| `voix` | Suffrages exprimés pour ce candidat dans ce bureau |
+| `bloc` | Code officiel résolu (`EXG`, `GAU`, `DIV`, `CENT`, `DTE`, `EXD`) |
+
+### `v_scores_commune_pres`
+
+Voix **agrégées à la commune** par bloc, pour les présidentielles uniquement.
+
+```sql
+SELECT bloc, voix FROM v_scores_commune_pres
+WHERE code_commune = '59606' AND annee = 2022 AND tour = 1
+ORDER BY voix DESC
+```
+
+### `v_participation_commune_pres`
+
+Participation **agrégée à la commune**, présidentielles uniquement.
+Inclut `taux_participation_pct` calculé à la volée (`ROUND(100 × votants / inscrits, 2)`).
+
+### `v_scores_circo21_pres`
+
+Sous-ensemble de `v_scores_commune_pres` filtré sur les **20 communes de la
+21e circonscription du Nord** (Valenciennes). Codes INSEE validés par jointure
+spatiale sur `geographies_circonscriptions` (code `'59-21'`).
+
+Communes : Aubry-du-Hainaut, Bellaing, Condé-sur-l'Escaut, Crespin, Curgies,
+Estreux, Marly, Onnaing, Petite-Forêt, Préseau, Quarouble, Quiévrechain,
+Rombies-et-Marchipont, Saint-Aybert, Saint-Saulve, Saultain, Sebourg,
+Thivencelle, Valenciennes, Wallers.
+
+### `v_evolution_blocs_circo21`
+
+Évolution temporelle des blocs dans la circo 21, agrégée sur les 20 communes.
+
+```sql
+SELECT annee, bloc, voix_total FROM v_evolution_blocs_circo21
+WHERE tour = 1 ORDER BY annee, voix_total DESC
+```
+
+Exemple de résultat (1er tour) :
+
+| Année | Bloc dominant | Voix |
+|-------|--------------|------|
+| 2002 | GAU | 16 994 |
+| 2007 | DTE | 20 268 |
+| 2012 | GAU | 25 234 |
+| 2017 | EXD | 18 311 |
+| 2022 | EXD | 21 637 |

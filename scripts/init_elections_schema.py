@@ -10,8 +10,15 @@ Crée les 6 tables électorales (idempotent) et remplit les 4 référentiels :
 - nuances_harmonisees (présidentielles 2002/2007/2012 avec nuances)
 - candidats_presidentielle (présidentielles 2017/2022 sans nuances, avec parti et source_bloc)
 
-Les tables de résultats (resultats_participation, resultats_candidats) sont créées
-vides. Le chargement des Parquet se fait en C2b (scripts/load_elections.py).
+Puis crée les 5 vues d'agrégation (C2b) :
+- v_resultats_candidats_avec_bloc
+- v_scores_commune_pres
+- v_participation_commune_pres
+- v_scores_circo21_pres
+- v_evolution_blocs_circo21
+
+Les tables de résultats sont créées vides ici.
+Chargement des Parquet → scripts/load_elections_presidentielles.py
 """
 
 from __future__ import annotations
@@ -26,6 +33,7 @@ sys.path.insert(0, str(ROOT / "src"))  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
     create_elections_schema,
+    create_elections_views,
     populate_elections_referentiels,
 )
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
@@ -42,6 +50,7 @@ def main() -> None:
 
     create_elections_schema(con)
     populate_elections_referentiels(con)
+    create_elections_views(con)
 
     # ── Résumé ────────────────────────────────────────────────────────────
     tables = [r[0] for r in con.execute("SHOW TABLES").fetchall()]
@@ -63,7 +72,7 @@ def main() -> None:
     for tbl, n in counts.items():
         print(f"  {tbl:<35s} {n:>6,} lignes")
     print("─────────────────────────────────────────────────────────────")
-    print("Schéma électoral initialisé. Chargement données → C2b.")
+    print("Schéma électoral initialisé. Chargement données → load_elections_presidentielles.py")
 
     con.close()
 
