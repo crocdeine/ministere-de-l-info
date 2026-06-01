@@ -100,12 +100,14 @@ ministere-de-l-info/
 - **Filtres contextuels** : par département et/ou région selon le niveau sélectionné
 - **Mode contours** : pour les niveaux sans données population (arrondissements municipaux, circonscriptions)
 
-## Modules à venir
+## Modules
 
-- 🗳️ **Élections** — résultats présidentielles, législatives, municipales par bureau de vote
-- 🏛️ **Législatif** — suivi des textes JORF, votes, amendements
-- 💶 **Économie** — séries macroéconomiques BDF, données entreprises Sirene
-- 👥 **Élus** — Répertoire National des Élus (RNE), HATVP, mandats
+| Module | Statut | Périmètre |
+|--------|--------|-----------|
+| 📍 Géographie | ✅ Terminé | Régions, départements, EPCI, communes, arrondissements, circos. Population 2013/2018/2023. |
+| 🗳️ Élections | ✅ Présidentielles (Phase C) | Présidentielles 2002-2022, Hauts-de-France, focus circo 21. |
+| 🏛️ Législatif | 🔜 Phase D | Législatives 2002-2024. |
+| 📊 Économie | 🔜 À cadrer | — |
 
 ## Tests
 
