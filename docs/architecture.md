@@ -30,9 +30,9 @@ ministere-de-l-info/
 ├── app.py                          # Point d'entrée Streamlit, configure_logging()
 ├── pages/
 │   ├── 1_📍_Géographie.py          # Carte territoriale choroplèthe (322 L)
-│   ├── 2_🗳️_Élections.py           # Stub — module à venir
-│   ├── 3_🏛️_Législatif.py          # Stub — module à venir
-│   └── 4_💶_Économie.py            # Stub — module à venir
+│   ├── 2_🗳️_Élections.py           # Module présidentielles HdF (Phase C — fonctionnel)
+│   ├── 3_🏛️_Législatif.py          # Stub — Phase D
+│   └── 4_💶_Économie.py            # Stub — à cadrer
 │
 ├── src/ministere_de_l_info/
 │   ├── logging_config.py           # configure_logging() : LOG_LEVEL + LOG_FORMAT
@@ -173,11 +173,12 @@ Aucune clé API n'est hardcodée dans le code source.
 ### Tests
 
 - Framework : `pytest` avec `pytest-cov`
-- Couverture cible : ≥ 60 % (configurée dans `pyproject.toml`)
+- Couverture cible : ≥ 60 % (configurée dans `pyproject.toml`) — réelle à la Phase C : **75 %**
 - Les fixtures DuckDB utilisent une base in-memory (`:memory:`) — aucune dépendance
   à la base de production dans les tests
 - Les ETL loaders sont exclus de la couverture (réseau requis)
-- 62 tests de smoke ETL vérifient l'intégrité de la base après chargement réel
+- 62 tests de smoke ETL + 9 tests d'intégration électoraux (C4) — total **184 tests**
+- Tests `@pytest.mark.slow` (Streamlit headless) exclus par défaut ; lancer avec `pytest -m slow`
 
 ### CI (GitHub Actions)
 
@@ -208,6 +209,9 @@ Les choix d'architecture non triviaux sont documentés sous forme d'ADR :
 | [0002](adr/0002-streamlit-vs-fastapi.md) | Streamlit plutôt que FastAPI + frontend JS |
 | [0003](adr/0003-uv-vs-pip-poetry.md) | uv plutôt que pip / poetry |
 | [0004](adr/0004-polars-vs-pandas.md) | Polars prioritaire, Pandas en fallback |
+| [0005](adr/0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère — 6 blocs de clivages |
+
+**Schéma DuckDB électoral** : voir [docs/schema-elections.md](schema-elections.md) — 6 tables, 5 vues d'agrégation, blocs officiels.
 
 ## Pour aller plus loin
 

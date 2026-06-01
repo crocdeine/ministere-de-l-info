@@ -21,6 +21,10 @@ voir le README.
 
 ## Architecture du déploiement
 
+> **Dev vs prod — deux comportements différents pour `/app/data`** :
+> - **Dev** (`docker-compose.yml`) : bind mount `./data:/app/data:ro` — la DB locale est visible immédiatement dans le container, sans rebuild ni copie. Tout changement de `data/ministere.duckdb` sur l'hôte est instantanément reflété. (Depuis commit `7c54159`, fix Phase C.)
+> - **Prod** (`docker-compose.prod.yml`) : named volume `duckdb-data` — la DB est copiée dans le volume une fois, puis le container est autonome (pas de dépendance au filesystem hôte). Adapter la procédure de déploiement en conséquence.
+
 ```
 ┌─────────────────────────────────────────────────┐
 │ Mac mini (hôte)                                 │
@@ -35,7 +39,7 @@ voir le README.
 │ │ │   user: app (non-root)                  │ │ │
 │ │ │   spatial extension: pré-installée      │ │ │
 │ │ └───────────────────┬─────────────────────┘ │ │
-│ │                     │ mount                  │ │
+│ │                     │ mount (prod)            │ │
 │ │ ┌───────────────────▼─────────────────────┐ │ │
 │ │ │ volume: ministere-info_duckdb-data      │ │ │
 │ │ │   /app/data/ministere.duckdb (~900 MB)  │ │ │

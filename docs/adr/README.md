@@ -14,6 +14,7 @@ décision est révisée, un nouvel ADR est créé avec le statut "Remplace 000X"
 | [0002](0002-streamlit-vs-fastapi.md) | Streamlit plutôt que FastAPI + frontend JS | Accepté |
 | [0003](0003-uv-vs-pip-poetry.md) | uv plutôt que pip / poetry | Accepté |
 | [0004](0004-polars-vs-pandas.md) | Polars prioritaire, Pandas en fallback | Accepté |
+| [0005](0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère — 6 blocs | Accepté |
 
 ## Format
 
