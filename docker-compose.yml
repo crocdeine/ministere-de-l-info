@@ -12,8 +12,9 @@ services:
       - ./src:/app/src
       - ./app.py:/app/app.py
       - ./.streamlit:/app/.streamlit
-      # Persistance des données (named volume, perf optimale sur macOS)
-      - duckdb-data:/app/data
+      # DB locale montée en lecture seule (dev) : pas de rebuild quand la DB change
+      # En prod, la DB est intégrée à l'image — voir docker-compose.prod.yml
+      - ./data:/app/data:ro
       # Pages Streamlit (hot reload)
       - ./pages:/app/pages:ro
       # Référentiels (lecture seule)
@@ -24,7 +25,3 @@ services:
       - STREAMLIT_SERVER_RUN_ON_SAVE=true
       - LOG_FORMAT=json
     restart: unless-stopped
-
-volumes:
-  duckdb-data:
-    driver: local
