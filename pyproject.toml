@@ -39,17 +39,22 @@ dev = [
     "pre-commit>=4.6.0",
     "pytest>=9.0.3",
     "pytest-cov>=6.0.0",
+    "requests>=2.32.0",
     "ruff>=0.15.13",
 ]
 
 [tool.pytest.ini_options]
 addopts = [
+    "-m", "not slow",
     "--cov=src/ministere_de_l_info",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
     "--cov-fail-under=60",
     "--cov-config=pyproject.toml",
+]
+markers = [
+    "slow: tests démarant un processus externe (Streamlit). Lancer avec: pytest -m slow",
 ]
 testpaths = ["tests"]
 
