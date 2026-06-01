@@ -40,6 +40,7 @@ Référentiel des 56 scrutins disponibles dans le dataset (1999–2026).
 | `annee` | `INTEGER` NN | Année du scrutin |
 | `tour` | `INTEGER` NN | Numéro de tour (1 ou 2) |
 | `libelle` | `VARCHAR` NN | Libellé complet : `'Présidentielle 2022 — 1er tour'` |
+| `ancien_decoupage` | `BOOLEAN` DEF FALSE | TRUE pour législatives 2002/2007 (avant redécoupage Marleix, applicable dès 2012) |
 
 **Couverture** :
 
@@ -72,13 +73,10 @@ Données de participation électorale par bureau de vote. Correspond au fichier 
 | `blancs` | `INTEGER` | Bulletins blancs |
 | `nuls` | `INTEGER` | Bulletins nuls |
 | `exprimes` | `INTEGER` | Suffrages exprimés (votants – blancs – nuls) |
+| `code_circo` | `VARCHAR` nullable | Code circonscription `"DPT-NN"` (ex. `"59-05"`). Renseigné pour legi 2012/2017/2022 depuis le Parquet source ; reconstruit par jointure spatiale pour 2002/2007/2024. NULL si reconstruction impossible. |
 
 **Ratios non stockés** (calculables à la volée) : `ratio_abstentions_inscrits`,
 `ratio_votants_inscrits`, `ratio_blancs_votants`, `ratio_exprimes_votants`, etc.
-
-Le Parquet source contient aussi `code_circonscription`, `libelle_commune`,
-`libelle_departement`, `code_canton` — non stockés dans ce schéma (version C2a).
-À ajouter en C2c si nécessaire pour les scrutins législatifs.
 
 ---
 
@@ -151,13 +149,18 @@ Mapping `(nuance, annee) → bloc` pour les scrutins **avec nuances** dans le Pa
 | `nuance` | `VARCHAR` PK | Code nuance tel qu'il apparaît dans le Parquet |
 | `annee` | `INTEGER` PK | Année du scrutin (même nuance peut changer de sens selon l'année) |
 | `bloc` | `VARCHAR` NN | FK → `blocs_politiques.bloc` |
+| `source_bloc` | `VARCHAR` | Justification courte du classement (1 ligne, modèle `candidats_presidentielle`) |
 
-**Couverture initiale** : présidentielles 2002, 2007, 2012 (38 entrées).
-Les scrutins de liste (legi, euro, regi, muni) seront ajoutés en C2c.
+**Couverture** : **149 entrées** = 38 présidentielles (codes-candidats 2002/2007/2012)
++ **111 législatives** (codes partisans, 2002-2024). Détail et validation des nuances
+législatives : `reports/mapping-nuances-legislatives-validated.md`, méthodologie en
+ADR-0005 (§ « Application aux législatives 2002-2024 »).
 
 **Note** : pour les présidentielles 2002/2007/2012, les codes nuances sont des
 **codes-candidats** (ex. `CHIR` = Chirac, `JOSP` = Jospin), différents des codes
-partisans utilisés par les autres scrutins (ex. `RN`, `SOC`, `LR`).
+partisans utilisés par les autres scrutins (ex. `RN`, `SOC`, `LR`). La clé
+`(nuance, annee)` évite toute collision entre ces deux conventions (aucun chevauchement
+observé sur 2002/2007/2012).
 
 ---
 

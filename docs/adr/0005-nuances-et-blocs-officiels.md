@@ -73,6 +73,39 @@ explicite. Cela introduit une subjectivité non documentée, difficilement défe
   GAU (allié de gauche historique) et Cap21/Génération Écologie en CENT ou DIV selon
   la circulaire de référence.
 
+## Application aux législatives 2002-2024
+
+Cette section documente l'application concrète de la décision aux scrutins législatifs
+(Phase D1.2, validée le 2026-06-01).
+
+- **111 nuances classées** sur 6 scrutins : 2002 (22), 2007 (17), 2012 (17), 2017 (17),
+  2022 (16), 2024 (22). Détail ligne par ligne et justifications :
+  `reports/mapping-nuances-legislatives-validated.md`. Stockage : table
+  `nuances_harmonisees`, clé `(nuance, annee)`, colonne `source_bloc`.
+
+- **Sources** :
+  - 2022 → circulaire **INTA2212053C** (avr. 2022) — liste les nuances, **sans** grille de blocs.
+  - 2024 → circulaire **IOMA2415630C** (juin 2024) — crée la nuance **UG** (Union de la gauche)
+    et confirme que **FI est une nuance distincte d'EXG** ; ne contient pas de grille de blocs.
+  - 2002-2017 → les circulaires de nuançage **ne sont pas publiées au JO** (documents internes
+    non archivables) ; le classement est **reconstruit** selon la logique officielle datée
+    (cf. décision n° 3 ci-dessus) et reste révisable.
+
+- **Cohérence interne (règle LFI)** : **FG 2012**, **FI 2017**, **NUP 2022**, **FI 2024** et
+  **UG 2024** sont tous classés **GAU**. La bascule de LFI vers **EXG** n'est introduite qu'à
+  partir des **municipales 2026** (circulaire **INTP2602966C**, validée par CE 27/02/2026).
+  Classer ces formations en EXG avant 2026 serait une application rétroactive proscrite par
+  la décision n° 3.
+
+- **Souverainistes (DSV)** : classés **DTE** (et non EXD) en 2022 et 2024, en cohérence avec
+  le traitement de DLF/Dupont-Aignan (CE 31/01/2020 n°437675) et confirmé par IOMA2415630C.
+
+- **Écologistes (ECO/VEC)** : **GAU** sur tous les scrutins, conformément à l'absence de bloc
+  écologiste distinct dans la nomenclature officielle.
+
+- **Cas tranché manuellement** : **PREP 2002** (Pôle Républicain, Chevènement) classé **GAU**
+  par cohérence avec le classement GAU de Chevènement (MDC) en présidentielle 2002.
+
 ## Réversibilité
 
 Un classement = une ligne dans une table de référence (`candidats_presidentielle` ou

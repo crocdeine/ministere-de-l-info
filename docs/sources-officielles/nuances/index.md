@@ -15,6 +15,14 @@ centre, droite, extrême droite.
 scrutins antérieurs, le projet reconstruit le bloc selon la logique officielle
 (voir [docs/adr/0005-nuances-et-blocs-officiels.md](../../adr/0005-nuances-et-blocs-officiels.md)).
 
+**Circulaires législatives 2002-2017 non archivables** : les circulaires de nuançage de ces
+scrutins sont des documents internes du Ministère, **non publiés au Journal officiel**. Elles
+ne peuvent donc pas être archivées ici. Le classement de leurs nuances est reconstruit selon
+la logique officielle datée de l'[ADR-0005](../../adr/0005-nuances-et-blocs-officiels.md)
+(§ « Application aux législatives 2002-2024 »). Le détail des 111 nuances législatives validées
+(2002-2024) figure dans
+[reports/mapping-nuances-legislatives-validated.md](../../../reports/mapping-nuances-legislatives-validated.md).
+
 ## Circulaires archivées
 
 | Fichier | NOR | Date | Scrutin | Nuances | Blocs ? | Fait notable |

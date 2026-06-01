@@ -51,7 +51,7 @@ _TYPE_LIBELLE: dict[str, str] = {
 }
 
 
-def _build_elections() -> list[tuple[str, str, int, int, str]]:
+def _build_elections() -> list[tuple[str, str, int, int, str, bool]]:
     """Construit la liste des 56 scrutins connus (1999–2026)."""
     # (type_scrutin, annee, tour)
     raw: list[tuple[str, int, int]] = [
@@ -112,16 +112,18 @@ def _build_elections() -> list[tuple[str, str, int, int, str]]:
         ("muni", 2026, 1),
         ("muni", 2026, 2),
     ]
-    result: list[tuple[str, str, int, int, str]] = []
+    result: list[tuple[str, str, int, int, str, bool]] = []
     for typ, annee, tour in raw:
         id_el = f"{annee}_{typ}_t{tour}"
         tour_str = "1er tour" if tour == 1 else "2e tour"
         libelle = f"{_TYPE_LIBELLE[typ]} {annee} — {tour_str}"
-        result.append((id_el, typ, annee, tour, libelle))
+        # Scrutins législatifs antérieurs au redécoupage Marleix (applicable dès 2012)
+        ancien_decoupage = typ == "legi" and annee in (2002, 2007)
+        result.append((id_el, typ, annee, tour, libelle, ancien_decoupage))
     return result
 
 
-_ELECTIONS: list[tuple[str, str, int, int, str]] = _build_elections()
+_ELECTIONS: list[tuple[str, str, int, int, str, bool]] = _build_elections()
 
 # ── Blocs politiques ──────────────────────────────────────────────────────────
 # Nomenclature officielle Ministère de l'Intérieur — 6 blocs, codes en majuscules.
@@ -169,66 +171,221 @@ _CIRCO21_CODES: tuple[str, ...] = (
 # (CHIR = Chirac, JOSP = Jospin, etc.), contrairement aux scrutins de liste
 # qui utilisent des codes partisans (RN, SOC, LDVG, …).
 # Blocs officiels Ministère (reconstruction ante-2023 selon ADR-0005).
-# (nuance, annee, bloc)
+# (nuance, annee, bloc, source_bloc) — source_bloc = justification courte (1 ligne).
 #
-_NUANCES_PRES: list[tuple[str, int, str]] = [
+_NUANCES_PRES: list[tuple[str, int, str, str]] = [
     # ── 2002 (16 candidats) ────────────────────────────────────────────────
-    ("BAYR", 2002, "CENT"),  # Bayrou – UDF → CENT
-    ("BESA", 2002, "EXG"),  # Besancenot – LCR trotskiste → EXG
+    ("BAYR", 2002, "CENT", "Bayrou – UDF → CENT"),
+    ("BESA", 2002, "EXG", "Besancenot – LCR trotskiste → EXG"),
     (
         "BOUT",
         2002,
         "DTE",
-    ),  # Boutin – FRS conservateur chrétien, floue DTE/EXD ; retenu DTE par cohérence nomenclature Ministère
-    ("CHEV", 2002, "GAU"),  # Chevènement – MDC (socialiste dissident ex-PS) → GAU
-    ("CHIR", 2002, "DTE"),  # Chirac – RPR gaulliste → DTE
-    ("GLUC", 2002, "EXG"),  # Gluckstein – PT trotskiste → EXG
-    ("HUE", 2002, "GAU"),  # Hue – PCF → GAU (logique officielle Ministère, pas EXG)
-    ("JOSP", 2002, "GAU"),  # Jospin – PS → GAU
-    ("LAGU", 2002, "EXG"),  # Laguiller – LO → EXG
+        "Boutin – FRS conservateur chrétien → DTE (cohérence nomenclature Ministère)",
+    ),
+    ("CHEV", 2002, "GAU", "Chevènement – MDC (ex-PS) → GAU"),
+    ("CHIR", 2002, "DTE", "Chirac – RPR gaulliste → DTE"),
+    ("GLUC", 2002, "EXG", "Gluckstein – PT trotskiste → EXG"),
+    ("HUE", 2002, "GAU", "Hue – PCF → GAU (logique officielle Ministère, pas EXG)"),
+    ("JOSP", 2002, "GAU", "Jospin – PS → GAU"),
+    ("LAGU", 2002, "EXG", "Laguiller – LO → EXG"),
     (
         "LEPA",
         2002,
         "CENT",
-    ),  # Lepage – Cap21 (écologie libérale centriste) → CENT ; pas de bloc écolo officiel
-    ("LEPE", 2002, "EXD"),  # Le Pen J.-M. – FN → EXD
-    ("MADE", 2002, "DTE"),  # Madelin – DL (libéral-conservateur) → DTE
-    ("MAME", 2002, "GAU"),  # Mamère – Verts (nuance DVGV) → GAU
-    ("MEGR", 2002, "EXD"),  # Mégret – MNR (scissionniste FN) → EXD
-    ("SAIN", 2002, "DIV"),  # Saint-Josse – CPNT → DIV
-    ("TAUB", 2002, "GAU"),  # Taubira – PRG (allié PS) → GAU
+        "Lepage – Cap21 (écologie libérale) → CENT ; pas de bloc écolo officiel",
+    ),
+    ("LEPE", 2002, "EXD", "Le Pen J.-M. – FN → EXD"),
+    ("MADE", 2002, "DTE", "Madelin – DL (libéral-conservateur) → DTE"),
+    ("MAME", 2002, "GAU", "Mamère – Verts (DVGV) → GAU"),
+    ("MEGR", 2002, "EXD", "Mégret – MNR (scission FN) → EXD"),
+    ("SAIN", 2002, "DIV", "Saint-Josse – CPNT → DIV"),
+    ("TAUB", 2002, "GAU", "Taubira – PRG (allié PS) → GAU"),
     # ── 2007 (12 candidats) ────────────────────────────────────────────────
-    ("BAYR", 2007, "CENT"),  # Bayrou – MoDem → CENT
-    ("BESA", 2007, "EXG"),  # Besancenot – LCR → EXG
-    ("BOVE", 2007, "GAU"),  # Bové – altermondialiste/soutien Verts (DVGV) → GAU
-    ("BUFF", 2007, "GAU"),  # Buffet – PCF → GAU
-    ("LAGU", 2007, "EXG"),  # Laguiller – LO → EXG
-    ("LEPE", 2007, "EXD"),  # Le Pen J.-M. – FN → EXD
-    ("NIHO", 2007, "DIV"),  # Nihous – CPNT → DIV
-    ("ROYA", 2007, "GAU"),  # Royal – PS → GAU
-    ("SARK", 2007, "DTE"),  # Sarkozy – UMP → DTE
-    ("SCHI", 2007, "EXG"),  # Schivardi – PT trotskiste → EXG
-    (
-        "VILL",
-        2007,
-        "DTE",
-    ),  # de Villiers – MPF (nuance DVDR) → DTE ; CE 31/01/2020 n°437675 conforte DTE
-    ("VOYN", 2007, "GAU"),  # Voynet – Verts (nuance DVGV) → GAU
+    ("BAYR", 2007, "CENT", "Bayrou – MoDem → CENT"),
+    ("BESA", 2007, "EXG", "Besancenot – LCR → EXG"),
+    ("BOVE", 2007, "GAU", "Bové – altermondialiste/soutien Verts (DVGV) → GAU"),
+    ("BUFF", 2007, "GAU", "Buffet – PCF → GAU"),
+    ("LAGU", 2007, "EXG", "Laguiller – LO → EXG"),
+    ("LEPE", 2007, "EXD", "Le Pen J.-M. – FN → EXD"),
+    ("NIHO", 2007, "DIV", "Nihous – CPNT → DIV"),
+    ("ROYA", 2007, "GAU", "Royal – PS → GAU"),
+    ("SARK", 2007, "DTE", "Sarkozy – UMP → DTE"),
+    ("SCHI", 2007, "EXG", "Schivardi – PT trotskiste → EXG"),
+    ("VILL", 2007, "DTE", "de Villiers – MPF (DVDR) → DTE (CE 31/01/2020 n°437675)"),
+    ("VOYN", 2007, "GAU", "Voynet – Verts (DVGV) → GAU"),
     # ── 2012 (10 candidats) ────────────────────────────────────────────────
-    ("ARTH", 2012, "EXG"),  # Arthaud – LO → EXG
-    ("BAYR", 2012, "CENT"),  # Bayrou – MoDem → CENT
-    ("CHEM", 2012, "DIV"),  # Cheminade – Solidarité et Progrès → DIV
-    ("DUPO", 2012, "DTE"),  # Dupont-Aignan – DLR (nuance DVDR) → DTE ; CE 31/01/2020 n°437675
-    ("HOLL", 2012, "GAU"),  # Hollande – PS → GAU
-    ("JOLY", 2012, "GAU"),  # Joly – EELV (nuance DVGV) → GAU ; pas de bloc écolo officiel
-    ("LEPE", 2012, "EXD"),  # Le Pen Marine – FN → EXD
+    ("ARTH", 2012, "EXG", "Arthaud – LO → EXG"),
+    ("BAYR", 2012, "CENT", "Bayrou – MoDem → CENT"),
+    ("CHEM", 2012, "DIV", "Cheminade – Solidarité et Progrès → DIV"),
+    ("DUPO", 2012, "DTE", "Dupont-Aignan – DLR (DVDR) → DTE (CE 31/01/2020 n°437675)"),
+    ("HOLL", 2012, "GAU", "Hollande – PS → GAU"),
+    ("JOLY", 2012, "GAU", "Joly – EELV (DVGV) → GAU ; pas de bloc écolo officiel"),
+    ("LEPE", 2012, "EXD", "Le Pen Marine – FN → EXD"),
     (
         "MELE",
         2012,
         "GAU",
-    ),  # Mélenchon – Front de Gauche → GAU ; LFI bascule EXG en 2026 (INTP2602966C) seulement
-    ("POUT", 2012, "EXG"),  # Poutou – NPA (héritage LCR) → EXG
-    ("SARK", 2012, "DTE"),  # Sarkozy – UMP → DTE
+        "Mélenchon – Front de Gauche → GAU ; LFI bascule EXG en 2026 (INTP2602966C)",
+    ),
+    ("POUT", 2012, "EXG", "Poutou – NPA (héritage LCR) → EXG"),
+    ("SARK", 2012, "DTE", "Sarkozy – UMP → DTE"),
+]
+
+# ── Nuances → blocs, législatives 2002/2007/2012/2017/2022/2024 ──────────────
+# 111 entrées (nuance, annee) validées par Mathias le 2026-06-01.
+# Classement "officiel de l'époque" (ADR-0005) ; circulaires 2002-2017 non publiées
+# au JO (documents internes) → reconstruction sourcée ; 2022 = INTA2212053C ;
+# 2024 = IOMA2415630C. Détail et justification : reports/mapping-nuances-legislatives-validated.md
+# Format : (nuance, annee, bloc, source_bloc)
+_NUANCES_LEGI: list[tuple[str, int, str, str]] = [
+    # ── 2002 (22 nuances) ──────────────────────────────────────────────────
+    ("COM", 2002, "GAU", "PCF → GAU (logique officielle Ministère, pas EXG)"),
+    ("CPNT", 2002, "DIV", "Chasse Pêche Nature Tradition → DIV"),
+    ("DIV", 2002, "DIV", "Divers → mapping direct"),
+    ("DL", 2002, "DTE", "Démocratie Libérale (Madelin) libéral-conservateur → DTE"),
+    ("DVD", 2002, "DTE", "Divers Droite → mapping direct"),
+    ("DVG", 2002, "GAU", "Divers Gauche → mapping direct"),
+    ("ECO", 2002, "GAU", "Écologistes/Verts → GAU (pas de bloc écolo officiel, ADR-0005)"),
+    ("EXD", 2002, "EXD", "Extrême droite → code = bloc"),
+    ("EXG", 2002, "EXG", "Extrême gauche → code = bloc"),
+    ("FN", 2002, "EXD", "Front National → EXD"),
+    ("LCR", 2002, "EXG", "Ligue Communiste Révolutionnaire (trotskiste) → EXG"),
+    ("LO", 2002, "EXG", "Lutte Ouvrière → EXG"),
+    ("MNR", 2002, "EXD", "MNR (Mégret, scission FN) → EXD"),
+    (
+        "MPF",
+        2002,
+        "DTE",
+        "MPF (Villiers) souverainiste conservateur → DTE (CE 31/01/2020 n°437675)",
+    ),
+    (
+        "PREP",
+        2002,
+        "GAU",
+        "Pôle Républicain (Chevènement, souverainiste de gauche) → GAU par cohérence DVG/MDC",
+    ),
+    ("PRG", 2002, "GAU", "Parti Radical de Gauche (allié PS) → GAU"),
+    ("REG", 2002, "DIV", "Régionalistes → DIV"),
+    ("RPF", 2002, "DTE", "RPF (Pasqua) souverainiste conservateur → DTE (même logique que MPF)"),
+    ("SOC", 2002, "GAU", "Parti Socialiste → GAU"),
+    ("UDF", 2002, "CENT", "UDF (Bayrou-Giscard) → CENT"),
+    ("UMP", 2002, "DTE", "UMP (Chirac) → DTE"),
+    ("VEC", 2002, "GAU", "Les Verts → GAU (idem ECO)"),
+    # ── 2007 (17 nuances) ──────────────────────────────────────────────────
+    ("COM", 2007, "GAU", "PCF → GAU"),
+    ("CPNT", 2007, "DIV", "Chasse Pêche Nature Tradition → DIV"),
+    ("DIV", 2007, "DIV", "Divers → mapping direct"),
+    ("DVD", 2007, "DTE", "Divers Droite → DTE"),
+    ("DVG", 2007, "GAU", "Divers Gauche → GAU"),
+    ("ECO", 2007, "GAU", "Écologistes → GAU (ADR-0005)"),
+    ("EXD", 2007, "EXD", "Extrême droite → code = bloc"),
+    ("EXG", 2007, "EXG", "Extrême gauche → code = bloc"),
+    ("FN", 2007, "EXD", "Front National → EXD"),
+    ("MAJ", 2007, "DTE", "Majorité présidentielle (UMP-alliés Sarkozy 2007) → DTE"),
+    ("MPF", 2007, "DTE", "MPF (Villiers) → DTE"),
+    ("RDG", 2007, "GAU", "Radical de Gauche (allié PS) → GAU"),
+    ("REG", 2007, "DIV", "Régionalistes → DIV"),
+    ("SOC", 2007, "GAU", "Parti Socialiste → GAU"),
+    ("UDFD", 2007, "CENT", "UDF Démocrate (rump post-MoDem 2007) tradition centriste → CENT"),
+    ("UMP", 2007, "DTE", "UMP (Sarkozy) → DTE"),
+    ("VEC", 2007, "GAU", "Les Verts → GAU"),
+    # ── 2012 (17 nuances) ──────────────────────────────────────────────────
+    ("ALLI", 2012, "CENT", "Alliance Centriste (Arthuis), précurseur UDI → CENT"),
+    ("AUT", 2012, "DIV", "Autres → divers inclassables, DIV"),
+    ("CEN", 2012, "CENT", "Centre → code centriste, CENT"),
+    ("DVD", 2012, "DTE", "Divers Droite → DTE"),
+    ("DVG", 2012, "GAU", "Divers Gauche → GAU"),
+    ("ECO", 2012, "GAU", "Écologistes (EELV) → GAU"),
+    ("EXD", 2012, "EXD", "Extrême droite → code = bloc"),
+    ("EXG", 2012, "EXG", "Extrême gauche → code = bloc"),
+    ("FG", 2012, "GAU", "Front de Gauche (PCF+PG) → GAU ; LFI bascule EXG en 2026 (INTP2602966C)"),
+    ("FN", 2012, "EXD", "Front National → EXD"),
+    ("NCE", 2012, "CENT", "Nouveau Centre (Borloo, allié UMP) → CENT"),
+    ("PRV", 2012, "DTE", "Parti Radical Valoisien (allié UMP) → DTE"),
+    ("RDG", 2012, "GAU", "Radical de Gauche (allié PS) → GAU"),
+    ("REG", 2012, "DIV", "Régionalistes → DIV"),
+    ("SOC", 2012, "GAU", "Parti Socialiste → GAU"),
+    ("UMP", 2012, "DTE", "UMP (Sarkozy → Fillon) → DTE"),
+    ("VEC", 2012, "GAU", "Les Verts/EELV → GAU"),
+    # ── 2017 (17 nuances) ──────────────────────────────────────────────────
+    ("COM", 2017, "GAU", "PCF → GAU"),
+    ("DIV", 2017, "DIV", "Divers → mapping direct"),
+    ("DLF", 2017, "DTE", "Debout la France (Dupont-Aignan) → DTE (CE 31/01/2020 n°437675)"),
+    ("DVD", 2017, "DTE", "Divers Droite → DTE"),
+    ("DVG", 2017, "GAU", "Divers Gauche → GAU"),
+    ("ECO", 2017, "GAU", "Écologistes (EELV) → GAU"),
+    ("EXD", 2017, "EXD", "Extrême droite → code = bloc"),
+    ("EXG", 2017, "EXG", "Extrême gauche → code = bloc"),
+    (
+        "FI",
+        2017,
+        "GAU",
+        "La France Insoumise → GAU en 2017 (IOMA2322276J 2023 confirme) ; EXG en 2026 (INTP2602966C)",
+    ),
+    ("FN", 2017, "EXD", "Front National → EXD (RN en 2018, après le scrutin)"),
+    ("LR", 2017, "DTE", "Les Républicains → DTE"),
+    ("MDM", 2017, "CENT", "MoDem (Bayrou) → CENT"),
+    ("RDG", 2017, "GAU", "Radical de Gauche → GAU"),
+    ("REG", 2017, "DIV", "Régionalistes → DIV"),
+    ("REM", 2017, "CENT", "La République En Marche (Macron) → CENT"),
+    ("SOC", 2017, "GAU", "Parti Socialiste → GAU"),
+    ("UDI", 2017, "CENT", "Union des Démocrates Indépendants → CENT"),
+    # ── 2022 (16 nuances) — source INTA2212053C ────────────────────────────
+    ("DIV", 2022, "DIV", "Divers → mapping direct"),
+    ("DSV", 2022, "DTE", "Divers Souverainiste → DTE (souverainistes non-EXD, logique CE DLF)"),
+    ("DVC", 2022, "CENT", "Divers Centre → mapping direct"),
+    ("DVD", 2022, "DTE", "Divers Droite → DTE"),
+    ("DVG", 2022, "GAU", "Divers Gauche → GAU"),
+    ("DXD", 2022, "EXD", "Divers Extrême Droite → code explicite"),
+    ("DXG", 2022, "EXG", "Divers Extrême Gauche → code explicite"),
+    ("ECO", 2022, "GAU", "Écologistes (EELV, INTA2212053C) → GAU"),
+    ("ENS", 2022, "CENT", "Ensemble! (LREM+MoDem+Horizons) → CENT"),
+    ("LR", 2022, "DTE", "Les Républicains → DTE"),
+    ("NUP", 2022, "GAU", "NUPES (LFI+PS+PCF+EELV) → GAU ; LFI bascule EXG en 2026 (INTP2602966C)"),
+    ("RDG", 2022, "GAU", "Radical de Gauche → GAU"),
+    ("REC", 2022, "EXD", "Reconquête (Zemmour, INTA2212053C) → EXD"),
+    ("REG", 2022, "DIV", "Régionalistes → DIV"),
+    ("RN", 2022, "EXD", "Rassemblement National → EXD (CE 21/09/2023 n°488379)"),
+    ("UDI", 2022, "CENT", "UDI → CENT"),
+    # ── 2024 (22 nuances) — source IOMA2415630C ────────────────────────────
+    ("COM", 2024, "GAU", "PCF standalone (hors NFP) → GAU"),
+    ("DIV", 2024, "DIV", "Divers → mapping direct"),
+    ("DSV", 2024, "DTE", "Divers Souverainiste → DTE (IOMA2415630C : souverainistes ≠ EXD)"),
+    ("DVC", 2024, "CENT", "Divers Centre → CENT"),
+    ("DVD", 2024, "DTE", "Divers Droite → DTE"),
+    ("DVG", 2024, "GAU", "Divers Gauche → GAU"),
+    ("ECO", 2024, "GAU", "Écologistes → GAU"),
+    ("ENS", 2024, "CENT", "Ensemble (Macron) → CENT"),
+    ("EXD", 2024, "EXD", "Extrême droite → code = bloc"),
+    (
+        "EXG",
+        2024,
+        "EXG",
+        "Extrême gauche (LO+NPA+POI, sans LFI) → IOMA2415630C confirme, code = bloc",
+    ),
+    (
+        "FI",
+        2024,
+        "GAU",
+        "LFI standalone hors NFP → GAU (IOMA2415630C : FI distincte d'EXG) ; EXG en 2026",
+    ),
+    ("HOR", 2024, "CENT", "Horizons (Philippe, allié Ensemble) → CENT"),
+    ("LR", 2024, "DTE", "Les Républicains (hors accord Macron) → DTE"),
+    ("RDG", 2024, "GAU", "Radical de Gauche → GAU"),
+    ("REC", 2024, "EXD", "Reconquête → EXD"),
+    ("REG", 2024, "DIV", "Régionalistes → DIV"),
+    ("RN", 2024, "EXD", "Rassemblement National → EXD"),
+    ("SOC", 2024, "GAU", "PS standalone (hors NFP) → GAU"),
+    ("UDI", 2024, "CENT", "UDI → CENT"),
+    (
+        "UG",
+        2024,
+        "GAU",
+        "NFP/Union de la Gauche (PS+PCF+EELV+LFI) → GAU (IOMA2415630C définit UG = Union de la gauche)",
+    ),
+    ("UXD", 2024, "EXD", "Union d'extrême droite (RN+alliés 2024) → EXD"),
+    ("VEC", 2024, "GAU", "Verts standalone (hors NFP) → GAU"),
 ]
 
 # ── Candidats présidentiels 2017 / 2022 ──────────────────────────────────────
@@ -421,11 +578,12 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
     """Crée les 6 tables électorales. Idempotent (CREATE TABLE IF NOT EXISTS)."""
     con.execute("""
         CREATE TABLE IF NOT EXISTS elections (
-            id_election  VARCHAR PRIMARY KEY,
-            type_scrutin VARCHAR NOT NULL,
-            annee        INTEGER NOT NULL,
-            tour         INTEGER NOT NULL,
-            libelle      VARCHAR NOT NULL
+            id_election      VARCHAR PRIMARY KEY,
+            type_scrutin     VARCHAR NOT NULL,
+            annee            INTEGER NOT NULL,
+            tour             INTEGER NOT NULL,
+            libelle          VARCHAR NOT NULL,
+            ancien_decoupage BOOLEAN DEFAULT FALSE
         )
     """)
 
@@ -496,6 +654,14 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("ALTER TABLE candidats_presidentielle ADD COLUMN IF NOT EXISTS parti VARCHAR")
     con.execute("ALTER TABLE candidats_presidentielle ADD COLUMN IF NOT EXISTS source_bloc VARCHAR")
 
+    # Migration D1.2 : nouvelles colonnes pour les scrutins législatifs
+    con.execute(
+        "ALTER TABLE elections ADD COLUMN IF NOT EXISTS ancien_decoupage BOOLEAN DEFAULT FALSE"
+    )
+    con.execute("ALTER TABLE resultats_participation ADD COLUMN IF NOT EXISTS code_circo VARCHAR")
+    # Migration D1.2 : justification courte du bloc, sur le modèle de candidats_presidentielle
+    con.execute("ALTER TABLE nuances_harmonisees ADD COLUMN IF NOT EXISTS source_bloc VARCHAR")
+
     logger.info("Schéma électoral créé/vérifié : 6 tables")
 
 
@@ -519,13 +685,23 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
     logger.info("blocs_politiques : %d blocs", len(_BLOCS))
 
     # elections (56 scrutins 1999-2026)
-    con.executemany("INSERT INTO elections VALUES (?, ?, ?, ?, ?)", _ELECTIONS)
+    con.executemany("INSERT INTO elections VALUES (?, ?, ?, ?, ?, ?)", _ELECTIONS)
     logger.info("elections : %d scrutins", len(_ELECTIONS))
 
-    # nuances_harmonisees (présidentielles avec nuances : 2002, 2007, 2012)
-    if _NUANCES_PRES:
-        con.executemany("INSERT INTO nuances_harmonisees VALUES (?, ?, ?)", _NUANCES_PRES)
-    logger.info("nuances_harmonisees : %d entrées (pres 2002/2007/2012)", len(_NUANCES_PRES))
+    # nuances_harmonisees : présidentielles (2002/2007/2012) + législatives
+    # (2002/2007/2012/2017/2022/2024). Chaque entrée porte sa justification (source_bloc).
+    nuances = _NUANCES_PRES + _NUANCES_LEGI
+    if nuances:
+        con.executemany(
+            "INSERT INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) VALUES (?, ?, ?, ?)",
+            nuances,
+        )
+    logger.info(
+        "nuances_harmonisees : %d entrées (%d pres + %d legi)",
+        len(nuances),
+        len(_NUANCES_PRES),
+        len(_NUANCES_LEGI),
+    )
 
     # candidats_presidentielle (présidentielles sans nuances : 2017, 2022)
     candidats = _CANDIDATS_PRES_2017 + _CANDIDATS_PRES_2022
@@ -635,4 +811,64 @@ def create_elections_views(con: duckdb.DuckDBPyConnection) -> None:
         ORDER BY annee, tour, bloc
     """)
 
-    logger.info("Vues d'agrégation créées/mises à jour : 5 vues")
+    # ── Vue 6 — scores par circonscription, législatives ─────────────────
+    con.execute("""
+        CREATE OR REPLACE VIEW v_scores_circo_legi AS
+        SELECT
+            rc.id_election,
+            e.annee,
+            e.tour,
+            e.ancien_decoupage,
+            rp.code_circo,
+            COALESCE(nh.bloc, 'DIV') AS bloc,
+            SUM(rc.voix)             AS voix
+        FROM resultats_candidats rc
+        JOIN elections e ON e.id_election = rc.id_election
+        JOIN resultats_participation rp
+            ON rp.id_election      = rc.id_election
+            AND rp.code_departement = rc.code_departement
+            AND rp.code_commune     = rc.code_commune
+            AND rp.code_bv          = rc.code_bv
+        LEFT JOIN nuances_harmonisees nh ON nh.nuance = rc.nuance AND nh.annee = e.annee
+        WHERE e.type_scrutin = 'legi'
+          AND rp.code_circo IS NOT NULL
+        GROUP BY
+            rc.id_election, e.annee, e.tour, e.ancien_decoupage,
+            rp.code_circo, COALESCE(nh.bloc, 'DIV')
+    """)
+
+    # ── Vue 7 — participation par circonscription, législatives ──────────
+    con.execute("""
+        CREATE OR REPLACE VIEW v_participation_circo_legi AS
+        SELECT
+            rp.id_election,
+            e.annee,
+            e.tour,
+            e.ancien_decoupage,
+            rp.code_circo,
+            SUM(rp.inscrits)                                                  AS inscrits,
+            SUM(rp.votants)                                                   AS votants,
+            SUM(rp.exprimes)                                                  AS exprimes,
+            ROUND(100.0 * SUM(rp.votants) / NULLIF(SUM(rp.inscrits), 0), 2)  AS taux_participation_pct
+        FROM resultats_participation rp
+        JOIN elections e ON e.id_election = rp.id_election
+        WHERE e.type_scrutin = 'legi'
+          AND rp.code_circo IS NOT NULL
+        GROUP BY rp.id_election, e.annee, e.tour, e.ancien_decoupage, rp.code_circo
+    """)
+
+    # ── Vue 8 — évolution temporelle des blocs HdF, législatives ─────────
+    con.execute("""
+        CREATE OR REPLACE VIEW v_evolution_blocs_hdf_legi AS
+        SELECT
+            annee,
+            tour,
+            ancien_decoupage,
+            bloc,
+            SUM(voix) AS voix_total
+        FROM v_scores_circo_legi
+        GROUP BY annee, tour, ancien_decoupage, bloc
+        ORDER BY annee, tour, bloc
+    """)
+
+    logger.info("Vues d'agrégation créées/mises à jour : 8 vues")
