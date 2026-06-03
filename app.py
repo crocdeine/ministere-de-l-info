@@ -39,7 +39,7 @@ st.success("✅ Stack opérationnelle.")
 
 with st.expander("Test DuckDB"):
     result = duckdb.sql("SELECT 'France' AS pays, 67_000_000 AS habitants").to_df()
-    st.dataframe(result, use_container_width=True)
+    st.dataframe(result, width="stretch")
 
 with st.expander("Test GeoPandas"):
     st.write(f"GeoPandas version : {gpd.__version__}")

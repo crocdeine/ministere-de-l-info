@@ -24,6 +24,8 @@ Toujours communiquer en français, ton neutre, sans blabla.
 
 Ces mises à jour ne sont PAS optionnelles : elles font partie du travail. Une session qui ne met pas à jour la mémoire est une session incomplète.
 
+**Points d'arrêt obligatoires** : quand un prompt mentionne explicitement "POINT D'ARRÊT", "ATTENDRE VALIDATION", "STOP", ou équivalent, Claude Code DOIT s'arrêter et attendre la confirmation explicite de Mathias en chat web. Un test automatisé (AppTest, pytest, Streamlit headless) ne remplace pas une validation manuelle quand elle est demandée. Les deux sont complémentaires.
+
 ---
 
 ## État des modules

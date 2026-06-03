@@ -160,7 +160,7 @@ def _render_vue_hdf(
     )
     st.dataframe(
         recap.to_pandas().style.format({"Voix totales": "{:,.0f}", "% HdF": "{:.1f}"}),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -248,7 +248,7 @@ def _render_vue_circo(
         height=320,
     )
     fig_bar.update_layout(showlegend=False, margin={"t": 20, "b": 20})
-    st.plotly_chart(fig_bar, use_container_width=True)
+    st.plotly_chart(fig_bar, width="stretch")
 
     # Évolution temporelle de la circo
     st.divider()
@@ -269,7 +269,7 @@ def _render_vue_circo(
         )
         st.dataframe(
             table.to_pandas().style.format({"Voix": "{:,.0f}", "% exp.": "{:.1f}"}),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -348,4 +348,4 @@ def _render_evolution_chart(
     )
     fig.update_traces(hovertemplate="<b>%{x}</b><br>%{y:,.0f}<extra>%{fullData.name}</extra>")
     with ev_right:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")

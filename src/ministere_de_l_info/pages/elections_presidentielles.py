@@ -195,7 +195,7 @@ def render() -> None:
     )
     fig.update_traces(hovertemplate="<b>%{x}</b><br>%{y:,.0f}<extra>%{fullData.name}</extra>")
     with ev_right:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # ── Tableau détail ───────────────────────────────────────────────────────────
     st.divider()
@@ -260,7 +260,7 @@ def render() -> None:
         .sort("Commune")
     )
 
-    st.dataframe(table_display, use_container_width=True, hide_index=True, height=400)
+    st.dataframe(table_display, width="stretch", hide_index=True, height=400)
 
     csv_bytes = table_display.write_csv().encode("utf-8")
     st.download_button(
