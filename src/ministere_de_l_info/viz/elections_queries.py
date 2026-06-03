@@ -1,4 +1,4 @@
-"""Requêtes DuckDB cachées pour la page Élections (C3)."""
+"""Requêtes DuckDB cachées pour la page Élections (présidentielles C3, législatives D1.3)."""
 
 from __future__ import annotations
 

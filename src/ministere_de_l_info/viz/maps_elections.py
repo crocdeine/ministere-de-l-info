@@ -1,4 +1,4 @@
-"""Cartes choroplèthes électorales — Folium (C3)."""
+"""Cartes choroplèthes électorales — Folium (C3 présidentielles, D1.3 législatives)."""
 
 from __future__ import annotations
 
@@ -104,6 +104,81 @@ def make_choropleth_elections_bloc_dominant(
         tooltip=folium.features.GeoJsonTooltip(
             fields=["nom", "bloc_dominant", "voix_dominant", "top3"],
             aliases=["Commune :", "Bloc dominant :", "Voix :", "Top 3 :"],
+            style="font-family: sans-serif; font-size: 12px; padding: 6px;",
+            sticky=True,
+        ),
+    ).add_to(m)
+
+    m.get_root().html.add_child(folium.Element(_legend_blocs_html(blocs_meta, titre)))
+    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    return m
+
+
+def make_choropleth_legi_circos_bloc_dominant(
+    scores_df: pl.DataFrame,
+    geo_df: pl.DataFrame,
+    blocs_meta: list[tuple[str, str, str, int]],
+    bounds: list[list[float]] | None,
+    titre: str,
+) -> folium.Map:
+    """Carte bloc dominant par circonscription pour les législatives."""
+    couleurs = {b[0]: b[2] for b in blocs_meta}
+    libelles = {b[0]: b[1] for b in blocs_meta}
+
+    dominant_map: dict[str, tuple[str, int]] = {}
+    for row in scores_df.sort("voix", descending=True).iter_rows(named=True):
+        code = row["code_circo"]
+        if code not in dominant_map:
+            dominant_map[code] = (row["bloc"], row["voix"])
+
+    top3: dict[str, list[tuple[str, int]]] = {}
+    for row in scores_df.sort("voix", descending=True).iter_rows(named=True):
+        code = row["code_circo"]
+        lst = top3.setdefault(code, [])
+        if len(lst) < 3:
+            lst.append((row["bloc"], row["voix"]))
+
+    features: list[dict] = []
+    for row in geo_df.iter_rows(named=True):
+        code = row["code_circo"]
+        if not row["geojson"]:
+            continue
+        bloc_dom, voix_dom = dominant_map.get(code, (None, 0))
+        couleur = couleurs.get(bloc_dom, "#cccccc") if bloc_dom else "#cccccc"
+        top3_txt = " | ".join(
+            f"{libelles.get(b, b)} : {_fmt_fr(float(v))}" for b, v in top3.get(code, [])
+        )
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "code": code,
+                    "nom": row.get("nom") or code,
+                    "bloc_dominant": libelles.get(bloc_dom, "—") if bloc_dom else "—",
+                    "voix_dominant": _fmt_fr(float(voix_dom)) if voix_dom else "—",
+                    "top3": top3_txt or "—",
+                    "_couleur": couleur,
+                },
+                "geometry": json.loads(row["geojson"]),
+            }
+        )
+
+    m = folium.Map(location=[50.2, 2.8], zoom_start=8, tiles="CartoDB positron")
+    if bounds:
+        m.fit_bounds(bounds)
+
+    folium.GeoJson(
+        {"type": "FeatureCollection", "features": features},
+        style_function=lambda f: {
+            "fillColor": f["properties"]["_couleur"],
+            "fillOpacity": 0.8,
+            "color": "white",
+            "weight": 1.0,
+        },
+        highlight_function=lambda _f: {"fillOpacity": 0.95, "weight": 2},
+        tooltip=folium.features.GeoJsonTooltip(
+            fields=["nom", "bloc_dominant", "voix_dominant", "top3"],
+            aliases=["Circo :", "Bloc dominant :", "Voix :", "Top 3 :"],
             style="font-family: sans-serif; font-size: 12px; padding: 6px;",
             sticky=True,
         ),

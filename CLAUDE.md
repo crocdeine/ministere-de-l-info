@@ -32,10 +32,10 @@ Ces mises à jour ne sont PAS optionnelles : elles font partie du travail. Une s
 |--------|--------|-----|--------|
 | 📍 Géographie | ✅ Terminé | v0.2 | Régions, dpts, EPCI, communes, arrondissements, circos. Population 2013/2018/2023. |
 | 🗳️ Élections | ✅ Présidentielles (Phase C) | v0.3-elections-pres | Présidentielles 2002-2022, HdF, focus circo 21 (Valenciennes). |
-| 🏛️ Législatif | 🟡 En cours (Phase D) | — | Données HdF 2002-2024 chargées (D1.2) ✓ ; page Streamlit à venir (D1.3) ; granularité bureau de vote (D2) ; municipales (D3) |
+| 🏛️ Législatif | ✅ Phase D1 (HdF 2002-2024) | — | Données + UI Streamlit ✓ ; BV (D2) et municipales (D3) à venir |
 | 📊 Économie | 🔜 À cadrer | — | — |
 
-**Dernier rapport** : `reports/session-2026-06-01_phase-c-recap.md` — D1.2 close : commit 51a6ef5
+**Dernier rapport** : `reports/session-2026-06-01_phase-c-recap.md` — D1.3 close : voir commit feat(ui)
 
 ---
 

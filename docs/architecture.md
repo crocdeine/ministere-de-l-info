@@ -29,9 +29,10 @@ ministere-de-l-info/
 │
 ├── app.py                          # Point d'entrée Streamlit, configure_logging()
 ├── pages/
-│   ├── 1_📍_Géographie.py          # Carte territoriale choroplèthe (322 L)
-│   ├── 2_🗳️_Élections.py           # Module présidentielles HdF (Phase C — fonctionnel)
-│   ├── 3_🏛️_Législatif.py          # Stub — Phase D
+│   ├── 1_📍_Géographie.py          # Carte territoriale choroplèthe
+│   ├── 2_🗳️_Élections.py           # Tabs : Présidentielles + Législatives (D1.3)
+│   │                               #   → st.tabs() ; code dans src/pages/elections_*.py
+│   ├── 3_🏛️_Législatif.py          # Stub — Phase D (BV, municipales)
 │   └── 4_💶_Économie.py            # Stub — à cadrer
 │
 ├── src/ministere_de_l_info/
@@ -44,6 +45,7 @@ ministere-de-l-info/
 │   │
 │   ├── etl/                        # Pipeline de chargement DuckDB
 │   │   ├── schema.py               # CREATE TABLE / contraintes (7 tables géo + 2 méta)
+│   │   ├── schema_elections.py     # Tables + vues électorales (8 vues, 2 colonnes D1.2)
 │   │   ├── views.py                # CREATE VIEW v_population_{region,dpt,epci,commune}
 │   │   ├── _common.py              # open_connection(), constantes partagées
 │   │   └── loaders/                # Un loader par entité géographique
@@ -55,20 +57,30 @@ ministere-de-l-info/
 │   │       ├── circonscriptions.py
 │   │       └── populations.py
 │   │
-│   └── viz/                        # Visualisation cartographique
-│       ├── maps.py                 # make_choropleth() — API publique unique
+│   ├── pages/                      # Modules UI Streamlit (render() importés par pages/)
+│   │   ├── elections_presidentielles.py  # Onglet présidentielles HdF 2002-2022
+│   │   └── elections_legislatives.py     # Onglet législatives HdF 2002-2024 (D1.3)
+│   │
+│   └── viz/                        # Visualisation cartographique + requêtes cachées
+│       ├── maps.py                 # make_choropleth() — carte géographie
+│       ├── maps_elections.py       # Cartes électorales Folium (communes + circos)
+│       ├── elections_queries.py    # Requêtes @st.cache_data — présidentielles
+│       ├── elections_legi_queries.py  # Requêtes @st.cache_data — législatives
 │       ├── _config.py              # Constantes : tables, colonnes, géométries, filtres
 │       ├── _display.py             # Palettes, formatters, légende HTML
 │       └── _queries.py             # Builders SQL DuckDB + helpers géométriques
 │
 ├── scripts/
-│   └── etl_territoires.py          # CLI ETL orchestrateur (138 L)
+│   └── etl_territoires.py          # CLI ETL orchestrateur
 │
-├── tests/                          # Suite pytest (143 tests, coverage > 70 %)
+├── tests/                          # Suite pytest (227 tests, coverage 74 %)
 │   ├── test_viz_maps.py
 │   ├── test_etl_territoires.py
-│   ├── test_etl_smoke.py           # 62 tests d'intégrité DB (smoke)
+│   ├── test_etl_smoke.py           # Tests d'intégrité DB
 │   ├── test_pages_geographie.py
+│   ├── test_elections_legislatives.py  # Données legi D1.2
+│   ├── test_pages_legislatives.py      # Requêtes UI legi D1.3
+│   ├── test_streamlit_smoke.py         # Smoke + AppTest onglets élections
 │   └── …
 │
 └── data/

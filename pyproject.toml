@@ -64,6 +64,9 @@ omit = [
     "*/etl/schema.py",
     "*/etl/views.py",
     "*/etl/_common.py",
+    # Pages Streamlit : UI pure, testée via AppTest (pytest.mark.slow)
+    "*/pages/elections_presidentielles.py",
+    "*/pages/elections_legislatives.py",
 ]
 
 [tool.ruff]
