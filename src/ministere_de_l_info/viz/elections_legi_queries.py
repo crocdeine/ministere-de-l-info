@@ -36,6 +36,9 @@ __all__ = [
     "get_circos_hdf_geo",
     "get_hdf_bounds_circo",
     "get_circo_bounds",
+    "get_communes_circo_legi_list",
+    "get_metrics_commune_legi",
+    "get_bv_details_legi",
 ]
 
 
@@ -345,6 +348,93 @@ def get_hdf_bounds_circo() -> list[list[float]] | None:
         return None
     miny, minx, maxy, maxx = row
     return [[float(miny), float(minx)], [float(maxy), float(maxx)]]
+
+
+@st.cache_data(ttl=3600)
+def get_communes_circo_legi_list(annee: int, tour: int, code_circo: str) -> list[tuple[str, str]]:
+    """Liste [(code_commune, nom)] des communes d'une circo pour ce scrutin. Triées par nom."""
+    con = _open_ro()
+    try:
+        rows = con.execute(
+            """
+            SELECT DISTINCT rp.code_commune, COALESCE(gc.nom, rp.code_commune) AS nom
+            FROM resultats_participation rp
+            JOIN elections e ON e.id_election = rp.id_election
+            LEFT JOIN geographies_communes gc ON gc.code_insee = rp.code_commune
+            WHERE e.type_scrutin = 'legi' AND e.annee = ? AND e.tour = ? AND rp.code_circo = ?
+            ORDER BY nom
+            """,
+            [annee, tour, code_circo],
+        ).fetchall()
+    finally:
+        con.close()
+    return [(r[0], r[1]) for r in rows]
+
+
+@st.cache_data(ttl=3600)
+def get_metrics_commune_legi(annee: int, tour: int, code_commune: str) -> dict:
+    """Métriques agrégées d'une commune (inscrits/votants/taux/bloc_dominant) — législatives."""
+    con = _open_ro()
+    try:
+        row = con.execute(
+            """
+            SELECT SUM(rp.inscrits), SUM(rp.votants), SUM(rp.exprimes),
+                   ROUND(100.0 * SUM(rp.votants) / NULLIF(SUM(rp.inscrits), 0), 2)
+            FROM resultats_participation rp
+            JOIN elections e ON e.id_election = rp.id_election
+            WHERE e.type_scrutin = 'legi' AND e.annee = ? AND e.tour = ? AND rp.code_commune = ?
+            """,
+            [annee, tour, code_commune],
+        ).fetchone()
+        bloc_row = con.execute(
+            """
+            SELECT bloc FROM v_resultats_candidats_avec_bloc
+            WHERE type_scrutin = 'legi' AND annee = ? AND tour = ? AND code_commune = ?
+            GROUP BY bloc ORDER BY SUM(voix) DESC LIMIT 1
+            """,
+            [annee, tour, code_commune],
+        ).fetchone()
+    finally:
+        con.close()
+    return {
+        "inscrits": int(row[0] or 0),
+        "votants": int(row[1] or 0),
+        "exprimes": int(row[2] or 0),
+        "taux_participation_pct": float(row[3] or 0.0),
+        "bloc_dominant": bloc_row[0] if bloc_row else "DIV",
+    }
+
+
+@st.cache_data(ttl=3600)
+def get_bv_details_legi(annee: int, tour: int, code_commune: str) -> pl.DataFrame:
+    """Détail par BV : participation + voix par bloc (pivot wide) — législatives."""
+    from ministere_de_l_info.viz.elections_queries import _build_bv_df  # noqa: PLC0415
+
+    con = _open_ro()
+    try:
+        part_rows = con.execute(
+            """
+            SELECT rp.code_bv, rp.inscrits, rp.votants, rp.exprimes,
+                   ROUND(100.0 * rp.votants / NULLIF(rp.inscrits, 0), 2)
+            FROM resultats_participation rp
+            JOIN elections e ON e.id_election = rp.id_election
+            WHERE e.type_scrutin = 'legi' AND e.annee = ? AND e.tour = ? AND rp.code_commune = ?
+            ORDER BY rp.code_bv
+            """,
+            [annee, tour, code_commune],
+        ).fetchall()
+        voix_rows = con.execute(
+            """
+            SELECT code_bv, bloc, SUM(voix) AS voix
+            FROM v_resultats_candidats_avec_bloc
+            WHERE type_scrutin = 'legi' AND annee = ? AND tour = ? AND code_commune = ?
+            GROUP BY code_bv, bloc
+            """,
+            [annee, tour, code_commune],
+        ).fetchall()
+    finally:
+        con.close()
+    return _build_bv_df(part_rows, voix_rows)
 
 
 @st.cache_data(ttl=86400)

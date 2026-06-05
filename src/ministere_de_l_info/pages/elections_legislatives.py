@@ -8,20 +8,23 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 from ministere_de_l_info.viz.elections_legi_queries import (
+    get_bv_details_legi,
     get_circo_bounds,
     get_circos_hdf_geo,
     get_circos_hdf_legi,
     get_communes_circo_legi_geo,
+    get_communes_circo_legi_list,
     get_evolution_circo_legi,
     get_evolution_hdf_legi,
     get_hdf_bounds_circo,
+    get_metrics_commune_legi,
     get_nuances_circo_legi,
     get_participation_hdf_legi,
     get_scores_communes_circo_legi,
     get_scores_hdf_legi,
     is_legi_data_loaded,
 )
-from ministere_de_l_info.viz.elections_queries import get_blocs_meta
+from ministere_de_l_info.viz.elections_queries import _BLOCS_ORDERED, get_blocs_meta
 from ministere_de_l_info.viz.maps_elections import (
     make_choropleth_elections_bloc_dominant,
     make_choropleth_legi_circos_bloc_dominant,
@@ -272,6 +275,76 @@ def _render_vue_circo(
             width="stretch",
             hide_index=True,
         )
+
+    # ── Section drill-down BV ────────────────────────────────────────────────────
+    st.divider()
+    st.subheader("🔍 Détail par bureau de vote")
+
+    communes_list = get_communes_circo_legi_list(annee, tour, code_circo)
+    commune_options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes_list]
+
+    commune_selected: str = st.selectbox(  # type: ignore[assignment]
+        "Commune",
+        commune_options,
+        index=0,
+        key=f"legi_drilldown_commune_{code_circo}",
+        help="Choisir une commune pour afficher le détail par bureau de vote.",
+    )
+
+    if commune_selected != "(aucune sélection)":
+        code_commune = commune_selected.rsplit("(", 1)[1].rstrip(")")
+        nom_commune = commune_selected.rsplit(" (", 1)[0]
+
+        metrics = get_metrics_commune_legi(annee, tour, code_commune)
+        st.caption(f"Commune sélectionnée : **{nom_commune}** ({code_commune})")
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Inscrits", f"{metrics['inscrits']:,}".replace(",", " "))
+        m2.metric("Votants", f"{metrics['votants']:,}".replace(",", " "))
+        m3.metric("Participation", f"{metrics['taux_participation_pct']:.1f} %")
+        m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "—"))
+
+        bv_df = get_bv_details_legi(annee, tour, code_commune)
+        if bv_df.is_empty():
+            st.warning(f"Aucun bureau de vote trouvé pour {nom_commune}.")
+        else:
+            col_order = [
+                "code_bv",
+                "inscrits",
+                "votants",
+                "exprimes",
+                "taux_participation_pct",
+                "bloc_gagnant",
+            ] + [f"voix_{b}" for b in _BLOCS_ORDERED]
+            col_order = [c for c in col_order if c in bv_df.columns]
+            bv_display = bv_df.select(col_order).rename(
+                {
+                    "code_bv": "BV",
+                    "inscrits": "Inscrits",
+                    "votants": "Votants",
+                    "exprimes": "Exprimés",
+                    "taux_participation_pct": "Particip. %",
+                    "bloc_gagnant": "Bloc gagnant",
+                    **{f"voix_{b}": b for b in _BLOCS_ORDERED},
+                }
+            )
+            fmt = {"Particip. %": "{:.1f}"}
+            for col in ["Inscrits", "Votants", "Exprimés"] + list(_BLOCS_ORDERED):
+                fmt[col] = "{:,}"
+            st.dataframe(
+                bv_display.to_pandas().style.format(fmt),
+                width="stretch",
+                hide_index=True,
+                height=400,
+            )
+            csv = bv_df.write_csv().encode("utf-8")
+            st.download_button(
+                f"Télécharger les BV de {nom_commune} en CSV",
+                data=csv,
+                file_name=f"bv_legi_{annee}_t{tour}_{code_commune}.csv",
+                mime="text/csv",
+                key=f"legi_bv_download_{code_circo}_{code_commune}",
+            )
 
 
 def _render_evolution_chart(

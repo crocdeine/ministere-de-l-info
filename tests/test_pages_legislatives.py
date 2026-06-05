@@ -19,13 +19,16 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from ministere_de_l_info.viz.elections_legi_queries import (  # noqa: E402
+    get_bv_details_legi,
     get_circo_bounds,
     get_circos_hdf_geo,
     get_circos_hdf_legi,
     get_communes_circo_legi_geo,
+    get_communes_circo_legi_list,
     get_evolution_circo_legi,
     get_evolution_hdf_legi,
     get_hdf_bounds_circo,
+    get_metrics_commune_legi,
     get_nuances_circo_legi,
     get_participation_communes_circo_legi,
     get_participation_hdf_legi,
@@ -338,4 +341,100 @@ class TestLegiFunctionsInterface:
     def test_empty_result_on_missing_annee(self, db_ready):
         """Année sans données retourne DataFrame vide."""
         df = get_scores_hdf_legi(1900, 1)
+        assert df.is_empty()
+
+
+# ── Tests BV-level (D2) ───────────────────────────────────────────────────────
+
+
+class TestGetCommunesCircoLegiList:
+    """get_communes_circo_legi_list → communes d'une circo pour un scrutin."""
+
+    def test_count_communes_59_21_2022(self, db_ready):
+        rows = get_communes_circo_legi_list(2022, 1, "59-21")
+        assert len(rows) == 20, f"Attendu 20 communes pour 59-21, trouvé {len(rows)}"
+
+    def test_format_tuple(self, db_ready):
+        rows = get_communes_circo_legi_list(2022, 1, "59-21")
+        code, nom = rows[0]
+        assert isinstance(code, str) and len(code) == 5
+        assert isinstance(nom, str) and len(nom) > 0
+
+    def test_sorted_by_nom(self, db_ready):
+        rows = get_communes_circo_legi_list(2022, 1, "59-21")
+        noms = [r[1] for r in rows]
+        assert noms == sorted(noms)
+
+    def test_valenciennes_presente(self, db_ready):
+        rows = get_communes_circo_legi_list(2022, 1, "59-21")
+        codes = [r[0] for r in rows]
+        assert "59606" in codes, "Valenciennes (59606) absente de 59-21"
+
+    def test_circo_inconnue_retourne_vide(self, db_ready):
+        rows = get_communes_circo_legi_list(2022, 1, "99-99")
+        assert rows == []
+
+
+class TestGetMetricsCommuneLegi:
+    """get_metrics_commune_legi → métriques agrégées d'une commune."""
+
+    def test_valenciennes_2022_t1(self, db_ready):
+        m = get_metrics_commune_legi(2022, 1, "59606")
+        assert m["inscrits"] > 20000
+        assert 0.0 <= m["taux_participation_pct"] <= 100.0
+        assert m["bloc_dominant"] in {"EXG", "GAU", "DIV", "CENT", "DTE", "EXD"}
+        assert m["votants"] <= m["inscrits"]
+
+    def test_commune_inconnue_retourne_zeros(self, db_ready):
+        m = get_metrics_commune_legi(2022, 1, "99999")
+        assert m["inscrits"] == 0
+        assert m["votants"] == 0
+
+
+class TestGetBvDetailsLegi:
+    """get_bv_details_legi → détail BV avec pivot des voix par bloc."""
+
+    _BLOCS = ["EXG", "GAU", "DIV", "CENT", "DTE", "EXD"]
+
+    def test_valenciennes_2022_t1_non_vide(self, db_ready):
+        df = get_bv_details_legi(2022, 1, "59606")
+        assert not df.is_empty()
+        assert len(df) == 23, f"Attendu 23 BV pour Valenciennes, trouvé {len(df)}"
+
+    def test_colonnes_attendues(self, db_ready):
+        df = get_bv_details_legi(2022, 1, "59606")
+        expected = {
+            "code_bv",
+            "inscrits",
+            "votants",
+            "exprimes",
+            "taux_participation_pct",
+            "bloc_gagnant",
+        } | {f"voix_{b}" for b in self._BLOCS}
+        assert expected.issubset(set(df.columns)), (
+            f"Colonnes manquantes : {expected - set(df.columns)}"
+        )
+
+    def test_somme_inscrits_bv_egal_commune(self, db_ready):
+        df = get_bv_details_legi(2022, 1, "59606")
+        metrics = get_metrics_commune_legi(2022, 1, "59606")
+        assert int(df["inscrits"].sum()) == metrics["inscrits"]
+
+    def test_taux_participation_bornes(self, db_ready):
+        df = get_bv_details_legi(2022, 1, "59606")
+        assert (df["taux_participation_pct"] >= 0.0).all()
+        assert (df["taux_participation_pct"] <= 100.0).all()
+
+    def test_voix_blocs_non_negatifs(self, db_ready):
+        df = get_bv_details_legi(2022, 1, "59606")
+        for b in self._BLOCS:
+            assert (df[f"voix_{b}"] >= 0).all()
+
+    def test_bloc_gagnant_valide(self, db_ready):
+        df = get_bv_details_legi(2022, 1, "59606")
+        blocs_valides = set(self._BLOCS)
+        assert set(df["bloc_gagnant"].to_list()).issubset(blocs_valides)
+
+    def test_commune_inconnue_retourne_vide(self, db_ready):
+        df = get_bv_details_legi(2022, 1, "99999")
         assert df.is_empty()

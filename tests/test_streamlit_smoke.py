@@ -136,3 +136,87 @@ def test_legi_ancien_decoupage_warning():
     assert "ancien" in textes.lower() or "Ancien" in textes, (
         f"Avertissement ancien découpage absent. Warnings : {textes[:200]}"
     )
+
+
+def test_pres_drilldown_renders():
+    """Sélectionner Lille dans le dropdown BV présidentielles → section drill-down présente."""
+    from streamlit.testing.v1 import AppTest
+
+    if not DB_PATH.exists():
+        pytest.skip("DB absente")
+    at = AppTest.from_file(str(ELECTIONS_PAGE), default_timeout=60)
+    at.run()
+    assert not at.exception
+
+    drilldown_sb = next((s for s in at.selectbox if s.key == "pres_drilldown_commune"), None)
+    if drilldown_sb is None:
+        pytest.skip("Selectbox pres_drilldown_commune non trouvé")
+
+    drilldown_sb.set_value("Lille (59350)").run()
+    assert not at.exception, f"Exception : {at.exception}"
+
+    # La section doit avoir rendu au moins un dataframe
+    assert len(at.dataframe) >= 1, "Aucun dataframe rendu après sélection de Lille"
+
+    # Au moins une métrique avec "Inscrits"
+    metric_labels = [m.label for m in at.metric]
+    assert any("Inscrits" in lbl for lbl in metric_labels), (
+        f"Métrique 'Inscrits' absente. Labels : {metric_labels}"
+    )
+
+
+def test_legi_drilldown_appears_with_circo():
+    """Sélectionner 59-21 + Valenciennes → section drill-down BV présente."""
+    from streamlit.testing.v1 import AppTest
+
+    if not DB_PATH.exists():
+        pytest.skip("DB absente")
+    at = AppTest.from_file(str(ELECTIONS_PAGE), default_timeout=60)
+    at.run()
+    assert not at.exception
+
+    # Sélectionner la circo 59-21
+    legi_circo = next((s for s in at.selectbox if s.key == "legi_circo"), None)
+    if legi_circo is None:
+        pytest.skip("Selectbox legi_circo non trouvé")
+
+    circo_option = next((o for o in legi_circo.options if "59-21" in str(o)), None)
+    if circo_option is None:
+        pytest.skip("Option 59-21 non trouvée dans legi_circo")
+
+    legi_circo.set_value(circo_option).run()
+    assert not at.exception
+
+    # Sélectionner Valenciennes dans le drill-down
+    drilldown_sb = next(
+        (s for s in at.selectbox if s.key and "legi_drilldown_commune" in s.key), None
+    )
+    if drilldown_sb is None:
+        pytest.skip("Selectbox legi_drilldown_commune non trouvé après sélection circo")
+
+    val_option = next((o for o in drilldown_sb.options if "59606" in str(o)), None)
+    if val_option is None:
+        pytest.skip("Valenciennes (59606) absente du dropdown commune")
+
+    drilldown_sb.set_value(val_option).run()
+    assert not at.exception, f"Exception : {at.exception}"
+    assert len(at.dataframe) >= 1, "Aucun dataframe rendu après sélection Valenciennes"
+
+
+def test_legi_drilldown_hidden_when_no_circo():
+    """Vue 'toutes les circos HdF' → pas de section drill-down BV."""
+    from streamlit.testing.v1 import AppTest
+
+    if not DB_PATH.exists():
+        pytest.skip("DB absente")
+    at = AppTest.from_file(str(ELECTIONS_PAGE), default_timeout=30)
+    at.run()
+    assert not at.exception
+
+    # Vérifier que le selectbox de drill-down legi n'est pas présent en vue HdF
+    drilldown_sb = next(
+        (s for s in at.selectbox if s.key and "legi_drilldown_commune" in s.key), None
+    )
+    assert drilldown_sb is None, (
+        "Selectbox legi_drilldown_commune présent en vue HdF alors qu'il ne devrait pas l'être"
+    )

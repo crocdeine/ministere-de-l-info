@@ -58,14 +58,18 @@ ministere-de-l-info/
 │   │       └── populations.py
 │   │
 │   ├── pages/                      # Modules UI Streamlit (render() importés par pages/)
-│   │   ├── elections_presidentielles.py  # Onglet présidentielles HdF 2002-2022
-│   │   └── elections_legislatives.py     # Onglet législatives HdF 2002-2024 (D1.3)
+│   │   ├── elections_presidentielles.py  # Onglet présidentielles HdF 2002-2022 + drill-down BV (D2)
+│   │   └── elections_legislatives.py     # Onglet législatives HdF 2002-2024 + drill-down BV (D2)
 │   │
 │   └── viz/                        # Visualisation cartographique + requêtes cachées
 │       ├── maps.py                 # make_choropleth() — carte géographie
 │       ├── maps_elections.py       # Cartes électorales Folium (communes + circos)
 │       ├── elections_queries.py    # Requêtes @st.cache_data — présidentielles
+│       │                           #   D2 : get_communes_hdf_pres, get_metrics_commune_pres,
+│       │                           #        get_bv_details_pres, _build_bv_df (helper pivot)
 │       ├── elections_legi_queries.py  # Requêtes @st.cache_data — législatives
+│       │                           #   D2 : get_communes_circo_legi_list, get_metrics_commune_legi,
+│       │                           #        get_bv_details_legi
 │       ├── _config.py              # Constantes : tables, colonnes, géométries, filtres
 │       ├── _display.py             # Palettes, formatters, légende HTML
 │       └── _queries.py             # Builders SQL DuckDB + helpers géométriques
@@ -73,14 +77,15 @@ ministere-de-l-info/
 ├── scripts/
 │   └── etl_territoires.py          # CLI ETL orchestrateur
 │
-├── tests/                          # Suite pytest (227 tests, coverage 74 %)
+├── tests/                          # Suite pytest (258 tests, coverage 76 %)
 │   ├── test_viz_maps.py
 │   ├── test_etl_territoires.py
-│   ├── test_etl_smoke.py           # Tests d'intégrité DB
+│   ├── test_etl_smoke.py                  # Tests d'intégrité DB
 │   ├── test_pages_geographie.py
-│   ├── test_elections_legislatives.py  # Données legi D1.2
-│   ├── test_pages_legislatives.py      # Requêtes UI legi D1.3
-│   ├── test_streamlit_smoke.py         # Smoke + AppTest onglets élections
+│   ├── test_elections_legislatives.py     # Données legi D1.2
+│   ├── test_pages_legislatives.py         # Requêtes UI legi D1.3 + BV D2
+│   ├── test_elections_presidentielles.py  # Requêtes BV présidentielles D2
+│   ├── test_streamlit_smoke.py            # Smoke + AppTest onglets + drill-down D2
 │   └── …
 │
 └── data/
