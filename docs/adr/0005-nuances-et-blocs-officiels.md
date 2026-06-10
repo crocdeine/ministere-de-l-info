@@ -111,6 +111,35 @@ Cette section documente l'application concrète de la décision aux scrutins lé
 Cette section documente l'application concrète de la décision aux scrutins municipaux
 (Phase D3.2, validée le 2026-06-09).
 
+### Limitation de la source data.gouv.fr 2008
+
+Le fichier Parquet officiel `general-results.parquet` publié par data.gouv.fr
+pour les municipales 2008 est **incomplet pour le département du Nord (59)**.
+
+Vérification effectuée le 2026-06-10 (Phase D3.3) : le fichier source contient
+seulement **2 communes du 59** sur l'ensemble national — Seclin (59560) et
+Pérenchies (59457). Les grandes villes habituellement nuancées (Lille, Roubaix,
+Tourcoing, Valenciennes, Dunkerque) sont absentes du fichier.
+
+Répartition par département HdF dans le Parquet 2008 :
+
+| Département | Communes dans Parquet 2008 |
+|---|---|
+| 02 Aisne | 13 |
+| **59 Nord** | **2** |
+| 60 Oise | 32 |
+| 62 Pas-de-Calais | 102 |
+| 80 Somme | 15 |
+| **Total HdF** | **164** |
+
+Conséquence pour le projet : sur la carte 2008, ces communes apparaissent
+en gris (comportement honnête du LEFT JOIN sur `nuances_harmonisees`).
+L'UI affiche un warning explicite. Aucune correction technique possible —
+la lacune est en amont.
+
+Cette limitation n'affecte que le scrutin 2008. Les scrutins 2014, 2020 et
+2026 ont une couverture complète du département Nord.
+
 ### Périmètre et seuils de nuançage
 
 Les circulaires municipales distinguent deux régimes selon la taille de la commune :

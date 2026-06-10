@@ -30,9 +30,9 @@ ministere-de-l-info/
 ├── app.py                          # Point d'entrée Streamlit, configure_logging()
 ├── pages/
 │   ├── 1_📍_Géographie.py          # Carte territoriale choroplèthe
-│   ├── 2_🗳️_Élections.py           # Tabs : Présidentielles + Législatives (D1.3)
+│   ├── 2_🗳️_Élections.py           # Tabs : Présidentielles + Législatives + Municipales (D3.3)
 │   │                               #   → st.tabs() ; code dans src/pages/elections_*.py
-│   ├── 3_🏛️_Législatif.py          # Stub — Phase D (BV, municipales)
+│   ├── 3_🏛️_Législatif.py          # Stub — à cadrer
 │   └── 4_💶_Économie.py            # Stub — à cadrer
 │
 ├── src/ministere_de_l_info/
@@ -59,17 +59,23 @@ ministere-de-l-info/
 │   │
 │   ├── pages/                      # Modules UI Streamlit (render() importés par pages/)
 │   │   ├── elections_presidentielles.py  # Onglet présidentielles HdF 2002-2022 + drill-down BV (D2)
-│   │   └── elections_legislatives.py     # Onglet législatives HdF 2002-2024 + drill-down BV (D2)
+│   │   ├── elections_legislatives.py     # Onglet législatives HdF 2002-2024 + drill-down BV (D2)
+│   │   └── elections_municipales.py      # Onglet municipales HdF 2008-2026, drill-down listes (D3.3)
 │   │
 │   └── viz/                        # Visualisation cartographique + requêtes cachées
 │       ├── maps.py                 # make_choropleth() — carte géographie
-│       ├── maps_elections.py       # Cartes électorales Folium (communes + circos)
+│       ├── maps_elections.py       # Cartes électorales Folium (communes + circos + muni)
+│       │                           #   D3.3 : make_choropleth_muni_communes_bloc_dominant
+│       │                           #          (gestion communes Non classées : gris + trait pointillé)
 │       ├── elections_queries.py    # Requêtes @st.cache_data — présidentielles
 │       │                           #   D2 : get_communes_hdf_pres, get_metrics_commune_pres,
 │       │                           #        get_bv_details_pres, _build_bv_df (helper pivot)
 │       ├── elections_legi_queries.py  # Requêtes @st.cache_data — législatives
 │       │                           #   D2 : get_communes_circo_legi_list, get_metrics_commune_legi,
 │       │                           #        get_bv_details_legi
+│       ├── elections_muni_queries.py  # Requêtes @st.cache_data — municipales (D3.3)
+│       │                           #   get_scrutins_muni, get_communes_muni_geo, get_listes_commune_muni,
+│       │                           #   get_metrics_commune_muni, get_evolution_blocs_hdf_muni, etc.
 │       ├── _config.py              # Constantes : tables, colonnes, géométries, filtres
 │       ├── _display.py             # Palettes, formatters, légende HTML
 │       └── _queries.py             # Builders SQL DuckDB + helpers géométriques
@@ -77,7 +83,7 @@ ministere-de-l-info/
 ├── scripts/
 │   └── etl_territoires.py          # CLI ETL orchestrateur
 │
-├── tests/                          # Suite pytest (258 tests, coverage 76 %)
+├── tests/                          # Suite pytest (331 tests, coverage 69 %)
 │   ├── test_viz_maps.py
 │   ├── test_etl_territoires.py
 │   ├── test_etl_smoke.py                  # Tests d'intégrité DB
@@ -85,7 +91,9 @@ ministere-de-l-info/
 │   ├── test_elections_legislatives.py     # Données legi D1.2
 │   ├── test_pages_legislatives.py         # Requêtes UI legi D1.3 + BV D2
 │   ├── test_elections_presidentielles.py  # Requêtes BV présidentielles D2
-│   ├── test_streamlit_smoke.py            # Smoke + AppTest onglets + drill-down D2
+│   ├── test_elections_municipales.py      # Données muni D3.2 (volumes, nuances, vues)
+│   ├── test_pages_municipales.py          # Requêtes UI muni D3.3 + lacune source 2008
+│   ├── test_streamlit_smoke.py            # Smoke + AppTest onglets + drill-down D2 + muni D3.3
 │   └── …
 │
 └── data/

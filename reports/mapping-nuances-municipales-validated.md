@@ -34,6 +34,12 @@
 | LUG | GAU | Union de la Gauche |
 | LVEC | GAU | Verts / Écologistes |
 
+**Note source 2008** : Le fichier data.gouv.fr 2008 a une couverture
+incomplète pour le département Nord (59) — seulement 2 communes présentes
+(Seclin, Pérenchies) sur ce département. Les 164 nuances cataloguées ci-dessus
+proviennent essentiellement du Pas-de-Calais (102), de l'Oise (32) et de
+l'Aisne (13). Voir ADR-0005 § "Limitation de la source data.gouv.fr 2008".
+
 ---
 
 ## 2014 — 17 nuances

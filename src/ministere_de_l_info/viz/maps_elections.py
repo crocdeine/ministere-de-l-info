@@ -1,4 +1,4 @@
-"""Cartes choroplèthes électorales — Folium (C3 présidentielles, D1.3 législatives)."""
+"""Cartes choroplèthes électorales — Folium (C3 présidentielles, D1.3 législatives, D3.3 municipales)."""
 
 from __future__ import annotations
 
@@ -273,5 +273,159 @@ def make_choropleth_elections_score_bloc(
             )
         )
     )
+    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    return m
+
+
+# Motif SVG hachuré diagonal pour les communes "Non classé"
+_HATCH_PATTERN_SVG: str = (
+    "<defs>"
+    '<pattern id="hatch-nonclasse" patternUnits="userSpaceOnUse" width="6" height="6">'
+    '<rect width="6" height="6" fill="#9E9E9E" opacity="0.6"/>'
+    '<path d="M-1,1 l2,-2 M0,6 l6,-6 M5,7 l2,-2" stroke="#666" stroke-width="1.2"/>'
+    "</pattern>"
+    "</defs>"
+)
+
+
+def _legend_muni_html(
+    blocs_meta: list[tuple[str, str, str, int]],
+    titre: str,
+) -> str:
+    """Légende avec hachures pour les communes Non classées."""
+    rows = [
+        f'<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">'
+        f'<div style="width:20px;height:14px;background:{couleur};border:1px solid #bbb;'
+        f'flex-shrink:0;"></div>'
+        f'<span style="white-space:nowrap;">{libelle}</span>'
+        f"</div>"
+        for _, libelle, couleur, _ in blocs_meta
+    ]
+    # Entrée "Non classé" avec fond gris hachuré (CSS gradient)
+    rows.append(
+        '<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">'
+        '<div style="width:20px;height:14px;border:1px solid #bbb;flex-shrink:0;'
+        "background:repeating-linear-gradient(135deg,#9E9E9E 0px,#9E9E9E 3px,"
+        '#bbb 3px,#bbb 6px);"></div>'
+        '<span style="white-space:nowrap;">Non classé (commune &lt; seuil)</span>'
+        "</div>"
+    )
+    return (
+        '<div style="position:fixed;bottom:40px;left:12px;z-index:1000;'
+        "background:white;color:#222;padding:10px 14px;border-radius:6px;"
+        'border:1px solid #ccc;font-size:12px;font-family:sans-serif;pointer-events:none;">'
+        f'<div style="font-weight:600;margin-bottom:7px;">{titre}</div>'
+        + "\n".join(rows)
+        + "</div>"
+    )
+
+
+def make_choropleth_muni_communes_bloc_dominant(
+    geo_df: pl.DataFrame,
+    blocs_meta: list[tuple[str, str, str, int]],
+    bounds: list[list[float]] | None,
+    titre: str,
+) -> folium.Map:
+    """Carte bloc dominant par commune pour les municipales.
+
+    Utilise directement le DataFrame issu de get_communes_muni_geo() qui inclut
+    déjà bloc_dominant (NULL pour communes sans nuance) et voix_total.
+
+    Communes sans nuance : couleur grise, trait pointillé, tooltip "Non classé".
+    """
+    couleurs = {b[0]: b[2] for b in blocs_meta}
+    libelles = {b[0]: b[1] for b in blocs_meta}
+
+    _COULEUR_NON_CLASSE = "#9E9E9E"
+
+    features: list[dict] = []
+    for row in geo_df.iter_rows(named=True):
+        if not row.get("geojson"):
+            continue
+        bloc_dom = row.get("bloc_dominant")
+        voix_tot = row.get("voix_total") or 0
+        pct = row.get("pct_exprimes_dominant")
+
+        if bloc_dom:
+            couleur = couleurs.get(bloc_dom, _COULEUR_NON_CLASSE)
+            bloc_label = libelles.get(bloc_dom, bloc_dom)
+            pct_txt = f"{pct:.1f} %" if pct is not None else "—"
+            est_non_classe = False
+        else:
+            couleur = _COULEUR_NON_CLASSE
+            bloc_label = "Non classé"
+            pct_txt = "—"
+            est_non_classe = True
+
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "code": row["code_commune"],
+                    "nom": row["nom"],
+                    "bloc_dominant": bloc_label,
+                    "voix_total": _fmt_fr(float(voix_tot)) if voix_tot else "—",
+                    "pct_exprime": pct_txt,
+                    "_couleur": couleur,
+                    "_non_classe": est_non_classe,
+                },
+                "geometry": json.loads(row["geojson"]),
+            }
+        )
+
+    m = folium.Map(location=[50.2, 2.8], zoom_start=8, tiles="CartoDB positron")
+    if bounds:
+        m.fit_bounds(bounds)
+
+    # Communes nuancées (couleur de bloc)
+    features_classe = [f for f in features if not f["properties"]["_non_classe"]]
+    if features_classe:
+        folium.GeoJson(
+            {"type": "FeatureCollection", "features": features_classe},
+            style_function=lambda f: {
+                "fillColor": f["properties"]["_couleur"],
+                "fillOpacity": 0.8,
+                "color": "white",
+                "weight": 0.5,
+            },
+            highlight_function=lambda _f: {"fillOpacity": 0.95, "weight": 1.5},
+            tooltip=folium.features.GeoJsonTooltip(
+                fields=["nom", "code", "bloc_dominant", "voix_total", "pct_exprime"],
+                aliases=[
+                    "Commune :",
+                    "INSEE :",
+                    "Bloc dominant :",
+                    "Voix totales :",
+                    "% exprimés :",
+                ],
+                style="font-family: sans-serif; font-size: 12px; padding: 6px;",
+                sticky=True,
+            ),
+            name="communes_classees",
+        ).add_to(m)
+
+    # Communes non nuancées (gris, trait pointillé)
+    features_nc = [f for f in features if f["properties"]["_non_classe"]]
+    if features_nc:
+        folium.GeoJson(
+            {"type": "FeatureCollection", "features": features_nc},
+            style_function=lambda _f: {
+                "fillColor": _COULEUR_NON_CLASSE,
+                "fillOpacity": 0.5,
+                "color": "#888",
+                "weight": 0.3,
+                "dashArray": "3,3",
+            },
+            highlight_function=lambda _f: {"fillOpacity": 0.8, "weight": 1.5},
+            tooltip=folium.features.GeoJsonTooltip(
+                fields=["nom", "code", "bloc_dominant"],
+                aliases=["Commune :", "INSEE :", "Statut :"],
+                style="font-family: sans-serif; font-size: 12px; padding: 6px;",
+                sticky=True,
+            ),
+            name="communes_non_classees",
+        ).add_to(m)
+
+    m.get_root().html.add_child(folium.Element(_legend_muni_html(blocs_meta, titre)))
     m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
     return m

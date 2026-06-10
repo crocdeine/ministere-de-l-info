@@ -220,3 +220,148 @@ def test_legi_drilldown_hidden_when_no_circo():
     assert drilldown_sb is None, (
         "Selectbox legi_drilldown_commune présent en vue HdF alors qu'il ne devrait pas l'être"
     )
+
+
+# ── Tests AppTest — onglet Municipales (D3.3) ─────────────────────────────────
+
+
+def test_muni_tab_renders():
+    """La page Élections se charge avec le 3e onglet Municipales sans exception."""
+    from streamlit.testing.v1 import AppTest
+
+    if not DB_PATH.exists():
+        pytest.skip("DB absente")
+    at = AppTest.from_file(str(ELECTIONS_PAGE), default_timeout=30)
+    at.run()
+    assert not at.exception, f"Exception inattendue : {at.exception}"
+
+
+def test_muni_selectbox_scrutin_present():
+    """Le selectbox 'muni_scrutin' est présent dans la page après chargement."""
+    from streamlit.testing.v1 import AppTest
+
+    if not DB_PATH.exists():
+        pytest.skip("DB absente")
+    at = AppTest.from_file(str(ELECTIONS_PAGE), default_timeout=30)
+    at.run()
+    assert not at.exception
+
+    muni_sb = next((s for s in at.selectbox if s.key == "muni_scrutin"), None)
+    if muni_sb is None:
+        pytest.skip("Selectbox muni_scrutin non trouvé (onglet inactif ou données absentes)")
+    assert len(muni_sb.options) >= 8, (
+        f"muni_scrutin : seulement {len(muni_sb.options)} options (attendu 8)"
+    )
+
+
+def test_muni_warning_seuil_2026():
+    """Sélectionner Municipales 2026 — 1er tour → warning circulaire INTP2602966C."""
+    from streamlit.testing.v1 import AppTest
+
+    if not DB_PATH.exists():
+        pytest.skip("DB absente")
+    at = AppTest.from_file(str(ELECTIONS_PAGE), default_timeout=30)
+    at.run()
+    assert not at.exception
+
+    muni_sb = next((s for s in at.selectbox if s.key == "muni_scrutin"), None)
+    if muni_sb is None:
+        pytest.skip("Selectbox muni_scrutin non trouvé")
+
+    opt_2026 = next((o for o in muni_sb.options if "2026" in str(o) and "1er" in str(o)), None)
+    if opt_2026 is None:
+        pytest.skip("Option 2026 1er tour non trouvée")
+
+    muni_sb.set_value(opt_2026).run()
+    assert not at.exception
+
+    infos = at.info
+    texte_infos = " ".join(i.value for i in infos)
+    assert "INTP2602966C" in texte_infos or "512694" in texte_infos, (
+        f"Warning circulaire 2026 absent. Infos : {texte_infos[:300]}"
+    )
+
+
+def test_muni_drilldown_lille_renders():
+    """Sélectionner Lille dans le drill-down muni → métriques et dataframe présents."""
+    from streamlit.testing.v1 import AppTest
+
+    if not DB_PATH.exists():
+        pytest.skip("DB absente")
+    at = AppTest.from_file(str(ELECTIONS_PAGE), default_timeout=60)
+    at.run()
+    assert not at.exception
+
+    muni_sb = next((s for s in at.selectbox if s.key == "muni_scrutin"), None)
+    if muni_sb is None:
+        pytest.skip("Selectbox muni_scrutin non trouvé")
+
+    opt_2026 = next((o for o in muni_sb.options if "2026" in str(o) and "1er" in str(o)), None)
+    if opt_2026 is None:
+        pytest.skip("Option 2026 1er tour non trouvée")
+    muni_sb.set_value(opt_2026).run()
+    assert not at.exception
+
+    drilldown_sb = next((s for s in at.selectbox if s.key and "muni_drilldown" in s.key), None)
+    if drilldown_sb is None:
+        pytest.skip("Selectbox muni_drilldown non trouvé")
+
+    lille_opt = next((o for o in drilldown_sb.options if "59350" in str(o)), None)
+    if lille_opt is None:
+        pytest.skip("Lille (59350) absente du dropdown commune")
+
+    drilldown_sb.set_value(lille_opt).run()
+    assert not at.exception, f"Exception : {at.exception}"
+
+    metric_labels = [m.label for m in at.metric]
+    assert any("Inscrits" in lbl for lbl in metric_labels), (
+        f"Métrique 'Inscrits' absente. Labels : {metric_labels}"
+    )
+    assert len(at.dataframe) >= 1, "Aucun dataframe après sélection de Lille"
+
+
+def test_muni_drilldown_petite_commune_non_nuancee():
+    """Petite commune en 2026 → warning 'non nuancée' affiché, vue bloc indisponible."""
+    from streamlit.testing.v1 import AppTest
+
+    if not DB_PATH.exists():
+        pytest.skip("DB absente")
+    at = AppTest.from_file(str(ELECTIONS_PAGE), default_timeout=60)
+    at.run()
+    assert not at.exception
+
+    muni_sb = next((s for s in at.selectbox if s.key == "muni_scrutin"), None)
+    if muni_sb is None:
+        pytest.skip("Selectbox muni_scrutin non trouvé")
+
+    opt_2026 = next((o for o in muni_sb.options if "2026" in str(o) and "1er" in str(o)), None)
+    if opt_2026 is None:
+        pytest.skip("Option 2026 1er tour non trouvée")
+    muni_sb.set_value(opt_2026).run()
+    assert not at.exception
+
+    drilldown_sb = next((s for s in at.selectbox if s.key and "muni_drilldown" in s.key), None)
+    if drilldown_sb is None:
+        pytest.skip("Selectbox muni_drilldown non trouvé")
+
+    # Chercher une commune avec un code connu comme petite (< 3500 hab)
+    # On prend la première commune avec code INSEE < 59200 autre que Lille
+    petite_opt = next(
+        (
+            o
+            for o in drilldown_sb.options
+            if o != "(aucune sélection)" and "59350" not in str(o) and "59001" in str(o)
+        ),
+        None,
+    )
+    if petite_opt is None:
+        pytest.skip("Commune petite connue (59001) absente du dropdown — absente du Parquet 2026")
+
+    drilldown_sb.set_value(petite_opt).run()
+    assert not at.exception, f"Exception : {at.exception}"
+
+    warnings = at.warning
+    textes = " ".join(w.value for w in warnings)
+    assert "non nuancée" in textes.lower() or "Non nuancée" in textes, (
+        f"Warning 'non nuancée' absent. Warnings : {textes[:300]}"
+    )
