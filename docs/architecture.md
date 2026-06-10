@@ -190,11 +190,11 @@ Aucune clé API n'est hardcodée dans le code source.
 ### Tests
 
 - Framework : `pytest` avec `pytest-cov`
-- Couverture cible : ≥ 60 % (configurée dans `pyproject.toml`) — réelle à la Phase C : **75 %**
+- Couverture cible : ≥ 60 % (configurée dans `pyproject.toml`) — réelle à la Phase D3.2 : **78 %**
 - Les fixtures DuckDB utilisent une base in-memory (`:memory:`) — aucune dépendance
   à la base de production dans les tests
 - Les ETL loaders sont exclus de la couverture (réseau requis)
-- 62 tests de smoke ETL + 9 tests d'intégration électoraux (C4) — total **184 tests**
+- 62 tests de smoke ETL + 9 tests d'intégration électoraux (C4) — total **289 tests** (D3.2)
 - Tests `@pytest.mark.slow` (Streamlit headless) exclus par défaut ; lancer avec `pytest -m slow`
 
 ### CI (GitHub Actions)
@@ -228,7 +228,7 @@ Les choix d'architecture non triviaux sont documentés sous forme d'ADR :
 | [0004](adr/0004-polars-vs-pandas.md) | Polars prioritaire, Pandas en fallback |
 | [0005](adr/0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère — 6 blocs de clivages |
 
-**Schéma DuckDB électoral** : voir [docs/schema-elections.md](schema-elections.md) — 6 tables, 5 vues d'agrégation, blocs officiels.
+**Schéma DuckDB électoral** : voir [docs/schema-elections.md](schema-elections.md) — 6 tables, 8 vues d'agrégation, blocs officiels. Phase D3.2 : 5 colonnes municipales ajoutées à `resultats_candidats`, 3 vues muni (`v_scores_commune_muni`, `v_evolution_blocs_hdf_muni`, `v_listes_commune_muni`).
 
 ## Pour aller plus loin
 

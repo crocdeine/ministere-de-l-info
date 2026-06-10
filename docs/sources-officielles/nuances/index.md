@@ -23,24 +23,38 @@ la logique officielle datée de l'[ADR-0005](../../adr/0005-nuances-et-blocs-off
 (2002-2024) figure dans
 [reports/mapping-nuances-legislatives-validated.md](../../../reports/mapping-nuances-legislatives-validated.md).
 
-## Circulaires archivées
+## Circulaires archivées (PDF)
 
 | Fichier | NOR | Date | Scrutin | Nuances | Blocs ? | Fait notable |
 |---|---|---|---|---|---|---|
 | 2022-legislatives_INTA2212053C.pdf | INTA2212053C | avr. 2022 | Législatives 2022 | 19 | Non | Pas de regroupement en blocs |
 | 2023-senatoriales_IOMA2322276J.pdf | IOMA2322276J | 16 août 2023 | Sénatoriales 2023 | 21 | Oui (1re fois) | Naissance des 6 blocs. LFI → gauche. RN → extrême droite |
 | 2024-legislatives_IOMA2415630C.pdf | IOMA2415630C | juin 2024 | Législatives 2024 | 24 | Oui | Création nuance UG (union gauche) |
-| 2026-municipales_INTP2602966C.pdf | INTP2602966C | 2 fév. 2026 | Municipales 2026 | 26 | Oui | LFI bascule → extrême gauche |
+| 2026-municipales_INTP2602966C.pdf | INTP2602966C | 2 fév. 2026 | Municipales 2026 | 26 | Oui | LFI bascule → extrême gauche ; seuil 3 500 hab |
 
-## Décisions du Conseil d'État (validations / contentieux)
+## Circulaires archivées (notes texte — PDF Légifrance non téléchargeable automatiquement)
+
+| Fichier | NOR | Date | Scrutin | Statut |
+|---|---|---|---|---|
+| 2020-municipales_INTA1931378J_lien.md | INTA1931378J | 3 fév. 2020 | Municipales 2020 | ⚠️ PDF à télécharger manuellement — URL dans le fichier note |
+
+## Décisions du Conseil d'État (archivées en texte intégral)
+
+| Fichier | N° | Date | Objet |
+|---|---|---|---|
+| 2020-CE_decision_437675.md | 437675 | 31 janv. 2020 | Suspension circulaire 10/12/2019 muni 2020 — seuil 9 000 hab + LDVC + DLF/EXD annulés |
+| 2026-CE_decision_512694.md | 512694 | 27 fév. 2026 | Rejet recours LFI + UDR contre INTP2602966C — LFI→EXG et UDR→EXD validés |
+
+## Décisions du Conseil d'État (citées, non archivées séparément)
 
 - CE 21 sept. 2023, n°488379 (référé) et CE 11 mars 2024, n°488378 (fond) : validation
   du classement RN en extrême droite (sénatoriales 2023)
-- CE 27 février 2026 : validation du classement LFI en extrême gauche et UDR en extrême
-  droite (municipales 2026)
-- CE 31 janvier 2020, n°437675 : suspension du classement de Debout la France (DLF) en
-  extrême droite pour les municipales 2020 (erreur manifeste d'appréciation) — conforte
-  le classement DLF/Dupont-Aignan en bloc DTE (droite) avant 2026
+
+## Lois citées
+
+| Référence | Légifrance | Objet |
+|---|---|---|
+| Loi n°2013-403 du 17 mai 2013 | https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000027414225 | Abaisse le seuil du scrutin proportionnel de liste de **3 500 à 1 000 habitants** (applicable aux municipales 2014). N'affecte pas le seuil de nuançage du Ministère (maintenu à 3 500 hab). |
 
 ## Usage dans le projet
 
@@ -48,6 +62,5 @@ Ces circulaires alimentent :
 
 - la table `blocs_politiques` (les 6 blocs officiels : EXG, GAU, DIV, CENT, DTE, EXD)
 - la table `candidats_presidentielle` (classement sourcé des candidats 2017/2022)
-- la table `nuances_harmonisees` (mapping nuance→bloc pour 2002/2007/2012)
-- la future table `nuances_blocs` (mapping nuance→bloc daté, pour les scrutins à nuances
-  partisanes : legi, euro, regi, muni — prévu en C2c)
+- la table `nuances_harmonisees` (mapping nuance→bloc pour présidentielles et législatives)
+- la future table d'extension pour les municipales (mapping 34 nuances muni → blocs — prévu D3.2)

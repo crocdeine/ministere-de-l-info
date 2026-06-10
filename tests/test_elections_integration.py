@@ -79,10 +79,12 @@ class TestCoherenceBlocs:
     """Tout candidat doit avoir un bloc résolu."""
 
     def test_aucun_candidat_sans_bloc(self, con):
-        n = con.execute(
-            "SELECT COUNT(*) FROM v_resultats_candidats_avec_bloc WHERE bloc IS NULL"
-        ).fetchone()[0]
-        assert n == 0, f"{n} lignes orphelines de bloc"
+        """Pres et legi uniquement : muni a des NULL blocs intentionnels (NC/<seuil)."""
+        n = con.execute("""
+            SELECT COUNT(*) FROM v_resultats_candidats_avec_bloc
+            WHERE bloc IS NULL AND type_scrutin != 'muni'
+        """).fetchone()[0]
+        assert n == 0, f"{n} lignes orphelines de bloc (pres+legi)"
 
     def test_tous_blocs_officiels_presents(self, con):
         """Sur la série complète, les 6 blocs officiels doivent tous apparaître au moins une fois."""

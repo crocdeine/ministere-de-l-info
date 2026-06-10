@@ -88,15 +88,15 @@ class TestVolumes:
 
 class TestResolutionBloc:
     def test_aucun_candidat_sans_bloc(self, con):
-        """Critique : chaque ligne de v_resultats_candidats_avec_bloc doit avoir un bloc."""
+        """Pres et legi uniquement : muni a des NULL blocs intentionnels (NC/<seuil)."""
         rows = con.execute("""
             SELECT id_election, COUNT(*) AS n_orphelins
             FROM v_resultats_candidats_avec_bloc
-            WHERE bloc IS NULL
+            WHERE bloc IS NULL AND type_scrutin != 'muni'
             GROUP BY id_election
         """).fetchall()
         assert not rows, (
-            f"Candidats sans bloc résolu : {rows}. "
+            f"Candidats sans bloc résolu (pres+legi) : {rows}. "
             "Vérifier nuances_harmonisees et candidats_presidentielle."
         )
 

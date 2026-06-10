@@ -106,6 +106,81 @@ Cette section documente l'application concrète de la décision aux scrutins lé
 - **Cas tranché manuellement** : **PREP 2002** (Pôle Républicain, Chevènement) classé **GAU**
   par cohérence avec le classement GAU de Chevènement (MDC) en présidentielle 2002.
 
+## Application aux municipales 2008-2026
+
+Cette section documente l'application concrète de la décision aux scrutins municipaux
+(Phase D3.2, validée le 2026-06-09).
+
+### Périmètre et seuils de nuançage
+
+Les circulaires municipales distinguent deux régimes selon la taille de la commune :
+
+- **Communes ≥ 3 500 hab** : scrutin de liste proportionnel à deux tours. Les préfets
+  attribuent une nuance à chaque liste (= chaque valeur `no_panneau`). Ces nuances sont
+  classées dans `nuances_harmonisees`.
+- **Communes < 3 500 hab** (seuil INTA1931378J 2020 ; identique dans INTP2602966C 2026) :
+  pas de nuançage officiel — `nuance = NULL` dans les fichiers Parquet. `voix` représente
+  des suffrages *par candidat* (scrutin majoritaire plurinominal), non des suffrages *par liste*.
+  Ces lignes sont chargées avec `bloc = NULL` et `pct_exprimes = NULL` dans les vues.
+- **Seuil historique 2008** : la circulaire de nuançage 2008 utilisait un seuil de 3 500 hab.
+  En pratique, seules 164 communes HdF apparaissent dans le Parquet 2008 (les grandes
+  communes), confirmant que seule la strate ≥ 3 500 hab était nuancée.
+
+**Exception chefs-lieux d'arrondissement** : la circulaire INTP2602966C prévoit que
+certains chefs-lieux d'arrondissement de taille < 3 500 hab reçoivent malgré tout un
+nuançage. En HdF 2026, ~2 communes inférieures au seuil apparaissent avec une nuance
+dans le Parquet. Ces lignes sont traitées normalement (nuance → bloc via
+`nuances_harmonisees`) sans correction manuelle.
+
+### Clé technique : `no_panneau` synthétique pour 2008
+
+Les fichiers Parquet du scrutin 2008 ont `no_panneau = NULL` pour la totalité des
+109 983 lignes. Cette colonne étant partie de la clé primaire `(id_election, code_departement,
+code_commune, code_bv, no_panneau)` avec contrainte NOT NULL, l'insertion échouerait.
+
+**Décision** : synthétiser `no_panneau` par `ROW_NUMBER()` fenêtré sur
+`(id_election, code_departement, code_commune, code_bv)`, trié par `(nuance, voix DESC)`.
+L'ordre est stable *au sein d'une même exécution* du loader mais **non reproductible**
+d'une exécution à l'autre si le Parquet ou l'ordre d'arrivée change.
+
+Conséquence : `no_panneau` en 2008 est un identifiant de chargement, pas un identifiant
+métier. Il ne doit pas être utilisé comme référence externe (jointures entre sessions,
+URLs de drill-down). Les vues d'agrégation groupent par `nuance`, pas par `no_panneau`,
+ce qui annule ce problème pour les usages analytiques.
+
+### 67 entrées dans `nuances_harmonisees` (et non 69)
+
+Proposition initiale : 69 nuances. Corrections validées :
+
+| Code | Décision | Justification |
+|------|----------|---------------|
+| `NC` (2014, 2020) | **Non inséré** | NC = "Non classé" administratif, catégorie résiduelle du Ministère. Attribuer un bloc introduirait un classement éditorial non étayé. |
+| `LMAJ` (2008) | **Non inséré** | LMAJ = sortie de la liste mayorale sortante, indicateur de situation (non réélu / majorité), pas d'idéologie stable à attribuer. |
+| `LNC` (2020) | **Non inséré** | Parallèle de NC pour les listes aux communes > 1 000 hab. Même raisonnement que NC. |
+
+Total retenu : **67 entrées** réparties sur 4 annees : 12 (2008), 17 (2014), 19 (2020), 19 (2026).
+
+### Décisions de classement notables
+
+**LCMD 2008 → GAU** : les libellés de liste sont NULL dans le Parquet 2008 pour ce code.
+L'analyse contextuelle (présence exclusive dans le bassin minier et les villes ouvrières
+du Nord-Pas-de-Calais, nomenclature "Communiste et Divers") conduit à classer GAU.
+Décision conservatrice — les 12 communes concernées en 2008 t1 correspondent au réseau
+PCF/apparentés actif sur ce territoire.
+
+**LDVC 2020 → CENT** (CE 31/01/2020 n°437675) : le Conseil d'État a confirmé dans cette
+décision que LDVC (Divers Centre) correspond aux investitures LREM/MoDem/UDI aux
+municipales 2020. Source : `docs/sources-officielles/nuances/2020-CE_decision_437675.md`.
+
+**LFI 2020 → GAU, LFI 2026 → EXG** (bascule INTP2602966C + CE 27/02/2026 n°512694) :
+conformément à la règle n° 3 (classement "officiel de l'époque"), LFI est GAU jusqu'en
+2024 inclus et EXG seulement à partir des municipales 2026. La circulaire INTP2602966C
+et la décision CE n°512694 introduisent explicitement ce changement. Cette bascule est
+documentée et testée (voir `tests/test_elections_municipales.py::TestLFIBascule`).
+
+**LUDR 2026 → EXD** : code nouveau introduit par INTP2602966C pour les listes
+"Union Droite Républicaine" (allié RN/parti Ciotti). Classé EXD conformément à la grille.
+
 ## Réversibilité
 
 Un classement = une ligne dans une table de référence (`candidats_presidentielle` ou
