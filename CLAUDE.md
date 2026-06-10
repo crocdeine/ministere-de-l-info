@@ -33,12 +33,10 @@ Ces mises à jour ne sont PAS optionnelles : elles font partie du travail. Une s
 | Module | Statut | Tag | Détail |
 |--------|--------|-----|--------|
 | 📍 Géographie | ✅ Terminé | v0.2 | Régions, dpts, EPCI, communes, arrondissements, circos. Population 2013/2018/2023. |
-| 🗳️ Élections | ✅ Présidentielles (Phase C) | v0.3-elections-pres | Présidentielles 2002-2022, HdF, focus circo 21 (Valenciennes). |
-| 🏛️ Législatif | ✅ Phase D1 + D2 (HdF 2002-2024, BV) | — | Données + UI Streamlit ✓ ; drill-down BV présidentielles + législatives ✓ |
-| 🗳️ Municipales | ✅ Phase D3.3 (UI complète, données 8 scrutins) | — | 8 scrutins HdF 2008-2026, 67 nuances, 3 vues SQL, onglet Streamlit + drill-down listes. Lacune source 2008 dept 59 documentée (ADR-0005). |
+| 🗳️ Élections | ✅ Phase D complète (pres+legi+muni 2002-2026) | v0.4-elections-complet | Présidentielles 2002-2022, Législatives 2002-2024, Municipales 2008-2026, HdF. Drill-down BV. 30 scrutins, 11 vues SQL, 216 mappings nuances, méthodologie tracée (ADR-0005). |
 | 📊 Économie | 🔜 À cadrer | — | — |
 
-**Dernier rapport** : `reports/session-2026-06-09_phase-d3-recap.md` — D3.2 close : chargement muni HdF 2008-2026, 67 nuances, 3 vues SQL
+**Dernier rapport** : `reports/session-2026-06-10_phase-d-clôture.md` — Phase D close : module Élections complet (pres+legi+muni HdF 2002-2026), tag v0.4-elections-complet
 
 ---
 
