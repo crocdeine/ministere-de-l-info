@@ -28,6 +28,11 @@ COPY app.py ./
 # Installer le paquet local en mode éditable (path resolution via parents[3] reste valide)
 RUN uv sync --frozen --no-dev
 
+# Pré-installation de l'extension DuckDB spatial
+# L'extension est téléchargée au build time et incluse dans l'image,
+# évitant le téléchargement au runtime dans un container éphémère.
+RUN uv run python -c "import duckdb; con = duckdb.connect(); con.execute('INSTALL spatial'); con.close()"
+
 EXPOSE 8501
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
