@@ -238,6 +238,35 @@ Les choix d'architecture non triviaux sont documentés sous forme d'ADR :
 
 **Schéma DuckDB électoral** : voir [docs/schema-elections.md](schema-elections.md) — 6 tables, 8 vues d'agrégation, blocs officiels. Phase D3.2 : 5 colonnes municipales ajoutées à `resultats_candidats`, 3 vues muni (`v_scores_commune_muni`, `v_evolution_blocs_hdf_muni`, `v_listes_commune_muni`).
 
+## Déploiement
+
+### Distribution Mac (OrbStack + Docker)
+
+L'app est distribuée sous forme d'image Docker publiée sur GitHub Container
+Registry. Les utilisateurs finaux installent via un script one-shot.
+
+**Image** : `ghcr.io/crocdeine/ministere-de-l-info:latest`
+- Build automatique sur GitHub Actions à chaque tag `v*`
+- Multi-arch : linux/arm64 (Apple Silicon) + linux/amd64 (Intel)
+- ~1.82 Go (extension DuckDB spatial pré-installée)
+
+**Base de données** : séparée de l'image, attachée aux GitHub Releases
+- Volume Docker bind-mount vers `~/.ministere-info/data/`
+- Mise à jour indépendante du code (checksum SHA256 via update.sh)
+
+**Installation utilisateur** (une commande) :
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/main/deploy/install.sh)
+```
+
+**Guide mainteneur** : voir `deploy/README-deploy.md`
+
+### Prérequis utilisateur
+- macOS 13 (Ventura) ou plus récent
+- 4 Go d'espace disque libre
+- Connexion internet (~650 Mo à télécharger)
+- Homebrew et OrbStack installés automatiquement si absents
+
 ## Pour aller plus loin
 
 - [docs/data-sources.md](data-sources.md) — référence des sources de données (URLs, formats, limitations)
