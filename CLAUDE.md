@@ -42,9 +42,9 @@ Leçon D3.3 : run 27265331430 watché au lieu du vrai run du commit 7f21346 — 
 | 📍 Géographie | ✅ Terminé | v0.2 | Régions, dpts, EPCI, communes, arrondissements, circos. Population 2013/2018/2023. |
 | 🗳️ Élections | ✅ Phase D complète (pres+legi+muni 2002-2026) | v0.4-elections-complet | Présidentielles 2002-2022, Législatives 2002-2024, Municipales 2008-2026, HdF. Drill-down BV. 30 scrutins, 11 vues SQL, 216 mappings nuances, méthodologie tracée (ADR-0005). |
 | 🚀 Déploiement | ✅ v0.4.3 (Mac/OrbStack, testé) | — | install.sh validé sur macOS 26.4.1. Image sur ghcr.io. DB sur GitHub Release. TODO : update.sh test réel, page Paramètres UI. |
-| 📊 Économie | 🔜 À cadrer | — | — |
+| 📊 Économie | 🔄 Phase E en cours | — | 5 rapports Antigravity, ADR-0006, 3 skills. Sources : Filosofi + RP + Sirene. 5 indicateurs. ETL en cours. |
 
-**Dernier rapport** : `deploy/README-deploy.md` — chantier déploiement Mac complet (v0.4.3, testé sur MacBook Air réel)
+**Dernier rapport** : `docs/adr/0006-module-economie-sources-et-schema.md` — décisions architecture module Économie (sources, indicateurs, schéma DuckDB)
 
 ---
 
@@ -75,6 +75,7 @@ Toute décision d'architecture non triviale est documentée dans `docs/adr/`. Ne
 | [0003](docs/adr/0003-uv-vs-pip-poetry.md) | uv ≠ pip/poetry | Lock file reproductible, CI rapide, API moderne. |
 | [0004](docs/adr/0004-polars-vs-pandas.md) | Polars > Pandas | Colonnaire, expressions paresseuses, API stricte. |
 | [0005](docs/adr/0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère | 6 blocs officiels (EXG/GAU/DIV/CENT/DTE/EXD), classement "de l'époque", sources tracées. |
+| [0006](docs/adr/0006-module-economie-sources-et-schema.md) | Module Économie — sources et schéma | Filosofi + RP + Sirene, 5 indicateurs, 2 tables, 3 vues, pièges ETL INSEE. |
 
 ---
 

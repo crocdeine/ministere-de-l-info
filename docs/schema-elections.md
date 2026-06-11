@@ -327,3 +327,48 @@ Exemple de résultat (1er tour) :
 | 2012 | GAU | 25 234 |
 | 2017 | EXD | 18 311 |
 | 2022 | EXD | 21 637 |
+
+---
+
+## Tables économiques (Phase E — ADR-0006)
+
+Deux tables séparées par source, structure large cohérente avec les tables
+électorales. Voir `docs/adr/0006-module-economie-sources-et-schema.md`.
+
+### `economie_filosofi`
+
+| Colonne | Type | Contrainte | Description |
+|---|---|---|---|
+| `code_commune` | `VARCHAR(5)` | PK, NOT NULL | Code INSEE commune (zéro-paddé) |
+| `annee` | `INTEGER` | PK, NOT NULL | Millésime de la donnée Filosofi |
+| `taux_pauvrete` | `DOUBLE` | nullable | % ménages sous 60% revenu médian national |
+| `niveau_vie_median` | `DOUBLE` | nullable | Niveau de vie médian en euros |
+| `d1_niveau_vie` | `DOUBLE` | nullable | 1er décile du niveau de vie |
+| `d9_niveau_vie` | `DOUBLE` | nullable | 9e décile du niveau de vie |
+| `secret` | `BOOLEAN` | DEFAULT FALSE | TRUE si données masquées (commune < 50 ménages) |
+
+**Couverture** : communes HdF (~3 782), millésimes 2012→2022 annuels.
+**Piège** : `nullstr=['s', 'nd']` obligatoire à l'import CSV/Parquet INSEE.
+
+### `economie_rp`
+
+| Colonne | Type | Contrainte | Description |
+|---|---|---|---|
+| `code_commune` | `VARCHAR(5)` | PK, NOT NULL | Code INSEE commune (zéro-paddé) |
+| `annee_millesime` | `INTEGER` | PK, NOT NULL | Ex: 2020 = recensement sur 2016-2020 |
+| `tx_chomage_dec` | `DOUBLE` | nullable | Taux de chômage déclaratif RP (seule source communale) |
+| `part_ouvriers_employes` | `DOUBLE` | nullable | % ouvriers + employés dans la population active |
+| `part_emploi_industriel` | `DOUBLE` | nullable | % emplois secteur industriel (NAF division C) |
+| `pop_active` | `INTEGER` | nullable | Population active totale |
+| `secret` | `BOOLEAN` | DEFAULT FALSE | TRUE si données masquées |
+
+**Couverture** : communes HdF, millésimes glissants 5 ans depuis 2006.
+**Attention** : taux de chômage déclaratif ≠ taux BIT (différence méthodologique).
+
+### Vues économiques
+
+| Vue | Grain | Description |
+|---|---|---|
+| `v_economie_commune` | Commune × an | Fusion Filosofi + RP, indicateurs bruts |
+| `v_croisement_eco_elections` | Commune × élection | Croisement `v_scores_commune_pres` + éco (n-1) |
+| `v_evolution_economie_hdf` | An | Agrégats régionaux (moyennes HdF) |
