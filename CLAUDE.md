@@ -26,6 +26,13 @@ Ces mises à jour ne sont PAS optionnelles : elles font partie du travail. Une s
 
 **Points d'arrêt obligatoires** : quand un prompt mentionne explicitement "POINT D'ARRÊT", "ATTENDRE VALIDATION", "STOP", ou équivalent, Claude Code DOIT s'arrêter et attendre la confirmation explicite de Mathias en chat web. Un test automatisé (AppTest, pytest, Streamlit headless) ne remplace pas une validation manuelle quand elle est demandée. Les deux sont complémentaires.
 
+**Vérification CI post-push (règle obligatoire)** : après git push, identifier le run déclenché par ce push :
+```bash
+gh run list --limit 3 --json databaseId,headSha,conclusion,displayTitle
+```
+Comparer `headSha` avec `git rev-parse HEAD`. Ne jamais conclure "CI verte" sur un run antérieur.
+Leçon D3.3 : run 27265331430 watché au lieu du vrai run du commit 7f21346 — échec CI non détecté pendant 2 commits.
+
 ---
 
 ## État des modules
