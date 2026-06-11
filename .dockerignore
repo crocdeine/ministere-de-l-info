@@ -43,7 +43,26 @@ data
 # Claude
 .claude
 
+# Tests et rapports
+tests
+reports
+scripts
+deploy
+
+# CI/CD
+.github
+
+# Coverage
+coverage.xml
+.coverage.*
+
 # LaTeX artefacts
 *.aux
 *.log
 *.out
+
+# Fichiers lourds
+*.duckdb
+*.duckdb.wal
+*.duckdb.gz
+*.parquet

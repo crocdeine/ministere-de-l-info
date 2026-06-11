@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import duckdb
-import geopandas as gpd
 import polars as pl
 import streamlit as st
 
@@ -40,9 +39,6 @@ st.success("✅ Stack opérationnelle.")
 with st.expander("Test DuckDB"):
     result = duckdb.sql("SELECT 'France' AS pays, 67_000_000 AS habitants").to_df()
     st.dataframe(result, width="stretch")
-
-with st.expander("Test GeoPandas"):
-    st.write(f"GeoPandas version : {gpd.__version__}")
 
 st.divider()
 
