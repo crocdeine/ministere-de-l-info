@@ -92,7 +92,7 @@ def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
             e.code_commune,
             e.annee         AS annee_election,
             e.bloc,
-            e.pct_exprimes,
+            e.voix,
             eco.taux_pauvrete,
             eco.tx_chomage_dec,
             eco.part_ouvriers_employes
