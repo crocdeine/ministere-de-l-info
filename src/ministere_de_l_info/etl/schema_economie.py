@@ -48,11 +48,15 @@ def create_economie_schema(con: duckdb.DuckDBPyConnection) -> None:
             tx_chomage_dec         DOUBLE,
             part_ouvriers_employes DOUBLE,
             part_emploi_industriel DOUBLE,
+            part_logements_sociaux DOUBLE,
+            nb_logements_sociaux   INTEGER,
             pop_active             INTEGER,
             secret                 BOOLEAN    DEFAULT FALSE,
             PRIMARY KEY (code_commune, annee_millesime)
         )
     """)
+    con.execute("ALTER TABLE economie_rp ADD COLUMN IF NOT EXISTS part_logements_sociaux DOUBLE")
+    con.execute("ALTER TABLE economie_rp ADD COLUMN IF NOT EXISTS nb_logements_sociaux INTEGER")
     logger.debug("Table economie_rp créée (ou existante).")
     logger.info("Schéma économie créé.")
 
@@ -77,6 +81,8 @@ def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
             r.tx_chomage_dec,
             r.part_ouvriers_employes,
             r.part_emploi_industriel,
+            r.part_logements_sociaux,
+            r.nb_logements_sociaux,
             r.pop_active,
             (f.secret OR COALESCE(r.secret, FALSE)) AS secret_partiel
         FROM economie_filosofi f

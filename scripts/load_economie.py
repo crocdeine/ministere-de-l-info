@@ -159,15 +159,19 @@ def _print_summary(con: duckdb.DuckDBPyConnection) -> None:
         print("  Filosofi  (absent — millésime 2021 non chargé ?)")
 
     row_r = con.execute(
-        "SELECT tx_chomage_dec, part_ouvriers_employes, part_emploi_industriel, pop_active "
+        "SELECT tx_chomage_dec, part_ouvriers_employes, part_emploi_industriel, "
+        "part_logements_sociaux, nb_logements_sociaux, pop_active "
         "FROM economie_rp WHERE code_commune = '59350' AND annee_millesime = 2021"
     ).fetchone()
     if row_r:
-        tc, po, pi, pa = row_r
+        tc, po, pi, pls, nls, pa = row_r
         print(
             f"  RP        tx_chomage={tc:.1f}%  ouvriers_emp={po:.1f}%  "
             f"industrie={pi:.1f}%  pop_active={pa:,}"
         )
+        pls_str = f"{pls:.1f}%" if pls is not None else "NULL"
+        nls_str = f"{nls:,}" if nls is not None else "NULL"
+        print(f"            log_sociaux={pls_str}  nb_hlm={nls_str}")
     else:
         print("  RP        (absent — millésime 2021 non chargé ?)")
     print("──────────────────────────────────────────────────────────────────────────")

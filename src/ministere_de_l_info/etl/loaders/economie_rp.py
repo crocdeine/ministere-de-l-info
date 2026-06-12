@@ -1,11 +1,11 @@
-"""Loader RP — emploi, chômage déclaratif et CSP par commune HdF.
+"""Loader RP — emploi, chômage déclaratif, CSP et logements par commune HdF.
 
 Source : INSEE Recensement de la Population via dataset data.gouv.fr 67289477639527408ae687da
   "Recensement de la population communal et Filosofi depuis 2015"
   URL Parquet : voir _PARQUET_URL dans scripts/load_economie.py
 
 Format source : long (OLAP) — colonnes : code_com, nom_commune, annee, source, clef_json, valeur
-Source RP emploi : source = 'rp_actifs_emploi', millésimes 2015-2021
+Sources RP : source IN ('rp_actifs_emploi', 'rp_logements'), millésimes 2015-2021
 
 Convention suffixes INSEE RP :
   _c = effectif (count) — ex : actifs_15_64_ans_c = 118 248 pour Lille
@@ -19,6 +19,9 @@ Indicateurs calculés :
   part_emploi_industriel  = emplois_au_lieu_travail_industrie_c
                             / emplois_au_lieu_travail_c * 100
                             (emplois situés dans la commune, pas résidentiels)
+  part_logements_sociaux  = nb_rp_hlm_p / residences_principales_p * 100
+                            (source rp_logements — HLM parmi résidences principales)
+  nb_logements_sociaux    = nb_rp_hlm_p (effectif absolu HLM)
   pop_active              = actifs_15_64_ans_c (effectif absolu)
 
 Secret statistique : valeur = NULL dans le Parquet (masquée par INSEE).
@@ -77,7 +80,9 @@ def load_economie_rp(
     con.execute(f"""
         INSERT INTO economie_rp
             (code_commune, annee_millesime, tx_chomage_dec,
-             part_ouvriers_employes, part_emploi_industriel, pop_active, secret)
+             part_ouvriers_employes, part_emploi_industriel,
+             part_logements_sociaux, nb_logements_sociaux,
+             pop_active, secret)
         SELECT
             code_com::VARCHAR(5)  AS code_commune,
             annee                 AS annee_millesime,
@@ -115,12 +120,25 @@ def load_economie_rp(
                 ELSE NULL
             END AS part_emploi_industriel,
 
+            -- Part logements sociaux (HLM / résidences principales)
+            CASE
+                WHEN MAX(CASE WHEN source = 'rp_logements' AND clef_json = 'residences_principales_p' THEN valeur END) > 0
+                THEN (
+                    MAX(CASE WHEN source = 'rp_logements' AND clef_json = 'nb_rp_hlm_p' THEN valeur END) /
+                    MAX(CASE WHEN source = 'rp_logements' AND clef_json = 'residences_principales_p' THEN valeur END) * 100.0
+                )::DOUBLE
+                ELSE NULL
+            END AS part_logements_sociaux,
+
+            MAX(CASE WHEN source = 'rp_logements' AND clef_json = 'nb_rp_hlm_p' THEN valeur END)::INTEGER
+                AS nb_logements_sociaux,
+
             MAX(CASE WHEN clef_json = 'actifs_15_64_ans_c' THEN valeur END)::INTEGER AS pop_active,
 
             (MAX(CASE WHEN clef_json = 'chomeurs_15_64_ans_p' THEN valeur END) IS NULL) AS secret
 
         FROM read_parquet('{path_sql}')
-        WHERE source = 'rp_actifs_emploi'
+        WHERE source IN ('rp_actifs_emploi', 'rp_logements')
           AND ({filtre_hdf})
           {annees_cond}
         GROUP BY code_com, annee
@@ -137,5 +155,5 @@ def load_economie_rp(
         logger.info("  %d : %d communes", annee, n)
 
     millesimes_range = millesimes or list(range(2015, 2022))
-    version = f"donnees-insee-olap/rp_actifs_emploi {min(millesimes_range)}-{max(millesimes_range)}"
+    version = f"donnees-insee-olap/rp_actifs_emploi+rp_logements {min(millesimes_range)}-{max(millesimes_range)}"
     upsert_metadata(con, "economie_rp", count, version)
