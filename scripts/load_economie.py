@@ -1,33 +1,28 @@
-"""Chargement des données économiques INSEE (Filosofi + RP) pour HdF.
+"""Chargement des données économiques pour HdF (INSEE + CNAF + URSSAF + DREES).
 
 Usage :
     uv run python scripts/load_economie.py
-    uv run python scripts/load_economie.py --force
     uv run python scripts/load_economie.py --source filosofi
     uv run python scripts/load_economie.py --source rp
+    uv run python scripts/load_economie.py --source cnaf
+    uv run python scripts/load_economie.py --source urssaf
+    uv run python scripts/load_economie.py --source drees
+    uv run python scripts/load_economie.py --source social   # cnaf + drees
+    uv run python scripts/load_economie.py --force           # re-télécharger les caches
     uv run python scripts/load_economie.py --millesimes 2020,2021
 
-Sources :
-    Dataset data.gouv.fr 67289477639527408ae687da :
-    "Recensement de la population communal et Filosofi depuis 2015 — France métropolitaine"
-    Fichier unique : donnees-insee-olap.parquet (1.73 Go national)
-    Format OLAP (long) : code_com, nom_commune, annee, source, clef_json, valeur
+Sources et tables DuckDB :
+  filosofi  → economie_filosofi (Filosofi HdF 2017-2021, cache ~40 Mo)
+  rp        → economie_rp       (RP emploi/CSP HdF 2015-2021, cache partagé)
+  cnaf      → economie_social   (RSA par commune 2020-2024, download ~?? Mo)
+  urssaf    → economie_emploi_urssaf (effectifs salariés privé par APE 2006-2025, ~100-200 Mo)
+  drees     → economie_social   (APL médecins généralistes dernier millésime disponible)
 
-    Indicateurs chargés :
-    - Filosofi (source='filosofi_disponible') : taux_pauvrete, niveau_vie_median, déciles
-    - RP emploi (source='rp_actifs_emploi')  : tx_chomage_dec, part_ouvriers_employes,
-                                               part_emploi_industriel, pop_active
+Ordre recommandé pour un premier chargement :
+    all = filosofi + rp + cnaf + urssaf + drees (dans cet ordre)
 
-Stratégie cache :
-    Première exécution : DuckDB httpfs télécharge le Parquet national et sauvegarde
-    une version filtrée HdF (~50 Mo) dans data/raw/economie/donnees-insee-olap-hdf.parquet.
-    Exécutions suivantes : lecture du cache local (--force pour re-télécharger).
-
-Filtre :
-    Hauts-de-France uniquement (depts 02, 59, 60, 62, 80)
-
-Idempotent :
-    DELETE + INSERT par source et millésime.
+Filtre : Hauts-de-France uniquement (depts 02, 59, 60, 62, 80)
+Idempotent : DELETE + INSERT ou upsert ON CONFLICT par source.
 """
 
 from __future__ import annotations
@@ -43,8 +38,11 @@ sys.path.insert(0, str(ROOT / "src"))
 import duckdb  # noqa: E402
 
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
+from ministere_de_l_info.etl.loaders.economie_cnaf import load_economie_cnaf  # noqa: E402
+from ministere_de_l_info.etl.loaders.economie_drees import load_economie_drees  # noqa: E402
 from ministere_de_l_info.etl.loaders.economie_filosofi import load_economie_filosofi  # noqa: E402
 from ministere_de_l_info.etl.loaders.economie_rp import load_economie_rp  # noqa: E402
+from ministere_de_l_info.etl.loaders.economie_urssaf import load_economie_urssaf  # noqa: E402
 from ministere_de_l_info.etl.schema_economie import (  # noqa: E402
     create_economie_schema,
     create_economie_views,
@@ -118,6 +116,32 @@ def _build_hdf_cache(force: bool = False, yes: bool = False) -> None:
 
 def _print_summary(con: duckdb.DuckDBPyConnection) -> None:
     """Affiche les volumes par table et millésime."""
+    print("\n── economie_social ───────────────────────────────────────────────────────")
+    rows_s = con.execute(
+        "SELECT annee, COUNT(*) AS n, "
+        "SUM(nb_foyers_rsa IS NOT NULL) AS n_rsa, "
+        "SUM(apl_medecins IS NOT NULL) AS n_apl "
+        "FROM economie_social GROUP BY annee ORDER BY annee"
+    ).fetchall()
+    if rows_s:
+        print(f"  {'annee':>6s} {'communes':>10s} {'RSA':>8s} {'APL':>8s}")
+        for annee, n, n_rsa, n_apl in rows_s:
+            print(f"  {annee:>6d} {n:>10,} {n_rsa:>8,} {n_apl:>8,}")
+    else:
+        print("  (vide)")
+
+    print("\n── economie_emploi_urssaf ────────────────────────────────────────────────")
+    rows_u = con.execute(
+        "SELECT annee, COUNT(*) AS n FROM economie_emploi_urssaf GROUP BY annee ORDER BY annee"
+    ).fetchall()
+    if rows_u:
+        total_u = sum(n for _, n in rows_u)
+        print(
+            f"  {len(rows_u)} années ({rows_u[0][0]}→{rows_u[-1][0]}), {total_u:,} lignes totales"
+        )
+    else:
+        print("  (vide)")
+
     print("\n── economie_filosofi ─────────────────────────────────────────────────────")
     rows = con.execute(
         "SELECT annee, COUNT(*) AS n_communes FROM economie_filosofi GROUP BY annee ORDER BY annee"
@@ -188,9 +212,12 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--source",
-        choices=["filosofi", "rp", "all"],
+        choices=["filosofi", "rp", "cnaf", "urssaf", "drees", "social", "all"],
         default="all",
-        help="Source à charger : filosofi | rp | all (défaut : all)",
+        help=(
+            "Source à charger : filosofi | rp | cnaf | urssaf | drees | "
+            "social (cnaf+drees) | all (défaut : all)"
+        ),
     )
     parser.add_argument(
         "--millesimes",
@@ -229,6 +256,18 @@ def main() -> None:
         if args.source in ("rp", "all"):
             logger.info("=== Chargement RP emploi ===")
             load_economie_rp(con, _RAW_DIR, force=args.force, millesimes=millesimes)
+
+        if args.source in ("cnaf", "social", "all"):
+            logger.info("=== Chargement CNAF RSA ===")
+            load_economie_cnaf(con, _RAW_DIR, force=args.force, annees=millesimes)
+
+        if args.source in ("urssaf", "all"):
+            logger.info("=== Chargement URSSAF effectifs ===")
+            load_economie_urssaf(con, _RAW_DIR, force=args.force)
+
+        if args.source in ("drees", "social", "all"):
+            logger.info("=== Chargement DREES APL ===")
+            load_economie_drees(con, _RAW_DIR, force=args.force)
 
         _print_summary(con)
         print("\nChargement économie terminé.")

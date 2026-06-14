@@ -143,3 +143,101 @@ def test_code_commune_varchar(con):
     ).fetchone()
     if row_aisne:
         assert len(row_aisne[0]) == 5, f"code_commune pas en 5 chars : {row_aisne[0]!r}"
+
+
+# ── Tests Phase E+ (CNAF, URSSAF, DREES) ──────────────────────────────────────
+# Ces tests nécessitent que les loaders cnaf/urssaf/drees aient été exécutés
+# via scripts/load_economie.py --source social ou --source all.
+
+
+@pytest.fixture(scope="module")
+def con_social(con) -> duckdb.DuckDBPyConnection:
+    """Fixture : passe si economie_social contient des données RSA (CNAF chargé)."""
+    n = con.execute(
+        "SELECT COUNT(*) FROM economie_social WHERE nb_foyers_rsa IS NOT NULL"
+    ).fetchone()[0]
+    if n == 0:
+        pytest.skip(
+            "Données CNAF non chargées. Lancer : uv run python scripts/load_economie.py --source cnaf"
+        )
+    return con
+
+
+@pytest.fixture(scope="module")
+def con_urssaf(con) -> duckdb.DuckDBPyConnection:
+    """Fixture : passe si economie_emploi_urssaf contient des données."""
+    n = con.execute("SELECT COUNT(*) FROM economie_emploi_urssaf").fetchone()[0]
+    if n == 0:
+        pytest.skip(
+            "Données URSSAF non chargées. Lancer : uv run python scripts/load_economie.py --source urssaf"
+        )
+    return con
+
+
+def test_cnaf_data_loaded(con_social):
+    """economie_social contient des données RSA."""
+    n = con_social.execute(
+        "SELECT COUNT(*) FROM economie_social WHERE nb_foyers_rsa IS NOT NULL"
+    ).fetchone()[0]
+    assert n > 1000, f"Trop peu de communes avec données RSA : {n}"
+
+
+def test_cnaf_lille(con_social):
+    """Lille (59350) 2024 : nb_foyers_rsa ~11 000 (±1 000)."""
+    row = con_social.execute(
+        "SELECT nb_foyers_rsa FROM economie_social WHERE code_commune = '59350' AND annee = 2024"
+    ).fetchone()
+    assert row is not None, "Lille 59350 absente de economie_social 2024 — CNAF chargé ?"
+    nfr = row[0]
+    assert nfr is not None, "nb_foyers_rsa NULL pour Lille 2024"
+    assert 10_000 < nfr < 12_000, f"nb_foyers_rsa Lille 2024 hors plage attendue : {nfr:,}"
+
+
+def test_urssaf_data_loaded(con_urssaf):
+    """economie_emploi_urssaf contient des données."""
+    n = con_urssaf.execute("SELECT COUNT(*) FROM economie_emploi_urssaf").fetchone()[0]
+    assert n > 100_000, f"Trop peu de lignes URSSAF HdF : {n:,}"
+
+
+def test_urssaf_industrie_hdf(con_urssaf):
+    """Des lignes GS1 Industrie existent pour HdF avec des effectifs > 0."""
+    n = con_urssaf.execute(
+        "SELECT COUNT(*) FROM economie_emploi_urssaf "
+        "WHERE secteur_gs LIKE '%Industrie%' AND nb_salaries > 0"
+    ).fetchone()[0]
+    assert n > 0, "Aucune ligne secteur Industrie avec salariés > 0 — vérifier secteur_gs"
+
+
+def test_drees_apl_loaded(con_social):
+    """economie_social contient des données APL (DREES chargé)."""
+    n = con_social.execute(
+        "SELECT COUNT(*) FROM economie_social WHERE apl_medecins IS NOT NULL"
+    ).fetchone()[0]
+    if n == 0:
+        pytest.skip(
+            "Données DREES non chargées. Lancer : uv run python scripts/load_economie.py --source drees"
+        )
+    assert n > 1000, f"Trop peu de communes avec données APL : {n}"
+
+
+def test_drees_desert_medical(con_social):
+    """Des communes HdF ont desert_medical = TRUE (APL < 2.5)."""
+    n = con_social.execute(
+        "SELECT COUNT(*) FROM economie_social WHERE desert_medical = TRUE"
+    ).fetchone()[0]
+    if n == 0:
+        pytest.skip("Données DREES non chargées — test ignoré.")
+    assert n > 50, f"Trop peu de déserts médicaux HdF : {n} (attendu >50)"
+
+
+def test_vue_desindustrialisation(con_urssaf):
+    """v_desindustrialisation_commune retourne des lignes avec variation calculée."""
+    rows = con_urssaf.execute(
+        "SELECT code_commune, variation_pct FROM v_desindustrialisation_commune LIMIT 5"
+    ).fetchall()
+    assert len(rows) > 0, "v_desindustrialisation_commune est vide — URSSAF chargé ?"
+    # Au moins une commune avec variation calculée (secteur Industrie présent au début ET à la fin)
+    has_variation = any(r[1] is not None for r in rows)
+    assert has_variation, (
+        "Toutes les communes ont variation_pct NULL dans v_desindustrialisation_commune"
+    )

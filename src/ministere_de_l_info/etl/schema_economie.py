@@ -3,12 +3,22 @@
 Fonctions exportées
 -------------------
 - create_economie_schema(con)  : CREATE TABLE IF NOT EXISTS, idempotent
-- create_economie_views(con)   : CREATE OR REPLACE VIEW × 3
+- create_economie_views(con)   : CREATE OR REPLACE VIEW × 5
 
-Sources
--------
-- economie_filosofi : INSEE Filosofi (revenus/pauvreté), millésimes 2017-2021
-- economie_rp       : INSEE RP actifs-emploi (chômage, CSP, industrie), 2015-2021
+Tables (4)
+----------
+- economie_filosofi       : INSEE Filosofi (revenus/pauvreté), millésimes 2017-2021
+- economie_rp             : INSEE RP actifs-emploi (chômage, CSP, industrie), 2015-2021
+- economie_social         : CNAF RSA + DREES APL par commune/an
+- economie_emploi_urssaf  : URSSAF effectifs salariés privés par commune × APE × an
+
+Vues (5)
+--------
+- v_economie_commune           : jointure Filosofi + RP
+- v_croisement_eco_elections   : économie × présidentielles T2
+- v_evolution_economie_hdf     : agrégats HdF par année
+- v_economie_sociale_commune   : economie_social + nom commune
+- v_desindustrialisation_commune: variation emploi industriel entre 1ère et dernière année URSSAF
 
 Filtre géographique
 -------------------
@@ -26,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_economie_schema(con: duckdb.DuckDBPyConnection) -> None:
-    """Crée les 2 tables économiques. Idempotent (CREATE TABLE IF NOT EXISTS)."""
+    """Crée les 4 tables économiques. Idempotent (CREATE TABLE IF NOT EXISTS)."""
     con.execute("""
         CREATE TABLE IF NOT EXISTS economie_filosofi (
             code_commune      VARCHAR(5) NOT NULL,
@@ -58,16 +68,44 @@ def create_economie_schema(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("ALTER TABLE economie_rp ADD COLUMN IF NOT EXISTS part_logements_sociaux DOUBLE")
     con.execute("ALTER TABLE economie_rp ADD COLUMN IF NOT EXISTS nb_logements_sociaux INTEGER")
     logger.debug("Table economie_rp créée (ou existante).")
-    logger.info("Schéma économie créé.")
+
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS economie_social (
+            code_commune    VARCHAR(5) NOT NULL,
+            annee           INTEGER    NOT NULL,
+            nb_foyers_rsa   INTEGER,
+            taux_foyers_rsa DOUBLE,
+            apl_medecins    DOUBLE,
+            desert_medical  BOOLEAN,
+            PRIMARY KEY (code_commune, annee)
+        )
+    """)
+    logger.debug("Table economie_social créée (ou existante).")
+
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS economie_emploi_urssaf (
+            code_commune      VARCHAR(5) NOT NULL,
+            annee             INTEGER    NOT NULL,
+            secteur_gs        VARCHAR,
+            code_ape          VARCHAR(5),
+            nb_salaries       INTEGER,
+            nb_etablissements INTEGER,
+            PRIMARY KEY (code_commune, annee, code_ape)
+        )
+    """)
+    logger.debug("Table economie_emploi_urssaf créée (ou existante).")
+    logger.info("Schéma économie créé (4 tables).")
 
 
 def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
-    """Crée les 3 vues du module Économie.
+    """Crée les 5 vues du module Économie.
 
     Dépendances :
-    - v_economie_commune          : economie_filosofi + economie_rp
-    - v_croisement_eco_elections  : v_economie_commune + v_scores_commune_pres (schema_elections.py)
-    - v_evolution_economie_hdf    : economie_filosofi + economie_rp agrégés HdF
+    - v_economie_commune             : economie_filosofi + economie_rp
+    - v_croisement_eco_elections     : v_economie_commune + v_scores_commune_pres
+    - v_evolution_economie_hdf       : economie_filosofi + economie_rp agrégés HdF
+    - v_economie_sociale_commune     : economie_social + geographies_communes
+    - v_desindustrialisation_commune : economie_emploi_urssaf (industrie, min→max annee)
     """
     con.execute("""
         CREATE OR REPLACE VIEW v_economie_commune AS
@@ -129,4 +167,63 @@ def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
         ORDER BY f.annee
     """)
     logger.debug("Vue v_evolution_economie_hdf créée.")
-    logger.info("Vues économie créées (3 vues).")
+
+    con.execute("""
+        CREATE OR REPLACE VIEW v_economie_sociale_commune AS
+        SELECT
+            s.code_commune,
+            s.annee,
+            gc.nom            AS nom_commune,
+            s.nb_foyers_rsa,
+            s.taux_foyers_rsa,
+            s.apl_medecins,
+            s.desert_medical
+        FROM economie_social s
+        LEFT JOIN geographies_communes gc ON gc.code_insee = s.code_commune
+    """)
+    logger.debug("Vue v_economie_sociale_commune créée.")
+
+    con.execute("""
+        CREATE OR REPLACE VIEW v_desindustrialisation_commune AS
+        WITH industrie AS (
+            SELECT
+                code_commune,
+                annee,
+                SUM(COALESCE(nb_salaries, 0)) AS nb_salaries_industrie
+            FROM economie_emploi_urssaf
+            WHERE secteur_gs LIKE '%Industrie%'
+            GROUP BY code_commune, annee
+        ),
+        bornes AS (
+            SELECT
+                code_commune,
+                MIN(annee) AS annee_min,
+                MAX(annee) AS annee_max
+            FROM industrie
+            GROUP BY code_commune
+        )
+        SELECT
+            b.code_commune,
+            gc.nom                              AS nom_commune,
+            b.annee_min,
+            b.annee_max,
+            debut.nb_salaries_industrie         AS salaries_debut,
+            fin.nb_salaries_industrie           AS salaries_fin,
+            (fin.nb_salaries_industrie - debut.nb_salaries_industrie)::INTEGER AS variation_absolue,
+            CASE
+                WHEN debut.nb_salaries_industrie > 0
+                THEN ROUND(
+                    (fin.nb_salaries_industrie - debut.nb_salaries_industrie)::DOUBLE
+                    / debut.nb_salaries_industrie * 100.0, 2
+                )
+                ELSE NULL
+            END AS variation_pct
+        FROM bornes b
+        JOIN industrie debut
+            ON debut.code_commune = b.code_commune AND debut.annee = b.annee_min
+        JOIN industrie fin
+            ON fin.code_commune = b.code_commune AND fin.annee = b.annee_max
+        LEFT JOIN geographies_communes gc ON gc.code_insee = b.code_commune
+    """)
+    logger.debug("Vue v_desindustrialisation_commune créée.")
+    logger.info("Vues économie créées (5 vues).")
