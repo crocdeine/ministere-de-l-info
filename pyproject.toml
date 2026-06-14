@@ -78,7 +78,9 @@ omit = [
     "*/pages/elections_presidentielles.py",
     "*/pages/elections_legislatives.py",
     "*/pages/elections_municipales.py",
+    "*/pages/economie.py",
     "*/viz/elections_muni_queries.py",
+    "*/viz/economie_queries.py",
 ]
 
 [tool.ruff]
