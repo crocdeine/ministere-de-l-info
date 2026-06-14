@@ -1,6 +1,6 @@
-"""Page Économie — module render() (Phase E4).
+"""Page Économie — module render() (Phase E4 + E+).
 
-Répond aux 4 questions éditoriales de l'ADR-0006 :
+Répond aux questions éditoriales de l'ADR-0006 :
 1. Les communes les plus pauvres votent-elles RN ?
 2. La désindustrialisation prédit-elle le vote EXD ?
 3. La part d'ouvriers/employés détermine-t-elle la couleur politique ?
@@ -19,10 +19,13 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 from ministere_de_l_info.viz.economie_queries import (
-    get_annees_disponibles,
+    get_annees_par_indicateur,
+    get_communes_industrie_hdf,
     get_croisement_eco_elections,
+    get_desindustrialisation_commune,
     get_economie_commune,
     get_evolution_hdf,
+    get_evolution_rsa_hdf,
     get_indicateurs,
     get_scores_commune,
     is_data_loaded,
@@ -55,6 +58,29 @@ _INDIC_EVOL: dict[str, str] = {
 }
 
 _FILOSOFI_INDICS = {"taux_pauvrete", "niveau_vie_median"}
+
+_INDICATEURS_CROISEMENT: dict[str, str] = {
+    "taux_pauvrete": "Taux de pauvreté (%)",
+    "niveau_vie_median": "Niveau de vie médian (€)",
+    "tx_chomage_dec": "Taux de chômage (RP, %)",
+    "part_ouvriers_employes": "Part ouvriers + employés (%)",
+    "part_emploi_industriel": "Part emploi industriel (%)",
+    "part_logements_sociaux": "Part logements sociaux (%)",
+}
+
+
+def _make_desert_map(df: pl.DataFrame) -> folium.Map:
+    """Carte déserts médicaux — rouge si APL < 2,5, gris sinon (choroplèthe binaire)."""
+    return _make_choropleth(
+        df.with_columns(
+            pl.when(pl.col("valeur").is_not_null() & (pl.col("valeur") < 2.5))
+            .then(pl.lit(1.0))
+            .otherwise(pl.lit(None, dtype=pl.Float64))
+            .alias("valeur"),
+            pl.lit(False).alias("secret"),
+        ),
+        "Désert médical (APL < 2,5)",
+    )
 
 
 def _make_choropleth(df: pl.DataFrame, libelle: str) -> folium.Map:
@@ -126,7 +152,7 @@ def _make_choropleth(df: pl.DataFrame, libelle: str) -> folium.Map:
 def _render_carte_tab() -> None:
     """Onglet Carte des indicateurs — choroplèthe + drill-down commune."""
     indicateurs = get_indicateurs()
-    annees = get_annees_disponibles()
+    annees_par_indic = get_annees_par_indicateur()
 
     c1, c2 = st.columns([2, 1])
     with c1:
@@ -137,12 +163,11 @@ def _render_carte_tab() -> None:
             key="eco_indicateur",
         )
     with c2:
-        annee: int = st.selectbox(  # type: ignore[assignment]
-            "Année",
-            annees,
-            index=len(annees) - 1,
-            key="eco_annee",
-        )
+        annees = sorted(annees_par_indic.get(indicateur, []), reverse=True)
+        if not annees:
+            st.warning("Pas de données disponibles pour cet indicateur.")
+            return
+        annee: int = st.selectbox("Année", annees, key="eco_annee")  # type: ignore[assignment]
 
     libelle = indicateurs[indicateur]
     df = get_scores_commune(annee, indicateur)
@@ -153,13 +178,16 @@ def _render_carte_tab() -> None:
 
     n_valides = df.filter(pl.col("valeur").is_not_null() & ~pl.col("secret")).height
     n_secret = df.filter(pl.col("secret")).height
-    source = (
-        "INSEE Filosofi" if indicateur in _FILOSOFI_INDICS else "INSEE Recensement de la Population"
-    )
-    st.caption(
-        f"{n_valides:,} communes avec données · {n_secret:,} secret statistique INSEE "
-        f"(gris) — Source : {source}"
-    )
+    if indicateur in _FILOSOFI_INDICS:
+        source = "INSEE Filosofi"
+    elif indicateur == "nb_foyers_rsa":
+        source = "CNAF data.caf.fr"
+    elif indicateur == "apl_medecins":
+        source = "DREES data.solidarites-sante.gouv.fr"
+    else:
+        source = "INSEE Recensement de la Population"
+    secret_info = f" · {n_secret:,} secret statistique INSEE (gris)" if n_secret else ""
+    st.caption(f"{n_valides:,} communes avec données{secret_info} — Source : {source}")
 
     try:
         carte = _make_choropleth(df, libelle)
@@ -167,6 +195,10 @@ def _render_carte_tab() -> None:
     except Exception as exc:
         st.error(f"Erreur carte : {exc}")
         logger.exception("Erreur choroplèthe économie")
+
+    if indicateur == "apl_medecins":
+        n_desert = df.filter(pl.col("valeur").is_not_null() & (pl.col("valeur") < 2.5)).height
+        st.metric("Communes en désert médical (APL < 2,5)", n_desert)
 
     # ── Drill-down commune ─────────────────────────────────────────────────────
     with st.expander("🔍 Drill-down commune"):
@@ -218,9 +250,33 @@ def _render_carte_tab() -> None:
 
 
 def _render_evolution_tab() -> None:
-    """Onglet Évolution HdF — indicateurs agrégés 2017-2021."""
-    evol_df = get_evolution_hdf()
+    """Onglet Évolution HdF — Filosofi/RP 2017-2021 ou RSA CNAF 2020-2024."""
+    mode: str = st.radio(  # type: ignore[assignment]
+        "Série",
+        ["Filosofi / RP (2017-2021)", "RSA allocataires (2020-2024)"],
+        horizontal=True,
+        key="eco_evol_mode",
+    )
 
+    if mode.startswith("RSA"):
+        rsa_df = get_evolution_rsa_hdf()
+        if rsa_df.is_empty():
+            st.info("Données RSA non chargées. Lancez : `load_economie.py --source cnaf`")
+            return
+        fig = px.line(
+            rsa_df.to_pandas(),
+            x="annee",
+            y="total_foyers_rsa_hdf",
+            markers=True,
+            title="Évolution allocataires RSA — Hauts-de-France",
+            labels={"annee": "Année", "total_foyers_rsa_hdf": "Foyers RSA"},
+        )
+        fig.update_layout(height=420, margin={"t": 50, "b": 30})
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Source : CNAF data.caf.fr — snapshot décembre")
+        return
+
+    evol_df = get_evolution_hdf()
     if evol_df.is_empty():
         st.warning("Aucune donnée d'évolution disponible.")
         return
@@ -233,14 +289,12 @@ def _render_evolution_tab() -> None:
     )
     libelle = _INDIC_EVOL[indic_evol]
     annees = evol_df["annee"].to_list()
-    titre = f"Évolution {libelle} — Hauts-de-France {min(annees)}-{max(annees)}"
-
     fig = px.line(
         evol_df.to_pandas(),
         x="annee",
         y=indic_evol,
         markers=True,
-        title=titre,
+        title=f"Évolution {libelle} — Hauts-de-France {min(annees)}-{max(annees)}",
         labels={"annee": "Année", indic_evol: libelle},
     )
     fig.update_layout(
@@ -265,7 +319,7 @@ def _render_croisement_tab() -> None:
         "La part d'ouvriers/employés détermine-t-elle la couleur politique ?"
     )
 
-    indicateurs = get_indicateurs()
+    indicateurs = _INDICATEURS_CROISEMENT
     c1, c2, c3 = st.columns(3)
     with c1:
         annee_election: int = st.selectbox(  # type: ignore[assignment]
@@ -310,7 +364,6 @@ def _render_croisement_tab() -> None:
     n_communes = scatter_df.height
     libelle_x = indicateurs[indic_x]
 
-    # pop_active peut être NULL pour certaines communes → utiliser valeur par défaut pour la taille
     scatter_pd = scatter_df.with_columns(pl.col("pop_active").fill_null(1000)).to_pandas()
 
     fig = px.scatter(
@@ -343,6 +396,81 @@ def _render_croisement_tab() -> None:
     )
 
 
+def _render_industrie_tab() -> None:
+    """Onglet Désindustrialisation — emploi GS1 Industrie + déserts médicaux."""
+    st.subheader("Emploi industriel (GS1) — Hauts-de-France 2006-2025")
+    hdf_df = get_desindustrialisation_commune()
+    if hdf_df.is_empty():
+        st.info("Données URSSAF non chargées. Lancez : `load_economie.py --source urssaf`")
+    else:
+        annees_ind = hdf_df["annee"].to_list()
+        fig = px.line(
+            hdf_df.to_pandas(),
+            x="annee",
+            y="nb_salaries",
+            markers=True,
+            title=f"Effectifs salariés secteur Industrie — HdF {min(annees_ind)}-{max(annees_ind)}",
+            labels={"annee": "Année", "nb_salaries": "Salariés industrie"},
+        )
+        fig.add_vrect(x0=2008, x1=2010, fillcolor="grey", opacity=0.15, line_width=0)
+        fig.add_vrect(x0=2020, x1=2021, fillcolor="#4488ff", opacity=0.12, line_width=0)
+        fig.update_layout(height=400, margin={"t": 50, "b": 30})
+        st.plotly_chart(fig, use_container_width=True)
+        st.caption("Source : URSSAF / ACOSS — open.urssaf.fr")
+
+    st.subheader("Drill-down commune")
+    communes_ind = get_communes_industrie_hdf()
+    if not communes_ind:
+        st.info("Données URSSAF non chargées.")
+    else:
+        opts = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes_ind]
+        sel: str = st.selectbox("Commune", opts, key="industrie_commune")  # type: ignore[assignment]
+        if sel != "(aucune sélection)":
+            code_ind = sel.rsplit("(", 1)[1].rstrip(")")
+            nom_ind = sel.rsplit(" (", 1)[0]
+            ts_df = get_desindustrialisation_commune(code_ind)
+            if ts_df.is_empty():
+                st.info(f"Pas de données industrie pour {nom_ind}.")
+            else:
+                fig2 = px.line(
+                    ts_df.to_pandas(),
+                    x="annee",
+                    y="nb_salaries",
+                    markers=True,
+                    title=f"Emploi industriel — {nom_ind}",
+                    labels={"annee": "Année", "nb_salaries": "Salariés"},
+                )
+                fig2.update_layout(height=340, margin={"t": 40, "b": 20})
+                st.plotly_chart(fig2, use_container_width=True)
+
+    st.subheader("Déserts médicaux HdF (APL < 2,5) — Millésime 2023")
+    annees_apl = get_annees_par_indicateur().get("apl_medecins", [])
+    if not annees_apl:
+        st.info("Données DREES APL non chargées. Lancez : `load_economie.py --source drees`")
+    else:
+        apl_df = get_scores_commune(max(annees_apl), "apl_medecins")
+        if not apl_df.is_empty():
+            n_total = apl_df.filter(pl.col("valeur").is_not_null()).height
+            n_desert = apl_df.filter(
+                pl.col("valeur").is_not_null() & (pl.col("valeur") < 2.5)
+            ).height
+            st.metric("Communes désert médical / avec données APL", f"{n_desert} / {n_total}")
+            try:
+                st_folium(
+                    _make_desert_map(apl_df),
+                    use_container_width=True,
+                    height=500,
+                    returned_objects=[],
+                )
+            except Exception as exc:
+                st.error(f"Erreur carte déserts médicaux : {exc}")
+                logger.exception("Erreur carte déserts médicaux")
+            st.caption(
+                "Rouge : APL < 2,5 consult./hab./an (seuil officiel DREES). "
+                "Source : DREES data.solidarites-sante.gouv.fr"
+            )
+
+
 def render() -> None:
     """Point d'entrée de la page Économie — ministere-de-l-info."""
     if not is_data_loaded():
@@ -352,11 +480,12 @@ def render() -> None:
 
     st.header("📊 Économie — Hauts-de-France")
 
-    tab_carte, tab_evolution, tab_croisement = st.tabs(
+    tab_carte, tab_evolution, tab_croisement, tab_industrie = st.tabs(
         [
             "🗺️ Carte des indicateurs",
             "📈 Évolution HdF",
             "🔗 Économie × Élections",
+            "🏭 Désindustrialisation",
         ]
     )
 
@@ -366,3 +495,5 @@ def render() -> None:
         _render_evolution_tab()
     with tab_croisement:
         _render_croisement_tab()
+    with tab_industrie:
+        _render_industrie_tab()

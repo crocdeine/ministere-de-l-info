@@ -1,15 +1,19 @@
-"""Requêtes DuckDB cachées pour la page Économie (Phase E3).
+"""Requêtes DuckDB cachées pour la page Économie (Phase E3 + E+).
 
 Fonctions exportées
 -------------------
-- is_data_loaded()            : True si les 2 tables économiques contiennent des données
-- get_annees_disponibles()    : années dans economie_filosofi
-- get_indicateurs()           : dict code → libellé des 6 indicateurs
-- get_scores_commune()        : indicateur × commune HdF pour une année
-- get_economie_commune()      : tous indicateurs pour une commune, toutes années
+- is_data_loaded()              : True si les 2 tables économiques contiennent des données
+- get_annees_par_indicateur()   : dict indicateur → années disponibles (toutes sources)
+- get_indicateurs()             : dict code → libellé des 8 indicateurs
+- get_scores_commune()          : indicateur × commune HdF pour une année
+- get_economie_commune()        : tous indicateurs pour une commune, toutes années
 - get_croisement_eco_elections(): croisement économie × présidentielles T2
-- get_evolution_hdf()         : évolution agrégée HdF (3 indicateurs)
-- get_stats_hdf()             : min/max/moy/med d'un indicateur pour calibrer la choroplèthe
+- get_evolution_hdf()           : évolution agrégée HdF (3 indicateurs Filosofi/RP)
+- get_evolution_rsa_hdf()       : évolution total foyers RSA HdF (CNAF 2020-2024)
+- get_deserts_medicaux()        : communes HdF desert_medical=TRUE + geojson
+- get_desindustrialisation_commune() : effectifs industrie HdF ou par commune 2006-2025
+- get_top_communes_rsa()        : top N communes par foyers RSA pour une année
+- get_communes_industrie_hdf()  : liste communes HdF avec données emploi industriel
 """
 
 from __future__ import annotations
@@ -31,8 +35,12 @@ _INDICATEURS_VALIDES = frozenset(
         "part_ouvriers_employes",
         "part_emploi_industriel",
         "part_logements_sociaux",
+        "nb_foyers_rsa",
+        "apl_medecins",
     }
 )
+# Indicateurs provenant de economie_social (Phase E+) — routage alternatif
+_INDICATEURS_SOCIAL = frozenset({"nb_foyers_rsa", "apl_medecins"})
 
 
 def _open_ro() -> duckdb.DuckDBPyConnection:
@@ -53,20 +61,9 @@ def is_data_loaded() -> bool:
         con.close()
 
 
-@st.cache_data(ttl=3600)
-def get_annees_disponibles() -> list[int]:
-    """Années disponibles dans economie_filosofi (2017-2021)."""
-    con = _open_ro()
-    try:
-        rows = con.execute("SELECT DISTINCT annee FROM economie_filosofi ORDER BY annee").fetchall()
-        return [int(r[0]) for r in rows]
-    finally:
-        con.close()
-
-
 @st.cache_data
 def get_indicateurs() -> dict[str, str]:
-    """Dictionnaire code → libellé des 6 indicateurs disponibles."""
+    """Dictionnaire code → libellé des 8 indicateurs disponibles."""
     return {
         "taux_pauvrete": "Taux de pauvreté (%)",
         "niveau_vie_median": "Niveau de vie médian (€)",
@@ -74,6 +71,8 @@ def get_indicateurs() -> dict[str, str]:
         "part_ouvriers_employes": "Part ouvriers + employés (%)",
         "part_emploi_industriel": "Part emploi industriel (%)",
         "part_logements_sociaux": "Part logements sociaux (%)",
+        "nb_foyers_rsa": "Allocataires RSA (foyers)",
+        "apl_medecins": "Accessibilité médecins (APL)",
     }
 
 
@@ -81,30 +80,49 @@ def get_indicateurs() -> dict[str, str]:
 def get_scores_commune(annee: int, indicateur: str) -> pl.DataFrame:
     """Valeur d'un indicateur par commune HdF pour une année.
 
+    Filosofi/RP : jointure sur v_economie_commune (secret INSEE géré).
+    nb_foyers_rsa, apl_medecins : jointure sur economie_social (secret=FALSE).
     Retourne code_commune, nom_commune, valeur, secret, geojson.
-    La colonne geojson vient de geometry_simplified_communal (déjà simplifiée en DB).
     """
     if indicateur not in _INDICATEURS_VALIDES:
         raise ValueError(f"Indicateur inconnu : {indicateur}")
 
     con = _open_ro()
     try:
-        rows = con.execute(  # noqa: S608
-            f"""
-            SELECT
-                gc.code_insee                                   AS code_commune,
-                gc.nom                                          AS nom_commune,
-                v.{indicateur}                                  AS valeur,
-                COALESCE(v.secret_partiel, FALSE)               AS secret,
-                ST_AsGeoJSON(gc.geometry_simplified_communal)   AS geojson
-            FROM geographies_communes gc
-            LEFT JOIN v_economie_commune v
-                ON gc.code_insee = v.code_commune AND v.annee = ?
-            WHERE gc.code_region = '32'
-            ORDER BY gc.nom
-            """,
-            [annee],
-        ).fetchall()
+        if indicateur in _INDICATEURS_SOCIAL:
+            rows = con.execute(  # noqa: S608
+                f"""
+                SELECT
+                    gc.code_insee                                   AS code_commune,
+                    gc.nom                                          AS nom_commune,
+                    s.{indicateur}                                  AS valeur,
+                    FALSE                                           AS secret,
+                    ST_AsGeoJSON(gc.geometry_simplified_communal)   AS geojson
+                FROM geographies_communes gc
+                LEFT JOIN economie_social s
+                    ON gc.code_insee = s.code_commune AND s.annee = ?
+                WHERE gc.code_region = '32'
+                ORDER BY gc.nom
+                """,
+                [annee],
+            ).fetchall()
+        else:
+            rows = con.execute(  # noqa: S608
+                f"""
+                SELECT
+                    gc.code_insee                                   AS code_commune,
+                    gc.nom                                          AS nom_commune,
+                    v.{indicateur}                                  AS valeur,
+                    COALESCE(v.secret_partiel, FALSE)               AS secret,
+                    ST_AsGeoJSON(gc.geometry_simplified_communal)   AS geojson
+                FROM geographies_communes gc
+                LEFT JOIN v_economie_commune v
+                    ON gc.code_insee = v.code_commune AND v.annee = ?
+                WHERE gc.code_region = '32'
+                ORDER BY gc.nom
+                """,
+                [annee],
+            ).fetchall()
     finally:
         con.close()
 
@@ -289,36 +307,173 @@ def get_evolution_hdf() -> pl.DataFrame:
 
 
 @st.cache_data(ttl=3600)
-def get_stats_hdf(annee: int, indicateur: str) -> dict:
-    """Statistiques (min/max/moy/médiane) d'un indicateur HdF pour une année.
-
-    Utile pour calibrer les seuils de la choroplèthe.
-    """
-    if indicateur not in _INDICATEURS_VALIDES:
-        raise ValueError(f"Indicateur inconnu : {indicateur}")
-
+def get_annees_par_indicateur() -> dict[str, list[int]]:
+    """Années disponibles par indicateur (selon la table source)."""
     con = _open_ro()
     try:
-        row = con.execute(  # noqa: S608
-            f"""
-            SELECT
-                MIN({indicateur})    AS vmin,
-                MAX({indicateur})    AS vmax,
-                AVG({indicateur})    AS vmoy,
-                MEDIAN({indicateur}) AS vmed
-            FROM v_economie_commune
-            WHERE annee = ? AND {indicateur} IS NOT NULL
-            """,
-            [annee],
-        ).fetchone()
+
+        def _a(sql: str) -> list[int]:
+            return [int(r[0]) for r in con.execute(sql).fetchall()]
+
+        f = _a("SELECT DISTINCT annee FROM economie_filosofi ORDER BY annee")
+        r = _a("SELECT DISTINCT annee_millesime FROM economie_rp ORDER BY annee_millesime")
+        rsa = _a(
+            "SELECT DISTINCT annee FROM economie_social WHERE nb_foyers_rsa IS NOT NULL ORDER BY annee"
+        )
+        apl = _a(
+            "SELECT DISTINCT annee FROM economie_social WHERE apl_medecins IS NOT NULL ORDER BY annee"
+        )
     finally:
         con.close()
-
-    if not row or row[0] is None:
-        return {"min": None, "max": None, "moy": None, "med": None}
     return {
-        "min": float(row[0]),
-        "max": float(row[1]),
-        "moy": float(row[2]),
-        "med": float(row[3]),
+        "taux_pauvrete": f,
+        "niveau_vie_median": f,
+        "tx_chomage_dec": r,
+        "part_ouvriers_employes": r,
+        "part_emploi_industriel": r,
+        "part_logements_sociaux": r,
+        "nb_foyers_rsa": rsa,
+        "apl_medecins": apl,
     }
+
+
+@st.cache_data(ttl=3600)
+def get_evolution_rsa_hdf() -> pl.DataFrame:
+    """Évolution du total foyers RSA en HdF par année (CNAF 2020-2024)."""
+    con = _open_ro()
+    try:
+        rows = con.execute(
+            "SELECT annee, SUM(nb_foyers_rsa) AS total_foyers_rsa_hdf "
+            "FROM economie_social WHERE nb_foyers_rsa IS NOT NULL "
+            "GROUP BY annee ORDER BY annee"
+        ).fetchall()
+    finally:
+        con.close()
+    if not rows:
+        return pl.DataFrame(schema={"annee": pl.Int64, "total_foyers_rsa_hdf": pl.Int64})
+    return pl.DataFrame(
+        {
+            "annee": [int(r[0]) for r in rows],
+            "total_foyers_rsa_hdf": [int(r[1]) if r[1] is not None else None for r in rows],
+        }
+    )
+
+
+@st.cache_data(ttl=3600)
+def get_deserts_medicaux() -> pl.DataFrame:
+    """Communes HdF avec desert_medical=TRUE, APL et geojson."""
+    con = _open_ro()
+    try:
+        rows = con.execute(
+            "SELECT s.code_commune, gc.nom AS nom_commune, s.apl_medecins, "
+            "ST_AsGeoJSON(gc.geometry_simplified_communal) AS geojson "
+            "FROM economie_social s "
+            "LEFT JOIN geographies_communes gc ON gc.code_insee = s.code_commune "
+            "WHERE s.desert_medical = TRUE ORDER BY s.apl_medecins ASC"
+        ).fetchall()
+    finally:
+        con.close()
+    if not rows:
+        return pl.DataFrame(
+            schema={
+                "code_commune": pl.Utf8,
+                "nom_commune": pl.Utf8,
+                "apl_medecins": pl.Float64,
+                "geojson": pl.Utf8,
+            }
+        )
+    return pl.DataFrame(
+        {
+            "code_commune": [r[0] for r in rows],
+            "nom_commune": [r[1] for r in rows],
+            "apl_medecins": [float(r[2]) if r[2] is not None else None for r in rows],
+            "geojson": [r[3] for r in rows],
+        }
+    )
+
+
+@st.cache_data(ttl=3600, show_spinner="Chargement données industrie…")
+def get_desindustrialisation_commune(code_commune: str | None = None) -> pl.DataFrame:
+    """Effectifs salariés industrie HdF par année.
+
+    code_commune=None : agrégé HdF (SUM). Sinon : filtré sur une commune.
+    Filtre : secteur_gs LIKE '%Industrie%'.
+    """
+    con = _open_ro()
+    try:
+        if code_commune is not None:
+            rows = con.execute(
+                "SELECT annee, SUM(nb_salaries) AS nb_salaries, "
+                "SUM(nb_etablissements) AS nb_etablissements "
+                "FROM economie_emploi_urssaf "
+                "WHERE secteur_gs LIKE '%Industrie%' AND code_commune = ? "
+                "GROUP BY annee ORDER BY annee",
+                [code_commune],
+            ).fetchall()
+        else:
+            rows = con.execute(
+                "SELECT annee, SUM(nb_salaries) AS nb_salaries, "
+                "SUM(nb_etablissements) AS nb_etablissements "
+                "FROM economie_emploi_urssaf "
+                "WHERE secteur_gs LIKE '%Industrie%' "
+                "GROUP BY annee ORDER BY annee"
+            ).fetchall()
+    finally:
+        con.close()
+    if not rows:
+        return pl.DataFrame(
+            schema={"annee": pl.Int64, "nb_salaries": pl.Int64, "nb_etablissements": pl.Int64}
+        )
+    return pl.DataFrame(
+        {
+            "annee": [int(r[0]) for r in rows],
+            "nb_salaries": [int(r[1]) if r[1] is not None else None for r in rows],
+            "nb_etablissements": [int(r[2]) if r[2] is not None else None for r in rows],
+        }
+    )
+
+
+@st.cache_data(ttl=3600)
+def get_top_communes_rsa(annee: int, n: int = 20) -> pl.DataFrame:
+    """Top N communes HdF par nombre de foyers RSA pour une année."""
+    con = _open_ro()
+    try:
+        rows = con.execute(
+            "SELECT s.code_commune, COALESCE(gc.nom, s.code_commune) AS nom_commune, "
+            "s.nb_foyers_rsa "
+            "FROM economie_social s "
+            "LEFT JOIN geographies_communes gc ON gc.code_insee = s.code_commune "
+            "WHERE s.annee = ? AND s.nb_foyers_rsa IS NOT NULL "
+            "ORDER BY s.nb_foyers_rsa DESC LIMIT ?",
+            [annee, n],
+        ).fetchall()
+    finally:
+        con.close()
+    if not rows:
+        return pl.DataFrame(
+            schema={"code_commune": pl.Utf8, "nom_commune": pl.Utf8, "nb_foyers_rsa": pl.Int64}
+        )
+    return pl.DataFrame(
+        {
+            "code_commune": [r[0] for r in rows],
+            "nom_commune": [r[1] for r in rows],
+            "nb_foyers_rsa": [int(r[2]) if r[2] is not None else None for r in rows],
+        }
+    )
+
+
+@st.cache_data(ttl=3600)
+def get_communes_industrie_hdf() -> list[tuple[str, str]]:
+    """Communes HdF ayant des données emploi industriel (code, nom)."""
+    con = _open_ro()
+    try:
+        rows = con.execute(
+            "SELECT DISTINCT u.code_commune, COALESCE(gc.nom, u.code_commune) "
+            "FROM economie_emploi_urssaf u "
+            "LEFT JOIN geographies_communes gc ON gc.code_insee = u.code_commune "
+            "WHERE u.secteur_gs LIKE '%Industrie%' AND u.nb_salaries > 0 "
+            "ORDER BY 2"
+        ).fetchall()
+    finally:
+        con.close()
+    return [(r[0], r[1]) for r in rows] if rows else []
