@@ -241,3 +241,76 @@ def test_vue_desindustrialisation(con_urssaf):
     assert has_variation, (
         "Toutes les communes ont variation_pct NULL dans v_desindustrialisation_commune"
     )
+
+
+# ── Tests Phase E++ (Eurostat contexte macro) ─────────────────────────────────
+# Nécessitent : uv run python scripts/load_economie.py --source eurostat
+
+
+@pytest.fixture(scope="module")
+def con_contexte(con) -> duckdb.DuckDBPyConnection:
+    """Fixture : passe si economie_contexte existe et contient des données Eurostat."""
+    table_exists = con.execute(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'economie_contexte'"
+    ).fetchone()[0]
+    if not table_exists:
+        pytest.skip(
+            "Table economie_contexte absente — relancer load_economie.py pour créer le schéma."
+        )
+    n = con.execute("SELECT COUNT(*) FROM economie_contexte").fetchone()[0]
+    if n == 0:
+        pytest.skip(
+            "Données Eurostat non chargées. "
+            "Lancer : uv run python scripts/load_economie.py --source eurostat"
+        )
+    return con
+
+
+def test_contexte_chomage_loaded(con_contexte):
+    """economie_contexte contient tx_chomage_bit pour FRE et FR."""
+    rows = con_contexte.execute(
+        "SELECT code_geo FROM economie_contexte "
+        "WHERE indicateur = 'tx_chomage_bit' GROUP BY code_geo"
+    ).fetchall()
+    geos = {r[0] for r in rows}
+    assert "FRE" in geos, "FRE absent de economie_contexte (tx_chomage_bit)"
+    assert "FR" in geos, "FR absent de economie_contexte (tx_chomage_bit)"
+    # HdF structurellement plus élevé que la moyenne nationale
+    row = con_contexte.execute(
+        "SELECT SUM(CASE WHEN code_geo='FRE' THEN valeur END) > "
+        "       SUM(CASE WHEN code_geo='FR'  THEN valeur END) "
+        "FROM economie_contexte WHERE indicateur = 'tx_chomage_bit'"
+    ).fetchone()
+    assert row[0], "tx_chomage_bit HdF (FRE) ≤ France sur l'ensemble des années — inattendu"
+
+
+def test_contexte_pib_loaded(con_contexte):
+    """economie_contexte contient pib_eur_hab pour FRE et FR."""
+    rows = con_contexte.execute(
+        "SELECT code_geo FROM economie_contexte WHERE indicateur = 'pib_eur_hab' GROUP BY code_geo"
+    ).fetchall()
+    geos = {r[0] for r in rows}
+    assert "FRE" in geos, "FRE absent de economie_contexte (pib_eur_hab)"
+    assert "FR" in geos, "FR absent de economie_contexte (pib_eur_hab)"
+    # HdF structurellement plus faible que la moyenne nationale
+    row = con_contexte.execute(
+        "SELECT SUM(CASE WHEN code_geo='FRE' THEN valeur END) < "
+        "       SUM(CASE WHEN code_geo='FR'  THEN valeur END) "
+        "FROM economie_contexte WHERE indicateur = 'pib_eur_hab'"
+    ).fetchone()
+    assert row[0], "pib_eur_hab HdF (FRE) ≥ France sur l'ensemble des années — inattendu"
+
+
+def test_vue_contexte_hdf_france(con_contexte):
+    """v_contexte_hdf_vs_france retourne des lignes avec écart HdF > 0 pour le chômage."""
+    rows = con_contexte.execute(
+        "SELECT annee, valeur_hdf, valeur_france, ecart_hdf_france "
+        "FROM v_contexte_hdf_vs_france "
+        "WHERE indicateur = 'tx_chomage_bit' AND ecart_hdf_france IS NOT NULL "
+        "ORDER BY annee"
+    ).fetchall()
+    assert len(rows) > 0, "v_contexte_hdf_vs_france vide pour tx_chomage_bit"
+    positifs = sum(1 for _, vh, vf, ecart in rows if ecart > 0)
+    assert positifs > 0, (
+        "ecart_hdf_france toujours ≤ 0 pour tx_chomage_bit — HdF devrait être > France"
+    )

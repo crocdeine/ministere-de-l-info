@@ -3,22 +3,24 @@
 Fonctions exportées
 -------------------
 - create_economie_schema(con)  : CREATE TABLE IF NOT EXISTS, idempotent
-- create_economie_views(con)   : CREATE OR REPLACE VIEW × 5
+- create_economie_views(con)   : CREATE OR REPLACE VIEW × 6
 
-Tables (4)
+Tables (5)
 ----------
 - economie_filosofi       : INSEE Filosofi (revenus/pauvreté), millésimes 2017-2021
 - economie_rp             : INSEE RP actifs-emploi (chômage, CSP, industrie), 2015-2021
 - economie_social         : CNAF RSA + DREES APL par commune/an
 - economie_emploi_urssaf  : URSSAF effectifs salariés privés par commune × APE × an
+- economie_contexte       : Eurostat macro HdF vs France (chômage BIT + PIB/hab)
 
-Vues (5)
+Vues (6)
 --------
-- v_economie_commune           : jointure Filosofi + RP
-- v_croisement_eco_elections   : économie × présidentielles T2
-- v_evolution_economie_hdf     : agrégats HdF par année
-- v_economie_sociale_commune   : economie_social + nom commune
-- v_desindustrialisation_commune: variation emploi industriel entre 1ère et dernière année URSSAF
+- v_economie_commune             : jointure Filosofi + RP
+- v_croisement_eco_elections     : économie × présidentielles T2
+- v_evolution_economie_hdf       : agrégats HdF par année
+- v_economie_sociale_commune     : economie_social + nom commune
+- v_desindustrialisation_commune : variation emploi industriel entre 1ère et dernière année URSSAF
+- v_contexte_hdf_vs_france       : pivot HdF vs France par indicateur/année
 
 Filtre géographique
 -------------------
@@ -36,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_economie_schema(con: duckdb.DuckDBPyConnection) -> None:
-    """Crée les 4 tables économiques. Idempotent (CREATE TABLE IF NOT EXISTS)."""
+    """Crée les 5 tables économiques. Idempotent (CREATE TABLE IF NOT EXISTS)."""
     con.execute("""
         CREATE TABLE IF NOT EXISTS economie_filosofi (
             code_commune      VARCHAR(5) NOT NULL,
@@ -94,11 +96,24 @@ def create_economie_schema(con: duckdb.DuckDBPyConnection) -> None:
         )
     """)
     logger.debug("Table economie_emploi_urssaf créée (ou existante).")
-    logger.info("Schéma économie créé (4 tables).")
+
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS economie_contexte (
+            code_geo    VARCHAR(10) NOT NULL,
+            type_geo    VARCHAR(5)  NOT NULL,
+            annee       INTEGER     NOT NULL,
+            indicateur  VARCHAR(50) NOT NULL,
+            valeur      DOUBLE,
+            source      VARCHAR(50),
+            PRIMARY KEY (code_geo, annee, indicateur)
+        )
+    """)
+    logger.debug("Table economie_contexte créée (ou existante).")
+    logger.info("Schéma économie créé (5 tables).")
 
 
 def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
-    """Crée les 5 vues du module Économie.
+    """Crée les 6 vues du module Économie.
 
     Dépendances :
     - v_economie_commune             : economie_filosofi + economie_rp
@@ -106,6 +121,7 @@ def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
     - v_evolution_economie_hdf       : economie_filosofi + economie_rp agrégés HdF
     - v_economie_sociale_commune     : economie_social + geographies_communes
     - v_desindustrialisation_commune : economie_emploi_urssaf (industrie, min→max annee)
+    - v_contexte_hdf_vs_france       : economie_contexte pivot HdF vs FR
     """
     con.execute("""
         CREATE OR REPLACE VIEW v_economie_commune AS
@@ -226,4 +242,19 @@ def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
         LEFT JOIN geographies_communes gc ON gc.code_insee = b.code_commune
     """)
     logger.debug("Vue v_desindustrialisation_commune créée.")
-    logger.info("Vues économie créées (5 vues).")
+
+    con.execute("""
+        CREATE OR REPLACE VIEW v_contexte_hdf_vs_france AS
+        SELECT
+            annee,
+            indicateur,
+            MAX(CASE WHEN code_geo = 'FRE' THEN valeur END) AS valeur_hdf,
+            MAX(CASE WHEN code_geo = 'FR'  THEN valeur END) AS valeur_france,
+            MAX(CASE WHEN code_geo = 'FRE' THEN valeur END) -
+            MAX(CASE WHEN code_geo = 'FR'  THEN valeur END) AS ecart_hdf_france
+        FROM economie_contexte
+        GROUP BY annee, indicateur
+        ORDER BY indicateur, annee
+    """)
+    logger.debug("Vue v_contexte_hdf_vs_france créée.")
+    logger.info("Vues économie créées (6 vues).")

@@ -1,4 +1,4 @@
-"""Chargement des données économiques pour HdF (INSEE + CNAF + URSSAF + DREES).
+"""Chargement des données économiques pour HdF (INSEE + CNAF + URSSAF + DREES + Eurostat).
 
 Usage :
     uv run python scripts/load_economie.py
@@ -7,16 +7,19 @@ Usage :
     uv run python scripts/load_economie.py --source cnaf
     uv run python scripts/load_economie.py --source urssaf
     uv run python scripts/load_economie.py --source drees
-    uv run python scripts/load_economie.py --source social   # cnaf + drees
-    uv run python scripts/load_economie.py --force           # re-télécharger les caches
+    uv run python scripts/load_economie.py --source social     # cnaf + drees
+    uv run python scripts/load_economie.py --source eurostat   # chômage BIT + PIB Eurostat
+    uv run python scripts/load_economie.py --source contexte   # alias eurostat
+    uv run python scripts/load_economie.py --force             # re-télécharger les caches
     uv run python scripts/load_economie.py --millesimes 2020,2021
 
 Sources et tables DuckDB :
-  filosofi  → economie_filosofi (Filosofi HdF 2017-2021, cache ~40 Mo)
-  rp        → economie_rp       (RP emploi/CSP HdF 2015-2021, cache partagé)
-  cnaf      → economie_social   (RSA par commune 2020-2024, download ~?? Mo)
-  urssaf    → economie_emploi_urssaf (effectifs salariés privé par APE 2006-2025, ~100-200 Mo)
-  drees     → economie_social   (APL médecins généralistes dernier millésime disponible)
+  filosofi  → economie_filosofi     (Filosofi HdF 2017-2021, cache ~40 Mo)
+  rp        → economie_rp           (RP emploi/CSP HdF 2015-2021, cache partagé)
+  cnaf      → economie_social       (RSA par commune 2020-2024)
+  urssaf    → economie_emploi_urssaf (effectifs salariés privé par APE 2006-2025)
+  drees     → economie_social       (APL médecins généralistes dernier millésime)
+  eurostat  → economie_contexte     (tx_chomage_bit + pib_eur_hab, FRE vs FR 2000-2024)
 
 Ordre recommandé pour un premier chargement :
     all = filosofi + rp + cnaf + urssaf + drees (dans cet ordre)
@@ -40,6 +43,10 @@ import duckdb  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.etl.loaders.economie_cnaf import load_economie_cnaf  # noqa: E402
 from ministere_de_l_info.etl.loaders.economie_drees import load_economie_drees  # noqa: E402
+from ministere_de_l_info.etl.loaders.economie_eurostat import (  # noqa: E402
+    load_economie_chomage_eurostat,
+    load_economie_pib_eurostat,
+)
 from ministere_de_l_info.etl.loaders.economie_filosofi import load_economie_filosofi  # noqa: E402
 from ministere_de_l_info.etl.loaders.economie_rp import load_economie_rp  # noqa: E402
 from ministere_de_l_info.etl.loaders.economie_urssaf import load_economie_urssaf  # noqa: E402
@@ -212,11 +219,22 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--source",
-        choices=["filosofi", "rp", "cnaf", "urssaf", "drees", "social", "all"],
+        choices=[
+            "filosofi",
+            "rp",
+            "cnaf",
+            "urssaf",
+            "drees",
+            "social",
+            "eurostat",
+            "contexte",
+            "all",
+        ],
         default="all",
         help=(
             "Source à charger : filosofi | rp | cnaf | urssaf | drees | "
-            "social (cnaf+drees) | all (défaut : all)"
+            "social (cnaf+drees) | eurostat (chômage BIT + PIB) | contexte (alias eurostat) | "
+            "all (défaut : all, hors eurostat)"
         ),
     )
     parser.add_argument(
@@ -268,6 +286,12 @@ def main() -> None:
         if args.source in ("drees", "social", "all"):
             logger.info("=== Chargement DREES APL ===")
             load_economie_drees(con, _RAW_DIR, force=args.force)
+
+        if args.source in ("eurostat", "contexte"):
+            logger.info("=== Chargement Eurostat chômage BIT ===")
+            load_economie_chomage_eurostat(con, _RAW_DIR, force=args.force)
+            logger.info("=== Chargement Eurostat PIB/hab ===")
+            load_economie_pib_eurostat(con, _RAW_DIR, force=args.force)
 
         _print_summary(con)
         print("\nChargement économie terminé.")
