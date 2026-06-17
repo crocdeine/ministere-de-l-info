@@ -1,4 +1,4 @@
-"""Loader Eurostat SDMX — indicateurs macro HdF vs France.
+r"""Loader Eurostat SDMX — indicateurs macro HdF vs France.
 
 Sources :
   lfst_r_lfu3rt : taux de chômage BIT par région NUTS (1999-2025)
