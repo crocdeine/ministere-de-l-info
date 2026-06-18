@@ -42,9 +42,9 @@ Leçon D3.3 : run 27265331430 watché au lieu du vrai run du commit 7f21346 — 
 | 📍 Géographie | ✅ Terminé | v0.2 | Régions, dpts, EPCI, communes, arrondissements, circos. Population 2013/2018/2023. |
 | 🗳️ Élections | ✅ Phase D complète (pres+legi+muni 2002-2026) | v0.4-elections-complet | Présidentielles 2002-2022, Législatives 2002-2024, Municipales 2008-2026, HdF. Drill-down BV. 30 scrutins, 11 vues SQL, 216 mappings nuances, méthodologie tracée (ADR-0005). |
 | 🚀 Déploiement | ✅ v0.4.3 (Mac/OrbStack, testé) | — | install.sh validé sur macOS 26.4.1. Image sur ghcr.io. DB sur GitHub Release. TODO : update.sh test réel, page Paramètres UI. |
-| 📊 Économie | ✅ Phase E+ complète | — | Sources : Filosofi + RP + logements sociaux + CNAF RSA + DREES APL + URSSAF. 7 indicateurs Phase E, Phase E+ : CNAF RSA + DREES APL + URSSAF (1.15M lignes 2006-2025). 943 déserts médicaux HdF détectés. UI Streamlit : carte choroplèthe + évolution HdF + croisement économie×élections. 348 tests, 75.34% coverage. ETL : load_economie.py (cache HdF 40Mo). UI Phase E+ : onglet Désindustrialisation (URSSAF 2006-2025), RSA et APL dans carte + évolution, déserts médicaux carte binaire. |
+| 📊 Économie | ✅ Phase E++ complète | — | Sources : Filosofi + RP + logements sociaux + CNAF RSA + DREES APL + URSSAF + Eurostat. 7 indicateurs Phase E, Phase E+ : CNAF RSA + DREES APL + URSSAF (1.15M lignes 2006-2025). 943 déserts médicaux HdF détectés. Phase E++ : economie_contexte (Eurostat chômage BIT 1999-2025 + PIB/hab 2000-2024, HdF vs France). UI Streamlit : carte choroplèthe + évolution HdF + croisement économie×élections. 348 tests, 75.34% coverage. ETL : load_economie.py (cache HdF 40Mo). UI Phase E+ : onglet Désindustrialisation (URSSAF 2006-2025), RSA et APL dans carte + évolution, déserts médicaux carte binaire. UI Phase E++ : Tab 2 section Eurostat. |
 
-**Dernier rapport** : `reports/session-2026-06-14_phase-eplus.md` — Phase E+ close : CNAF RSA + DREES APL + URSSAF chargés, 943 déserts médicaux HdF détectés
+**Dernier rapport** : `reports/session-2026-06-17_phase-eplus-plus.md` — Phase E++ close : Eurostat HdF vs France (chômage BIT + PIB/hab), UI Tab 2 section contexte macro
 
 ---
 
