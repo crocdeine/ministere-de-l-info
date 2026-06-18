@@ -21,6 +21,7 @@ from streamlit_folium import st_folium
 from ministere_de_l_info.viz.economie_queries import (
     get_annees_par_indicateur,
     get_communes_industrie_hdf,
+    get_contexte_hdf_vs_france,
     get_croisement_eco_elections,
     get_desindustrialisation_commune,
     get_economie_commune,
@@ -28,6 +29,7 @@ from ministere_de_l_info.viz.economie_queries import (
     get_evolution_rsa_hdf,
     get_indicateurs,
     get_scores_commune,
+    is_contexte_loaded,
     is_data_loaded,
 )
 
@@ -249,16 +251,95 @@ def _render_carte_tab() -> None:
                 st.plotly_chart(fig, use_container_width=True)
 
 
+def _render_contexte_section() -> None:
+    """Contexte macro HdF vs France — données Eurostat."""
+    if not is_contexte_loaded():
+        st.info(
+            "Données contexte non chargées. "
+            "Lancer : `uv run python scripts/load_economie.py --source eurostat`"
+        )
+        return
+
+    indic_ctx: str = st.selectbox(  # type: ignore[assignment]
+        "Indicateur",
+        ["tx_chomage_bit", "pib_eur_hab"],
+        format_func=lambda k: {
+            "tx_chomage_bit": "Taux de chômage BIT (%)",
+            "pib_eur_hab": "PIB par habitant (€)",
+        }[k],
+        key="eco_ctx_indic",
+    )
+    df_ctx = get_contexte_hdf_vs_france(indic_ctx)
+    if df_ctx.is_empty():
+        st.warning("Aucune donnée disponible.")
+        return
+
+    df_long = (
+        df_ctx.select(
+            [
+                pl.col("annee"),
+                pl.col("valeur_hdf").alias("Hauts-de-France"),
+                pl.col("valeur_france").alias("France"),
+            ]
+        )
+        .unpivot(index="annee", variable_name="territoire", value_name="valeur")
+        .drop_nulls("valeur")
+    )
+
+    libelle = {
+        "tx_chomage_bit": "Taux de chômage BIT (%)",
+        "pib_eur_hab": "PIB par habitant (€)",
+    }[indic_ctx]
+
+    fig = px.line(
+        df_long.to_pandas(),
+        x="annee",
+        y="valeur",
+        color="territoire",
+        color_discrete_map={
+            "Hauts-de-France": "#E63946",
+            "France": "#457B9D",
+        },
+        markers=True,
+        title=f"{libelle} — Hauts-de-France vs France (2000-2025)",
+        labels={"annee": "Année", "valeur": libelle, "territoire": "Territoire"},
+    )
+    fig.update_layout(hovermode="x unified")
+    st.plotly_chart(fig, use_container_width=True)
+
+    last = df_ctx.filter(pl.col("ecart_hdf_france").is_not_null()).sort("annee").tail(1)
+    if not last.is_empty():
+        ecart = last["ecart_hdf_france"][0]
+        annee_last = last["annee"][0]
+        label_ecart = "pts de %" if indic_ctx == "tx_chomage_bit" else "€"
+        delta_color = "inverse" if indic_ctx == "pib_eur_hab" else "normal"
+        st.metric(
+            f"Écart HdF - France ({annee_last})",
+            f"{ecart:+.1f} {label_ecart}",
+            delta_color=delta_color,
+        )
+
+    st.caption("Source : Eurostat — lfst_r_lfu3rt / nama_10r_2gdp")
+
+
 def _render_evolution_tab() -> None:
-    """Onglet Évolution HdF — Filosofi/RP 2017-2021 ou RSA CNAF 2020-2024."""
+    """Onglet Évolution HdF — Filosofi/RP 2017-2021, RSA CNAF 2020-2024 ou Eurostat."""
     mode: str = st.radio(  # type: ignore[assignment]
-        "Série",
-        ["Filosofi / RP (2017-2021)", "RSA allocataires (2020-2024)"],
+        "Données à afficher",
+        [
+            "Revenus & emploi (INSEE 2017-2021)",
+            "Allocataires RSA (CNAF 2020-2024)",
+            "Contexte HdF vs France (Eurostat)",
+        ],
         horizontal=True,
         key="eco_evol_mode",
     )
 
-    if mode.startswith("RSA"):
+    if mode.startswith("Contexte"):
+        _render_contexte_section()
+        return
+
+    if mode.startswith("Allocataires"):
         rsa_df = get_evolution_rsa_hdf()
         if rsa_df.is_empty():
             st.info("Données RSA non chargées. Lancez : `load_economie.py --source cnaf`")

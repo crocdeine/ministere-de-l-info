@@ -1,8 +1,9 @@
-"""Requêtes DuckDB cachées pour la page Économie (Phase E3 + E+).
+"""Requêtes DuckDB cachées pour la page Économie (Phase E3 + E+ + E++).
 
 Fonctions exportées
 -------------------
 - is_data_loaded()              : True si les 2 tables économiques contiennent des données
+- is_contexte_loaded()          : True si economie_contexte contient des données
 - get_annees_par_indicateur()   : dict indicateur → années disponibles (toutes sources)
 - get_indicateurs()             : dict code → libellé des 8 indicateurs
 - get_scores_commune()          : indicateur × commune HdF pour une année
@@ -10,6 +11,7 @@ Fonctions exportées
 - get_croisement_eco_elections(): croisement économie × présidentielles T2
 - get_evolution_hdf()           : évolution agrégée HdF (3 indicateurs Filosofi/RP)
 - get_evolution_rsa_hdf()       : évolution total foyers RSA HdF (CNAF 2020-2024)
+- get_contexte_hdf_vs_france()  : HdF vs France par indicateur macro (Eurostat)
 - get_deserts_medicaux()        : communes HdF desert_medical=TRUE + geojson
 - get_desindustrialisation_commune() : effectifs industrie HdF ou par commune 2006-2025
 - get_top_communes_rsa()        : top N communes par foyers RSA pour une année
@@ -41,6 +43,8 @@ _INDICATEURS_VALIDES = frozenset(
 )
 # Indicateurs provenant de economie_social (Phase E+) — routage alternatif
 _INDICATEURS_SOCIAL = frozenset({"nb_foyers_rsa", "apl_medecins"})
+# Indicateurs macro contexte (Phase E++) — economie_contexte / Eurostat
+_INDICATEURS_CONTEXTE = frozenset({"tx_chomage_bit", "pib_eur_hab"})
 
 
 def _open_ro() -> duckdb.DuckDBPyConnection:
@@ -59,6 +63,53 @@ def is_data_loaded() -> bool:
         return int(n_f) > 0 and int(n_r) > 0
     finally:
         con.close()
+
+
+@st.cache_data(ttl=60)
+def is_contexte_loaded() -> bool:
+    """Vérifie que economie_contexte contient des données."""
+    con = _open_ro()
+    try:
+        n = con.execute("SELECT COUNT(*) FROM economie_contexte").fetchone()[0]
+        return int(n) > 0
+    finally:
+        con.close()
+
+
+@st.cache_data(ttl=3600)
+def get_contexte_hdf_vs_france(indicateur: str) -> pl.DataFrame:
+    """Valeurs HdF et France pour un indicateur macro (v_contexte_hdf_vs_france)."""
+    if indicateur not in _INDICATEURS_CONTEXTE:
+        raise ValueError(f"Indicateur contexte inconnu : {indicateur}")
+    con = _open_ro()
+    try:
+        rows = con.execute(
+            "SELECT annee, valeur_hdf, valeur_france, ecart_hdf_france "
+            "FROM v_contexte_hdf_vs_france "
+            "WHERE indicateur = ? "
+            "AND NOT (valeur_hdf IS NULL AND valeur_france IS NULL) "
+            "ORDER BY annee ASC",
+            [indicateur],
+        ).fetchall()
+    finally:
+        con.close()
+    if not rows:
+        return pl.DataFrame(
+            schema={
+                "annee": pl.Int64,
+                "valeur_hdf": pl.Float64,
+                "valeur_france": pl.Float64,
+                "ecart_hdf_france": pl.Float64,
+            }
+        )
+    return pl.DataFrame(
+        {
+            "annee": [int(r[0]) for r in rows],
+            "valeur_hdf": [float(r[1]) if r[1] is not None else None for r in rows],
+            "valeur_france": [float(r[2]) if r[2] is not None else None for r in rows],
+            "ecart_hdf_france": [float(r[3]) if r[3] is not None else None for r in rows],
+        }
+    )
 
 
 @st.cache_data
