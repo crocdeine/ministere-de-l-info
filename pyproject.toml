@@ -68,6 +68,7 @@ omit = [
     "*/etl/loaders/*",
     "*/etl/schema.py",
     "*/etl/schema_economie.py",
+    "*/etl/schema_legislatif.py",
     "*/etl/views.py",
     "*/etl/_common.py",
     # Pages Streamlit et modules de requêtes DB-dépendants :
