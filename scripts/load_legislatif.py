@@ -1,23 +1,23 @@
-"""Chargement des données législatives HdF (Sénat + AN).
+"""Chargement des données législatives (Sénat national + AN national via Datan).
 
 Usage :
     uv run python scripts/load_legislatif.py
     uv run python scripts/load_legislatif.py --source senat
-    uv run python scripts/load_legislatif.py --source nosdeputes
-    uv run python scripts/load_legislatif.py --source clair
-    uv run python scripts/load_legislatif.py --source clair --legislature 16
+    uv run python scripts/load_legislatif.py --source datan
+    uv run python scripts/load_legislatif.py --source overrides
     uv run python scripts/load_legislatif.py --force
 
 Sources et tables DuckDB :
-  senat       → leg_elus (chambre=SENAT, via ODSEN_GENERAL.csv)
-  nosdeputes  → leg_elus + leg_activite (chambre=AN, 16e législature)
-  clair       → leg_elus (chambre=AN, 17e législature par défaut)
-  all         → senat + nosdeputes + overrides (CLAIR non inclus par défaut)
-
-ATTENTION : le loader CLAIR est instable (erreurs 500 fréquentes).
-Ne pas inclure dans 'all' avant validation manuelle.
+  senat     → leg_elus (chambre=SENAT, France entière, ODSEN_GENERAL.csv)
+  datan     → leg_elus + leg_activite (chambre=AN, législatures 12-17, national)
+  overrides → leg_blocs_override (corrections manuelles de blocs)
+  all       → senat + datan + overrides
 
 Idempotent : chaque loader fait DELETE+INSERT par source.
+
+Sources dépréciées (non incluses dans 'all') :
+  nosdeputes : figé depuis juin 2024, endpoint /synthese renvoie {}
+  clair      : API hors service (HTTP 500 sur tous endpoints)
 """
 
 from __future__ import annotations
@@ -31,12 +31,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
-from ministere_de_l_info.etl.loaders.legislatif_clair import (  # noqa: E402
-    load_legislatif_deputes_clair,
-)
-from ministere_de_l_info.etl.loaders.legislatif_nosdeputes import (  # noqa: E402
-    load_legislatif_nosdeputes,
-)
+from ministere_de_l_info.etl.loaders.legislatif_datan import load_legislatif_datan  # noqa: E402
 from ministere_de_l_info.etl.loaders.legislatif_overrides import load_overrides  # noqa: E402
 from ministere_de_l_info.etl.loaders.legislatif_senat import load_legislatif_senat  # noqa: E402
 from ministere_de_l_info.etl.schema_legislatif import (  # noqa: E402
@@ -70,18 +65,12 @@ def _print_summary(con) -> None:  # type: ignore[no-untyped-def]
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Chargement données législatives HdF")
+    parser = argparse.ArgumentParser(description="Chargement données législatives")
     parser.add_argument(
         "--source",
-        choices=["senat", "nosdeputes", "clair", "overrides", "all"],
-        default="senat",
-        help="Source à charger (défaut : senat)",
-    )
-    parser.add_argument(
-        "--legislature",
-        type=int,
-        default=17,
-        help="Numéro de législature pour CLAIR (défaut : 17)",
+        choices=["senat", "datan", "overrides", "all"],
+        default="all",
+        help="Source à charger (défaut : all)",
     )
     parser.add_argument(
         "--force",
@@ -101,25 +90,16 @@ def main() -> None:
         create_legislatif_views(con)
 
         if args.source in ("senat", "all"):
-            logger.info("=== Chargement Sénat (ODSEN_GENERAL.csv) ===")
+            logger.info("=== Chargement Sénat (ODSEN_GENERAL.csv, France entière) ===")
             load_legislatif_senat(con, _RAW_DIR, force=args.force)
 
-        if args.source in ("nosdeputes", "all"):
-            logger.info("=== Chargement NosDéputés (16e législature) ===")
-            load_legislatif_nosdeputes(con, _RAW_DIR, force=args.force)
+        if args.source in ("datan", "all"):
+            logger.info("=== Chargement Datan (AN, législatures 12-17, national) ===")
+            load_legislatif_datan(con, _RAW_DIR, force=args.force)
 
         if args.source in ("overrides", "all"):
             logger.info("=== Application des overrides blocs ===")
             load_overrides(con)
-
-        if args.source == "clair":
-            logger.info(
-                "=== Chargement API CLAIR (législature %d) — INSTABLE ===",
-                args.legislature,
-            )
-            load_legislatif_deputes_clair(
-                con, _RAW_DIR, legislature=args.legislature, force=args.force
-            )
 
         _print_summary(con)
         print("\nChargement législatif terminé.")

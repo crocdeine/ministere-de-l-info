@@ -1,4 +1,8 @@
-"""Loader NosDéputés.fr — profils + métriques 16e législature HdF.
+"""DÉPRÉCIÉ — NosDéputés.fr figé depuis juin 2024, endpoint /synthese renvoie {}.
+Remplacé par legislatif_datan.py (Datan/data.gouv.fr, national, législatures 12-17).
+Conservé pour référence. Ne PAS inclure dans load_legislatif.py --source all.
+
+Loader NosDéputés.fr — profils + métriques 16e législature HdF.
 
 Source   : https://www.nosdeputes.fr/deputes/json (liste)
            https://www.nosdeputes.fr/<slug>/json (profil)

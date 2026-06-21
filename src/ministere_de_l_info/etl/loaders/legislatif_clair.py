@@ -1,4 +1,8 @@
-"""Loader API CLAIR — députés HdF (17e législature).
+"""DÉPRÉCIÉ — API CLAIR hors service (HTTP 500 "Connection is closed." sur tous endpoints).
+Remplacé par legislatif_datan.py (Datan/data.gouv.fr, national, législatures 12-17).
+Conservé pour référence. Ne PAS inclure dans load_legislatif.py --source all.
+
+Loader API CLAIR — députés HdF (17e législature).
 
 Source   : https://api.clair.vote/api/v1/deputes?legislature=17
 Format   : JSON paginé, limite=20/page (ne PAS augmenter — API instable)
