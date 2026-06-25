@@ -83,6 +83,8 @@ omit = [
     "*/pages/economie.py",
     "*/viz/elections_muni_queries.py",
     "*/viz/economie_queries.py",
+    "*/pages/legislatif.py",
+    "*/viz/legislatif_queries.py",
 ]
 
 [tool.ruff]

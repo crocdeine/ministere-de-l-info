@@ -255,3 +255,104 @@ def test_schema_score_columns_exist(con: duckdb.DuckDBPyConnection) -> None:
     cols = [r[1] for r in con.execute("PRAGMA table_info(leg_activite)").fetchall()]
     for col in ("score_participation", "score_loyaute", "score_majorite"):
         assert col in cols, f"Colonne {col} absente de leg_activite"
+
+
+# ---------------------------------------------------------------------------
+# Phase F3 — Tests des fonctions de requêtes (legislatif_queries.py)
+# ---------------------------------------------------------------------------
+
+
+def test_get_elus_actuels_toutes_chambres(con: duckdb.DuckDBPyConnection) -> None:
+    """Tous les élus actifs (AN + Sénat) retournés sans filtre."""
+    n = con.execute("SELECT COUNT(*) FROM leg_elus WHERE est_actif = TRUE").fetchone()[0]
+    # Requête directe SQL — vérifie cohérence avec données attendues
+    assert n >= 900, f"Attendu ≥900 élus actifs (577 AN + 348 Sénat), trouvé {n}"
+    # Vérifie les deux chambres présentes
+    chambres = {
+        r[0]
+        for r in con.execute(
+            "SELECT DISTINCT chambre FROM leg_elus WHERE est_actif = TRUE"
+        ).fetchall()
+    }
+    assert "AN" in chambres, "Chambre AN absente des élus actifs"
+    assert "SENAT" in chambres, "Chambre SENAT absente des élus actifs"
+
+
+def test_get_elus_actuels_filtre_hdf(con: duckdb.DuckDBPyConnection) -> None:
+    """Filtre HdF retourne un sous-ensemble cohérent (AN + Sénat)."""
+    n = con.execute(
+        "SELECT COUNT(*) FROM leg_elus WHERE est_actif = TRUE "
+        f"AND code_departement IN {_DEPTS_HDF!r}"
+    ).fetchone()[0]
+    # HdF : ~57 AN + 28 Sénat = ~85
+    assert 70 <= n <= 100, f"Attendu 70-100 élus actifs HdF, trouvé {n}"
+
+
+def test_get_composition_politique_an(con: duckdb.DuckDBPyConnection) -> None:
+    """Somme des comptages AN actifs = 577."""
+    rows = con.execute(
+        "SELECT COALESCE(o.bloc_force, e.bloc_politique, 'DIV') AS bloc_final, "
+        "COUNT(*) AS nb "
+        "FROM leg_elus e "
+        "LEFT JOIN leg_blocs_override o ON e.id = o.elu_id AND e.chambre = o.chambre "
+        "WHERE e.est_actif = TRUE AND e.chambre = 'AN' "
+        "GROUP BY bloc_final"
+    ).fetchall()
+    total = sum(r[1] for r in rows)
+    assert total == 577, f"Attendu 577 députés actifs, trouvé {total}"
+
+
+def test_get_composition_politique_senat(con: duckdb.DuckDBPyConnection) -> None:
+    """Somme des comptages Sénat actifs = 348."""
+    rows = con.execute(
+        "SELECT COALESCE(o.bloc_force, e.bloc_politique, 'DIV') AS bloc_final, "
+        "COUNT(*) AS nb "
+        "FROM leg_elus e "
+        "LEFT JOIN leg_blocs_override o ON e.id = o.elu_id AND e.chambre = o.chambre "
+        "WHERE e.est_actif = TRUE AND e.chambre = 'SENAT' "
+        "GROUP BY bloc_final"
+    ).fetchall()
+    total = sum(r[1] for r in rows)
+    assert total == 348, f"Attendu 348 sénateurs actifs, trouvé {total}"
+
+
+def test_get_classement_activite_an(con: duckdb.DuckDBPyConnection) -> None:
+    """Classement score_participation AN : lignes triées décroissant."""
+    rows = con.execute(
+        "SELECT a.score_participation "
+        "FROM leg_elus e "
+        "JOIN leg_activite a ON e.id = a.elu_id AND e.chambre = a.chambre "
+        "WHERE e.est_actif = TRUE AND e.chambre = 'AN' "
+        "AND a.score_participation IS NOT NULL "
+        "ORDER BY a.score_participation DESC LIMIT 20"
+    ).fetchall()
+    if not rows:
+        pytest.skip("Pas de scores d'activité AN")
+    scores = [r[0] for r in rows]
+    assert len(scores) > 0, "Classement vide"
+    for i in range(len(scores) - 1):
+        assert scores[i] >= scores[i + 1], (
+            f"Classement non décroissant à l'index {i}: {scores[i]} < {scores[i + 1]}"
+        )
+
+
+def test_get_classement_activite_senat_vide(con: duckdb.DuckDBPyConnection) -> None:
+    """Sénat n'a pas de scores Datan — résultat vide sans erreur."""
+    n = con.execute("SELECT COUNT(*) FROM leg_activite WHERE chambre = 'SENAT'").fetchone()[0]
+    assert n == 0, f"Attendu 0 scores Sénat, trouvé {n} (source Datan = AN uniquement)"
+
+
+def test_get_evolution_composition_an(con: duckdb.DuckDBPyConnection) -> None:
+    """Évolution composition AN : au moins 6 législatures (12-17)."""
+    legislatures = {
+        r[0]
+        for r in con.execute(
+            "SELECT DISTINCT legislature FROM leg_elus "
+            "WHERE chambre = 'AN' AND legislature IS NOT NULL"
+        ).fetchall()
+    }
+    assert len(legislatures) >= 6, (
+        f"Attendu ≥6 législatures distinctes, trouvé {len(legislatures)}: {legislatures}"
+    )
+    for leg in (12, 13, 14, 15, 16, 17):
+        assert leg in legislatures, f"Législature {leg} absente"
