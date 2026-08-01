@@ -9,9 +9,11 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._theme import inject_css
 from ministere_de_l_info.viz.maps import make_choropleth
 
 st.set_page_config(page_title="Géographie", page_icon="📍", layout="wide")
+inject_css()
 st.title("📍 Géographie territoriale")
 
 _DB_PATH = Path(__file__).parent.parent / "data" / "ministere.duckdb"

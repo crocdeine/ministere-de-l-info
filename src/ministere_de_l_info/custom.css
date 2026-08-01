@@ -1,0 +1,530 @@
+/* ================================================================
+   Ministère de l'Info — design system, fusionné pour Streamlit
+   ------------------------------------------------------------
+   Source : Design System Claude Design (ZIP fourni le 2026-07-30).
+   Fusionne les 7 fichiers de tokens (tokens/*.css) + les défauts
+   d'éléments (base.css) en un seul fichier, injecté via
+   st.markdown(..., unsafe_allow_html=True) par _theme.inject_css().
+
+   Le fichier tokens/fonts.css d'origine contient un @import Google
+   Fonts. Un @import CSS chargé par injection dynamique (st.markdown)
+   ne déclenche pas toujours le chargement au bon moment côté
+   navigateur. Le chargement des polices est donc fait séparément
+   via une balise <link> HTML, ajoutée par inject_css() — voir
+   _theme.py. Ne pas réintroduire l'@import ici.
+
+   Ne pas éditer les fichiers sources (design-system/tokens/*.css) :
+   ce fichier est un artefact généré/maintenu à la main à partir
+   d'eux. Toute évolution du design system doit être répercutée ici.
+   ================================================================ */
+
+/* ================================================================
+   1. TOKENS — variables CSS (:root)
+   ================================================================ */
+
+/* ---- tokens/colors.css ------------------------------------------------ */
+
+:root {
+  /* Republic base */
+  --blanc: #ffffff;
+  --bleu-france: #000091; /* official Bleu France */
+  --rouge-marianne: #e1000f; /* official Rouge Marianne */
+
+  /* Bleu France ramp (primary) */
+  --blue-900: #00006b;
+  --blue-800: #000091; /* = bleu-france */
+  --blue-700: #1212ff; /* hover */
+  --blue-600: #2323ff; /* active */
+  --blue-400: #6a6af4;
+  --blue-200: #cacafb;
+  --blue-100: #e3e3fd; /* light surface */
+  --blue-50: #f0f0fe;
+
+  /* Rouge Marianne ramp */
+  --red-800: #b81b22;
+  --red-700: #e1000f; /* = rouge-marianne */
+  --red-600: #f24c54;
+  --red-200: #fcc6c9;
+  --red-100: #fddede;
+  --red-50: #fef4f4;
+
+  /* Neutral ramp (cool administrative grey) */
+  --grey-1000: #161616; /* ink — primary text */
+  --grey-900: #242424;
+  --grey-800: #3a3a3a;
+  --grey-700: #595959; /* secondary text */
+  --grey-600: #757575;
+  --grey-500: #929292; /* muted / disabled text */
+  --grey-400: #bdbdbd;
+  --grey-300: #dddddd; /* borders */
+  --grey-200: #e5e5e5; /* dividers */
+  --grey-150: #ededed;
+  --grey-100: #f0f0f0; /* subtle fill */
+  --grey-50: #f7f7f7; /* page background */
+  --grey-25: #fbfbfb;
+
+  /* Semantic feedback */
+  --success-700: #18753c;
+  --success-100: #b8fec9;
+  --success-50: #dffee6;
+
+  --warning-700: #b34000;
+  --warning-100: #ffe9c2;
+  --warning-50: #fff4e6;
+
+  --error-700: #ce0500;
+  --error-100: #ffe9e9;
+  --error-50: #fff4f4;
+
+  --info-700: #0063cb;
+  --info-100: #e8edff;
+  --info-50: #f4f6ff;
+
+  /* Semantic aliases */
+  --text-strong: var(--grey-1000);
+  --text-body: var(--grey-900);
+  --text-secondary: var(--grey-700);
+  --text-muted: var(--grey-500);
+  --text-on-accent: var(--blanc);
+  --text-link: var(--bleu-france);
+  --text-link-hover: var(--blue-700);
+
+  --surface-page: var(--grey-50);
+  --surface-card: var(--blanc);
+  --surface-raised: var(--blanc);
+  --surface-sunken: var(--grey-100);
+  --surface-inverse: var(--grey-1000);
+  --surface-accent: var(--bleu-france);
+  --surface-accent-soft: var(--blue-100);
+
+  --border-default: var(--grey-300);
+  --border-strong: var(--grey-400);
+  --border-subtle: var(--grey-200);
+  --border-accent: var(--bleu-france);
+  --border-focus: var(--blue-700);
+
+  --action: var(--bleu-france);
+  --action-hover: var(--blue-700);
+  --action-active: var(--blue-600);
+  --action-soft: var(--blue-100);
+  --action-soft-hover: var(--blue-200);
+
+  --focus-ring: 0 0 0 2px var(--blanc), 0 0 0 4px var(--blue-600);
+}
+
+/* ---- tokens/typography.css --------------------------------------------- */
+
+:root {
+  --font-display: "Spectral", Georgia, "Times New Roman", serif;
+  --font-sans: "Hanken Grotesk", "Marianne", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+
+  /* Type scale (1.200 minor third, 16px base) */
+  --text-2xs: 0.6875rem; /* 11px — overlines, table meta */
+  --text-xs: 0.75rem; /* 12px — captions, légendes */
+  --text-sm: 0.875rem; /* 14px — secondary, dense UI */
+  --text-base: 1rem; /* 16px — body */
+  --text-md: 1.125rem; /* 18px — lead body */
+  --text-lg: 1.375rem; /* 22px — H4 / card titles */
+  --text-xl: 1.75rem; /* 28px — H3 */
+  --text-2xl: 2.25rem; /* 36px — H2 / page titles */
+  --text-3xl: 2.9375rem; /* 47px — H1 */
+  --text-4xl: 3.75rem; /* 60px — display / hero */
+  --text-5xl: 4.75rem; /* 76px — big editorial numbers */
+
+  --leading-tight: 1.1;
+  --leading-snug: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-overline: 0.12em;
+
+  /* Rôles sémantiques */
+  --type-hero-family: var(--font-display);
+  --type-hero-size: var(--text-4xl);
+  --type-hero-weight: var(--fw-semibold);
+  --type-hero-leading: var(--leading-tight);
+  --type-hero-tracking: var(--tracking-tight);
+
+  --type-h1-family: var(--font-display);
+  --type-h1-size: var(--text-3xl);
+  --type-h1-weight: var(--fw-semibold);
+
+  --type-h2-family: var(--font-display);
+  --type-h2-size: var(--text-2xl);
+  --type-h2-weight: var(--fw-medium);
+
+  --type-h3-family: var(--font-sans);
+  --type-h3-size: var(--text-xl);
+  --type-h3-weight: var(--fw-bold);
+
+  --type-h4-family: var(--font-sans);
+  --type-h4-size: var(--text-lg);
+  --type-h4-weight: var(--fw-semibold);
+
+  --type-overline-family: var(--font-sans);
+  --type-overline-size: var(--text-2xs);
+  --type-overline-weight: var(--fw-semibold);
+  --type-overline-tracking: var(--tracking-overline);
+
+  --type-body-family: var(--font-sans);
+  --type-body-size: var(--text-base);
+  --type-body-weight: var(--fw-regular);
+  --type-body-leading: var(--leading-relaxed);
+
+  --type-caption-family: var(--font-sans);
+  --type-caption-size: var(--text-xs);
+
+  --type-data-family: var(--font-mono);
+}
+
+/* ---- tokens/spacing.css -------------------------------------------------- */
+
+:root {
+  --space-0: 0;
+  --space-1: 0.25rem; /* 4 */
+  --space-2: 0.5rem; /* 8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-5: 1.25rem; /* 20 */
+  --space-6: 1.5rem; /* 24 */
+  --space-8: 2rem; /* 32 */
+  --space-10: 2.5rem; /* 40 */
+  --space-12: 3rem; /* 48 */
+  --space-16: 4rem; /* 64 */
+  --space-20: 5rem; /* 80 */
+  --space-24: 6rem; /* 96 */
+
+  --gap-inline: var(--space-2);
+  --gap-control: var(--space-3);
+  --gap-card: var(--space-6);
+  --gap-section: var(--space-12);
+
+  --pad-control-y: 0.5rem;
+  --pad-control-x: 0.875rem;
+  --pad-card: var(--space-6);
+  --pad-page: var(--space-8);
+
+  --sidebar-width: 244px;
+  --content-max: 1180px;
+  --container-max: 1320px;
+
+  --control-h-sm: 32px;
+  --control-h-md: 40px;
+  --control-h-lg: 48px;
+}
+
+/* ---- tokens/elevation.css ------------------------------------------------ */
+
+:root {
+  --radius-0: 0;
+  --radius-sm: 4px;
+  --radius-md: 6px; /* default — contrôles, tags */
+  --radius-lg: 10px; /* cards, panneaux */
+  --radius-xl: 16px; /* grandes surfaces, modales */
+  --radius-pill: 999px;
+
+  --border-w: 1px;
+  --border-w-strong: 2px;
+  --border-accent-w: 3px; /* barre d'accent gauche/haut */
+
+  --shadow-none: none;
+  --shadow-xs: 0 1px 2px rgba(22, 22, 22, 0.06);
+  --shadow-sm: 0 1px 3px rgba(22, 22, 22, 0.08), 0 1px 2px rgba(22, 22, 22, 0.04);
+  --shadow-md: 0 4px 12px rgba(22, 22, 22, 0.08), 0 1px 3px rgba(22, 22, 22, 0.05);
+  --shadow-lg: 0 12px 28px rgba(22, 22, 22, 0.12), 0 2px 6px rgba(22, 22, 22, 0.06);
+  --shadow-overlay: 0 16px 40px rgba(22, 22, 22, 0.18);
+
+  --shadow-tile: inset 0 -1px 0 0 var(--grey-200);
+}
+
+/* ---- tokens/motion.css ---------------------------------------------------- */
+
+:root {
+  --duration-instant: 80ms;
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 360ms;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+
+  --transition-colors: color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+  --transition-base: all var(--duration-base) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-instant: 0ms;
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+
+/* ---- tokens/data-viz.css --------------------------------------------------- */
+
+:root {
+  /* Nuances politiques (gauche → droite) */
+  --nuance-exg: #8b0000; /* Extrême gauche */
+  --nuance-gau: #e84c61; /* Gauche */
+  --nuance-div: #9e9e9e; /* Divers / non classé */
+  --nuance-cent: #f5b800; /* Centre */
+  --nuance-dte: #3b7dd8; /* Droite */
+  --nuance-exd: #1f3864; /* Extrême droite */
+
+  /* Choroplèthe population (YlOrRd, 5 classes) */
+  --choro-pop-1: #ffffb2; /* faible */
+  --choro-pop-2: #fecc5c;
+  --choro-pop-3: #fd8d3c;
+  --choro-pop-4: #f03b20;
+  --choro-pop-5: #bd0026; /* forte */
+
+  /* Choroplèthe évolution (RdYlGn, divergente) */
+  --choro-evo-1: #d73027; /* forte baisse */
+  --choro-evo-2: #fc8d59;
+  --choro-evo-3: #ffffbf; /* stable */
+  --choro-evo-4: #91cf60;
+  --choro-evo-5: #1a9850; /* forte hausse */
+
+  /* Carte */
+  --map-contour-fill: #f7f7f7; /* niveaux sans données */
+  --map-contour-stroke: #000091; /* contours bleu France */
+  --map-tile-bg: #fafafa; /* fond de tuile CartoDB positron */
+  --map-stroke-on-fill: #ffffff; /* séparateur entre polygones */
+  --map-secret-fill: #cccccc; /* secret statistique INSEE */
+}
+
+/* ================================================================
+   2. DÉFAUTS D'ÉLÉMENTS — tokens/base.css
+   ================================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+code,
+kbd,
+samp {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--blue-100);
+  color: var(--bleu-france);
+}
+
+/* figures tabulaires pour les données chiffrées (codes INSEE, tableaux) */
+.mdi-tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================
+   3. COUCHE D'APPLICATION STREAMLIT
+   ------------------------------------------------------------
+   Sélecteurs `data-testid`, cf. reports/research-streamlit-css-
+   selectors.md (Streamlit 1.57.0). On évite volontairement les
+   classes `.st-emotion-cache-*` (générées dynamiquement, non
+   pérennes). Limitations connues : le contenu de st.dataframe est
+   dessiné en <canvas> (glide-data-grid) et n'est pas stylable en
+   CSS ; les composants encapsulés en <iframe> (streamlit-folium)
+   ne reçoivent pas ce CSS.
+   ================================================================ */
+
+/* ---- Fond de page & typographie globale --------------------------- */
+
+[data-testid="stAppViewContainer"] {
+  background: var(--surface-page);
+  font-family: var(--font-sans);
+  color: var(--text-body);
+}
+
+[data-testid="stMain"] {
+  background: var(--surface-page);
+}
+
+/* ---- Sidebar / navigation ------------------------------------------ */
+
+[data-testid="stSidebar"] {
+  background: var(--surface-card);
+  border-right: var(--border-w) solid var(--border-subtle);
+}
+
+[data-testid="stSidebarNavLink"] {
+  color: var(--text-body) !important;
+  border-radius: var(--radius-md);
+  transition: var(--transition-colors);
+}
+
+/* Streamlit rend le libellé dans un noeud enfant (span/p) qui porte
+   parfois sa propre couleur ; on force l'héritage pour éviter un
+   texte illisible (ex. blanc sur blanc en thème clair). */
+[data-testid="stSidebarNavLink"] span,
+[data-testid="stSidebarNavLink"] p {
+  color: inherit !important;
+}
+
+[data-testid="stSidebarNavLink"][aria-current="page"] {
+  background: var(--action-soft);
+  color: var(--action) !important;
+  border-left: var(--border-accent-w) solid var(--bleu-france);
+}
+
+/* ---- Titres ---------------------------------------------------------- */
+
+[data-testid="stHeading"] h1 {
+  font-family: var(--type-h1-family);
+  font-size: var(--type-h1-size);
+  font-weight: var(--type-h1-weight);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-strong);
+}
+
+[data-testid="stHeading"] h2 {
+  font-family: var(--type-h2-family);
+  font-size: var(--type-h2-size);
+  font-weight: var(--type-h2-weight);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-strong);
+}
+
+[data-testid="stHeading"] h3 {
+  font-family: var(--type-h3-family);
+  font-size: var(--type-h3-size);
+  font-weight: var(--type-h3-weight);
+  line-height: var(--leading-snug);
+  color: var(--text-strong);
+}
+
+/* ---- Métriques (st.metric) ------------------------------------------- */
+
+[data-testid="stMetric"] {
+  background: var(--surface-card);
+  border: var(--border-w) solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-testid="stMetricValue"] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+
+[data-testid="stMetricLabel"] {
+  font-family: var(--type-overline-family);
+  font-size: var(--type-overline-size);
+  font-weight: var(--type-overline-weight);
+  letter-spacing: var(--type-overline-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+[data-testid="stMetricDelta"] {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+/* ---- Boutons & contrôles ------------------------------------------------- */
+
+[data-testid="stButton"] button {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-medium);
+  background: var(--action);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-md);
+  transition: var(--transition-colors);
+}
+
+[data-testid="stButton"] button:hover {
+  background: var(--action-hover);
+}
+
+[data-testid="stButton"] button:active {
+  background: var(--action-active);
+}
+
+[data-testid="stSelectbox"],
+[data-testid="stRadio"] {
+  font-family: var(--font-sans);
+}
+
+/* ---- Onglets (st.tabs) --------------------------------------------------- */
+
+[data-testid="stTabs"] [data-testid="stTab"] {
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  transition: var(--transition-colors);
+}
+
+[data-testid="stTabs"] [data-testid="stTab"][aria-selected="true"] {
+  color: var(--action);
+  border-bottom: var(--border-accent-w) solid var(--bleu-france);
+}
+
+/* ---- Dataframe (cadre uniquement — cellules en <canvas>, non stylables) -- */
+
+[data-testid="stDataFrame"] {
+  border: var(--border-w) solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+/* ---- Expander ------------------------------------------------------------ */
+
+[data-testid="stExpander"] {
+  border: var(--border-w) solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+/* ---- Callouts (st.info / warning / success / error) ----------------------- */
+
+[data-testid="stAlertContentInfo"] {
+  background: var(--info-50);
+  color: var(--info-700);
+}
+
+[data-testid="stAlertContentWarning"] {
+  background: var(--warning-50);
+  color: var(--warning-700);
+}
+
+[data-testid="stAlertContentSuccess"] {
+  background: var(--success-50);
+  color: var(--success-700);
+}
+
+[data-testid="stAlertContentError"] {
+  background: var(--error-50);
+  color: var(--error-700);
+}
+
+[data-testid="stAlert"] {
+  border-radius: var(--radius-md);
+}

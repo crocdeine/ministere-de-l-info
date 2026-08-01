@@ -6,6 +6,7 @@ import duckdb
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._theme import inject_css
 from ministere_de_l_info.logging_config import configure_logging
 
 configure_logging()
@@ -15,6 +16,8 @@ st.set_page_config(
     page_icon="🇫🇷",
     layout="wide",
 )
+
+inject_css()
 
 st.title("🇫🇷 ministère de l'info")
 st.caption("Application de data-visualisation politique, électorale et territoriale française")
