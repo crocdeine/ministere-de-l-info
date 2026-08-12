@@ -12,6 +12,7 @@ import plotly.express as px
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._theme import render_page_header
 from ministere_de_l_info.viz.legislatif_queries import (
     get_activite_par_bloc,
     get_classement_activite,
@@ -350,7 +351,11 @@ def render() -> None:
         st.code("uv run python scripts/load_legislatif.py")
         return
 
-    st.header("🏛️ Législatif — Assemblée nationale & Sénat")
+    render_page_header(
+        icon="account_balance",
+        title="Législatif",
+        subtitle="Assemblée nationale & Sénat",
+    )
 
     col_chambre, col_dept = st.columns(2)
     with col_chambre:

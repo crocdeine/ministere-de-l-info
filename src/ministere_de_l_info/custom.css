@@ -427,6 +427,13 @@ samp {
   border-radius: var(--radius-lg);
   padding: var(--space-4);
   box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+[data-testid="stMetric"]:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
 }
 
 [data-testid="stMetricValue"] {
@@ -459,7 +466,7 @@ samp {
   color: var(--text-on-accent);
   border: none;
   border-radius: var(--radius-md);
-  transition: var(--transition-colors);
+  transition: var(--transition-colors), transform var(--duration-instant) var(--ease-standard);
 }
 
 [data-testid="stButton"] button:hover {
@@ -468,6 +475,7 @@ samp {
 
 [data-testid="stButton"] button:active {
   background: var(--action-active);
+  transform: scale(0.97);
 }
 
 [data-testid="stSelectbox"],
@@ -527,4 +535,100 @@ samp {
 
 [data-testid="stAlert"] {
   border-radius: var(--radius-md);
+}
+
+/* ---- Cartes de synthèse (st.container(border=True)) ----------------------
+   Sélecteur vérifié par inspection DOM live (Streamlit 1.57.0) : le
+   conteneur réellement bordé est le `stVerticalBlock` enfant direct de
+   `stLayoutWrapper` — PAS `stVerticalBlockBorderWrapper` (ce testid
+   n'existe pas dans cette version, cf. reports/brainstorm-ui-ux-design-
+   system.md §5). Ne pas cibler `stVerticalBlock` seul : il est aussi
+   utilisé pour des blocs non bordés (colonnes, sections). */
+
+[data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] {
+  background: var(--surface-card);
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4);
+  transition: transform var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+[data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-accent);
+}
+
+/* ================================================================
+   4. ICÔNES — Material Symbols Outlined
+   ------------------------------------------------------------
+   Remplace les emojis dans les titres de page (cf. _theme.py::
+   render_page_header). Réglages de base recommandés par Google
+   Fonts pour ce type de police variable.
+   ================================================================ */
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  vertical-align: middle;
+}
+
+/* ---- En-tête de page (icône + H1 + sous-titre) — _theme.py::render_page_header */
+
+.mdi-page-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.mdi-page-header h1 {
+  margin: 0;
+}
+
+.mdi-page-icon {
+  font-size: 2.25rem;
+  color: var(--bleu-france);
+}
+
+.mdi-page-subtitle {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-4);
+}
+
+/* ================================================================
+   5. ANIMATIONS
+   ------------------------------------------------------------
+   Réutilise les tokens de durée/easing de tokens/motion.css.
+   Respecte prefers-reduced-motion (durées ramenées à 0ms par les
+   tokens eux-mêmes dans ce cas, cf. custom.css section 1).
+   ================================================================ */
+
+@keyframes mdi-fade-in-slide {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+[data-testid="stMainBlockContainer"] {
+  animation: mdi-fade-in-slide var(--duration-slow) var(--ease-out);
 }

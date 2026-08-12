@@ -9,12 +9,16 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info._theme import inject_css
+from ministere_de_l_info._theme import inject_css, render_page_header
 from ministere_de_l_info.viz.maps import make_choropleth
 
-st.set_page_config(page_title="Géographie", page_icon="📍", layout="wide")
+st.set_page_config(page_title="Géographie", page_icon=":material/map:", layout="wide")
 inject_css()
-st.title("📍 Géographie territoriale")
+render_page_header(
+    icon="map",
+    title="Géographie territoriale",
+    subtitle="Cartographie choroplèthe multi-niveaux et démographie INSEE.",
+)
 
 _DB_PATH = Path(__file__).parent.parent / "data" / "ministere.duckdb"
 

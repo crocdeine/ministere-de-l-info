@@ -18,6 +18,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._theme import render_page_header
 from ministere_de_l_info.viz.economie_queries import (
     get_annees_par_indicateur,
     get_communes_industrie_hdf,
@@ -559,7 +560,7 @@ def render() -> None:
         st.code("uv run python scripts/load_economie.py")
         return
 
-    st.header("📊 Économie — Hauts-de-France")
+    render_page_header(icon="bar_chart", title="Économie", subtitle="Hauts-de-France")
 
     tab_carte, tab_evolution, tab_croisement, tab_industrie = st.tabs(
         [

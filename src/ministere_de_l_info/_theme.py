@@ -6,10 +6,10 @@ du design system Ministère de l'Info (couleurs, typographie, spacing,
 qui les applique à l'UI (`data-testid="..."`, cf.
 `reports/research-streamlit-css-selectors.md`).
 
-Les polices Google Fonts (Spectral, Hanken Grotesk, IBM Plex Mono) sont
-chargées via une balise <link> HTML séparée : un `@import` CSS placé
-dans un bloc injecté dynamiquement par `st.markdown` ne garantit pas un
-chargement fiable côté navigateur.
+Les polices Google Fonts (Spectral, Hanken Grotesk, IBM Plex Mono,
+Material Symbols Outlined) sont chargées via une balise <link> HTML
+séparée : un `@import` CSS placé dans un bloc injecté dynamiquement par
+`st.markdown` ne garantit pas un chargement fiable côté navigateur.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ _GOOGLE_FONTS_URL = (
     "family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500"
     "&family=Hanken+Grotesk:wght@400;500;600;700;800"
     "&family=IBM+Plex+Mono:wght@400;500;600"
+    "&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..600,0..1,-25..0"
     "&display=swap"
 )
 
@@ -56,3 +57,24 @@ def inject_css() -> None:
         unsafe_allow_html=True,
     )
     st.markdown(f"<style>{_load_css()}</style>", unsafe_allow_html=True)
+
+
+def render_page_header(icon: str, title: str, subtitle: str | None = None) -> None:
+    """Affiche un titre de page cohérent (icône Material + H1 Spectral + sous-titre).
+
+    Remplace `st.title("🏷️ Titre")` : ni `st.title` ni `st.header` ne permettent
+    d'associer une icône vectorielle *et* un sous-titre avec le même contrôle de
+    mise en page. `icon` est un nom d'icône Material Symbols (ex. "account_balance"),
+    cf. https://fonts.google.com/icons.
+    """
+    subtitle_html = f'<p class="mdi-page-subtitle">{subtitle}</p>' if subtitle else ""
+    st.markdown(
+        f"""
+        <div class="mdi-page-header">
+          <span class="material-symbols-outlined mdi-page-icon" aria-hidden="true">{icon}</span>
+          <h1>{title}</h1>
+        </div>
+        {subtitle_html}
+        """,
+        unsafe_allow_html=True,
+    )

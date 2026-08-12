@@ -6,4 +6,9 @@ runOnSave = true
 headless = true
 
 [theme]
-base = "dark"
+base = "light"
+primaryColor = "#000091"
+backgroundColor = "#f7f7f7"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#242424"
+font = "sans serif"
