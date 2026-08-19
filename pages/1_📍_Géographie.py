@@ -9,11 +9,9 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info._theme import inject_css, render_page_header
+from ministere_de_l_info._theme import render_page_header
 from ministere_de_l_info.viz.maps import make_choropleth
 
-st.set_page_config(page_title="Géographie", page_icon=":material/map:", layout="wide")
-inject_css()
 render_page_header(
     icon="map",
     title="Géographie territoriale",

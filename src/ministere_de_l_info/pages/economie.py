@@ -18,6 +18,9 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._blocs_politiques import BLOCS_ORDERED as _BLOCS_ORDERED
+from ministere_de_l_info._blocs_politiques import COULEURS_BLOCS as _COULEURS_BLOCS
+from ministere_de_l_info._blocs_politiques import LIBELLES_BLOCS as _LIBELLES_BLOCS
 from ministere_de_l_info._theme import render_page_header
 from ministere_de_l_info.viz.economie_queries import (
     get_annees_par_indicateur,
@@ -36,23 +39,6 @@ from ministere_de_l_info.viz.economie_queries import (
 
 logger = logging.getLogger(__name__)
 
-_BLOCS_ORDERED = ["EXG", "GAU", "DIV", "CENT", "DTE", "EXD"]
-_COULEURS_BLOCS: dict[str, str] = {
-    "EXG": "#8B0000",
-    "GAU": "#DD0000",
-    "DIV": "#888888",
-    "CENT": "#FFEB00",
-    "DTE": "#0066CC",
-    "EXD": "#0D378A",
-}
-_LIBELLES_BLOCS: dict[str, str] = {
-    "EXG": "Extrême gauche",
-    "GAU": "Gauche",
-    "DIV": "Divers",
-    "CENT": "Centre",
-    "DTE": "Droite",
-    "EXD": "Extrême droite",
-}
 _ANNEES_PRES = [2002, 2007, 2012, 2017, 2022]
 _INDIC_EVOL: dict[str, str] = {
     "taux_pauvrete_moyen": "Taux de pauvreté moyen (%)",

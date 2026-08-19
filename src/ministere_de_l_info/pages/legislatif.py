@@ -12,6 +12,9 @@ import plotly.express as px
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._blocs_politiques import BLOCS_ORDERED as _BLOCS_ORDERED
+from ministere_de_l_info._blocs_politiques import COULEURS_BLOCS as _COULEURS_BLOCS
+from ministere_de_l_info._blocs_politiques import LIBELLES_BLOCS as _LIBELLES_BLOCS
 from ministere_de_l_info._theme import render_page_header
 from ministere_de_l_info.viz.legislatif_queries import (
     get_activite_par_bloc,
@@ -27,24 +30,6 @@ from ministere_de_l_info.viz.legislatif_queries import (
 logger = logging.getLogger(__name__)
 
 _DEPTS_HDF = ("02", "59", "60", "62", "80")
-
-_COULEURS_BLOCS: dict[str, str] = {
-    "EXG": "#8B0000",
-    "GAU": "#DD0000",
-    "DIV": "#888888",
-    "CENT": "#FFEB00",
-    "DTE": "#0066CC",
-    "EXD": "#0D378A",
-}
-_LIBELLES_BLOCS: dict[str, str] = {
-    "EXG": "Extrême gauche",
-    "GAU": "Gauche",
-    "DIV": "Divers",
-    "CENT": "Centre",
-    "DTE": "Droite",
-    "EXD": "Extrême droite",
-}
-_BLOCS_ORDERED = ["EXG", "GAU", "DIV", "CENT", "DTE", "EXD"]
 
 _CHAMBRE_MAP: dict[str, str | None] = {
     "Toutes": None,
@@ -357,16 +342,16 @@ def render() -> None:
         subtitle="Assemblée nationale & Sénat",
     )
 
-    col_chambre, col_dept = st.columns(2)
-    with col_chambre:
+    with st.sidebar:
+        st.header("Paramètres")
+
         chambre_label: str = st.selectbox(  # type: ignore[assignment]
             "Chambre",
             list(_CHAMBRE_MAP.keys()),
             key="leg_chambre",
         )
-    chambre = _CHAMBRE_MAP[chambre_label]
+        chambre = _CHAMBRE_MAP[chambre_label]
 
-    with col_dept:
         depts_df = get_departements_disponibles()
         dept_options = ["Tous (France)", "Hauts-de-France (région)"]
         if not depts_df.is_empty():

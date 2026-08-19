@@ -45,10 +45,10 @@ def _load_css() -> str:
 def inject_css() -> None:
     """Injecte les polices et le CSS du design system dans la page courante.
 
-    À appeler une fois, en tête de script, sur chaque page Streamlit qui
-    doit refléter le design system (Streamlit ré-exécute intégralement
-    chaque page lors de la navigation multipage : l'injection faite dans
-    `app.py` ne s'applique pas automatiquement aux fichiers `pages/*.py`).
+    Depuis la migration vers `st.navigation()` (app.py = routeur unique),
+    un seul appel dans `app.py`, avant `st.navigation(...).run()`, suffit :
+    ce code s'exécute à chaque interaction quelle que soit la page affichée.
+    Les fichiers `pages/*.py` n'ont plus besoin de l'appeler individuellement.
     """
     st.markdown(
         '<link rel="preconnect" href="https://fonts.googleapis.com">'

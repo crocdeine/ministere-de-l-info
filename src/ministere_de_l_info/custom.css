@@ -452,6 +452,17 @@ samp {
   color: var(--text-muted);
 }
 
+/* Libellés longs (ex. "Extrême gauche") sur métriques étroites (rangées de 6+
+   colonnes) : Streamlit tronque par défaut avec ellipsis sur le <p> interne
+   (stMarkdownContainer > p), pas sur le conteneur — cibler le <p> directement,
+   overflow/white-space ne s'héritent pas des ancêtres. Vérifié par inspection
+   DOM live (Streamlit 1.57). */
+[data-testid="stMetricLabel"] p {
+  overflow: visible !important;
+  white-space: normal !important;
+  text-overflow: unset !important;
+}
+
 [data-testid="stMetricDelta"] {
   font-family: var(--font-mono);
   font-size: var(--text-sm);
