@@ -199,3 +199,30 @@ ORDER BY f.annee;
 **Décision NOT NULL** : `code_commune` et `annee`/`annee_millesime` sont `NOT NULL`
 (clé primaire). Tous les indicateurs économiques acceptent `NULL` (secret statistique,
 données manquantes) — jamais de valeur sentinelle (0, -1) à la place d'un `NULL`.
+
+## Note d'exécution (2026-09-24)
+
+Section ajoutée a posteriori, sans modifier les décisions ci-dessus. Elle constate les
+écarts entre l'ADR et ce qui a été réalisé en Phase E (sources : code et
+`reports/session-2026-06-12_phase-e-cloture.md`).
+
+- **Source de données** : Filosofi et RP ne sont pas lus depuis des fichiers INSEE
+  séparés mais depuis un dataset unique au format long (OLAP) publié sur data.gouv.fr
+  (`67289477639527408ae687da`, « Recensement de la population communal et Filosofi
+  depuis 2015 », fichier `donnees-insee-olap.parquet`, 1,73 Go national), filtré HdF et
+  mis en cache local (`data/raw/economie/donnees-insee-olap-hdf.parquet`).
+- **`part_emploi_industriel`** : calculé à partir du RP
+  (`emplois_au_lieu_travail_industrie_c / emplois_au_lieu_travail_c`, emplois situés
+  dans la commune), et non à partir de Sirene. Sirene n'est pas utilisé. La série longue
+  de l'emploi industriel provient de l'URSSAF (voir ADR-0008).
+- **Millésimes réellement chargés** : Filosofi 2017-2021 (et non 2012-2022) ; RP
+  2015-2021 (et non 2006-2022). Volumes rapportés : 17 582 lignes `economie_filosofi`,
+  26 538 lignes `economie_rp`.
+- **Indicateurs** : 7 au lieu de 5 — ajout de `part_logements_sociaux` et
+  `nb_logements_sociaux` (RP logements, commit `63eede1`). Le niveau de diplôme n'est
+  pas chargé.
+- **`v_croisement_eco_elections`** : expose `voix` (et non `pct_exprimes`) ; la
+  jointure sur l'année n-1 ne trouve de données économiques que pour la présidentielle
+  2022 (Filosofi commence en 2017).
+- **Tables et vues supplémentaires** (CNAF, DREES, URSSAF, Eurostat) : documentées dans
+  l'ADR-0008.
