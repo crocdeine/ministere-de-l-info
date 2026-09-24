@@ -7,9 +7,11 @@ from pathlib import Path
 
 import duckdb
 
+from ministere_de_l_info.config import get_settings
+
 logger = logging.getLogger(__name__)
 
-_DB_PATH_DEFAULT = Path(__file__).resolve().parents[3] / "data" / "ministere.duckdb"
+_DB_PATH_DEFAULT = get_settings().db_path
 
 
 def open_connection(db_path: Path = _DB_PATH_DEFAULT) -> duckdb.DuckDBPyConnection:

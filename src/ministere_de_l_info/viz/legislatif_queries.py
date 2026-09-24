@@ -23,9 +23,11 @@ import duckdb
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info.config import get_settings
+
 logger = logging.getLogger(__name__)
 
-DB_PATH: Path = Path(__file__).resolve().parents[3] / "data" / "ministere.duckdb"
+DB_PATH: Path = get_settings().db_path
 
 _INDICATEURS_ACTIVITE_VALIDES = frozenset(
     {

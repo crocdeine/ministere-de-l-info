@@ -26,7 +26,9 @@ import duckdb
 import polars as pl
 import streamlit as st
 
-DB_PATH: Path = Path(__file__).resolve().parents[3] / "data" / "ministere.duckdb"
+from ministere_de_l_info.config import get_settings
+
+DB_PATH: Path = get_settings().db_path
 
 # Ensemble validé pour éviter les injections SQL dans les requêtes f-string
 _INDICATEURS_VALIDES = frozenset(
