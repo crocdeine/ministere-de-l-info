@@ -77,6 +77,9 @@ explicitement.
 uv run python scripts/etl_territoires.py --millesimes 2023 --yes
 
 # 2. Élections : schéma, puis les trois types de scrutin
+#    Prérequis : les deux Parquet du dataset « Données des élections agrégées »
+#    (data.gouv.fr) placés manuellement dans data/exploration/
+#    (general-results.parquet, candidats-results.parquet) — les scripts ne les téléchargent pas
 uv run python scripts/init_elections_schema.py
 uv run python scripts/load_elections_presidentielles.py
 uv run python scripts/load_elections_legislatives.py
