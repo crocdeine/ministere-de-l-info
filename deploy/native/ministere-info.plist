@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  MODÈLE de LaunchAgent pour l'exécution native de ministere-de-l-info.
+  Ne pas copier tel quel : deploy/native/install-native.sh remplace les
+  marqueurs @...@ et installe le résultat dans
+  ~/Library/LaunchAgents/com.crocdeine.ministere-info.native.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>@LABEL@</string>
+
+    <!-- Python de l'environnement uv du projet (dossier .venv créé par uv sync) :
+         pas de « uv run » au démarrage, donc aucune synchronisation ni accès réseau.
+         Attention : deux tirets consécutifs sont interdits dans un commentaire XML. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>@PYTHON@</string>
+        <string>-m</string>
+        <string>streamlit</string>
+        <string>run</string>
+        <string>app.py</string>
+        <string>--server.address</string>
+        <string>127.0.0.1</string>
+        <string>--server.port</string>
+        <string>@PORT@</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>@PROJECT_DIR@</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>@PATH@</string>
+        <!-- Base lue par l'application (voir src/ministere_de_l_info/config.py) -->
+        <key>MINISTERE_DB_PATH</key>
+        <string>@DB_PATH@</string>
+        <!-- Écoute locale uniquement : l'app n'est pas visible depuis le réseau -->
+        <key>STREAMLIT_SERVER_ADDRESS</key>
+        <string>127.0.0.1</string>
+        <key>STREAMLIT_SERVER_PORT</key>
+        <string>@PORT@</string>
+        <key>STREAMLIT_SERVER_HEADLESS</key>
+        <string>true</string>
+        <!-- App « de tous les jours » : pas de rechargement automatique sur
+             modification du code (.streamlit/config.toml l'active pour le dev) -->
+        <key>STREAMLIT_SERVER_RUN_ON_SAVE</key>
+        <string>false</string>
+        <key>STREAMLIT_SERVER_FILE_WATCHER_TYPE</key>
+        <string>none</string>
+        <key>STREAMLIT_BROWSER_GATHER_USAGE_STATS</key>
+        <string>false</string>
+        <key>LOG_LEVEL</key>
+        <string>INFO</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+
+    <!-- Démarre à l'ouverture de session et relance en cas d'arrêt inattendu -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <!-- Au moins 10 s entre deux relances (évite une boucle rapide en cas d'erreur) -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>@LOG_DIR@/app.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>@LOG_DIR@/app.err.log</string>
+</dict>
+</plist>

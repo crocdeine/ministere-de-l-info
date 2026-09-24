@@ -21,6 +21,7 @@ décision est révisée, un nouvel ADR est créé avec le statut "Remplace 000X"
 | [0009](0009-design-system-et-navigation.md) | Design system et navigation `st.navigation()` / `st.Page()` | Accepté (rédigé a posteriori le 2026-09-24) |
 | [0010](0010-revision-nuances-et-blocs.md) | Révision des classements nuances → blocs : grilles 2020/2023/2026, doctrine, reclassements | Accepté — révise 0005 |
 | [0011](0011-legislatif-groupes-par-legislature.md) | Législatif — classement des groupes par législature et modèle de mandats | Accepté (décision Mathias 2026-09-24) |
+| [0012](0012-execution-native-mac.md) | Exécution native sur le Mac mini (uv + LaunchAgent), Docker en repli | Accepté (décision Mathias 2026-09-24) |
 
 ## Format
 
