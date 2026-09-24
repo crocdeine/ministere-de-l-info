@@ -6,7 +6,10 @@ Fonctions exportées
 -------------------
 - create_elections_schema(con)        : CREATE TABLE IF NOT EXISTS × 6, idempotent
 - populate_elections_referentiels(con): remplit blocs_politiques, elections,
-  nuances_harmonisees et candidats_presidentielle ; idempotent (DELETE + INSERT)
+  nuances_harmonisees (pres + legi + muni) et candidats_presidentielle ;
+  idempotent (DELETE + INSERT)
+- populate_nuances_municipales(con)   : remplace les seules nuances municipales
+  (DELETE ciblé par année + INSERT), utilisé par load_elections_municipales.py
 
 Les tables de résultats (resultats_participation, resultats_candidats) sont créées
 vides ici ; le chargement des Parquet est fait en C2b (scripts/load_elections.py).
@@ -388,6 +391,141 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     ("VEC", 2024, "GAU", "Verts standalone (hors NFP) → GAU"),
 ]
 
+# ── Nuances municipales (2008 / 2014 / 2020 / 2026) ──────────────────────────
+# 67 entrées validées en phase D3.2 (ADR-0005), déplacées depuis
+# scripts/load_elections_municipales.py pour que le référentiel nuances_harmonisees
+# ait une source unique (correctif C2, audit 2026-09-24). Contenu inchangé.
+# Codes SANS mapping (non insérés, bloc NULL en vue) : NC (2014/2020), LMAJ (2008), LNC (2020)
+# Format : (nuance, annee, bloc, source_bloc)
+_NUANCES_MUNI: list[tuple[str, int, str, str]] = [
+    # ── 2008 — seuil 3 500 hab — 164 communes HdF nuancées ───────────────────
+    ("LAUT", 2008, "DIV", "Autre — liste inclassable (D3.2)"),
+    (
+        "LCMD",
+        2008,
+        "GAU",
+        "Communiste et Divers — analyse contextuelle, libellés Parquet NULL, "
+        "bassin minier HdF ; cohérence avec LDVG/LSOC (D3.2, LCMD→GAU validé)",
+    ),
+    ("LCOM", 2008, "EXG", "Communiste — PCF (D3.2)"),
+    ("LDVD", 2008, "DTE", "Divers Droite (D3.2)"),
+    ("LDVG", 2008, "GAU", "Divers Gauche (D3.2)"),
+    ("LEXG", 2008, "EXG", "Extrême gauche (D3.2)"),
+    ("LFN", 2008, "EXD", "Front National (D3.2)"),
+    ("LGC", 2008, "DIV", "Gauche-Centre local — 5 occurrences, trop peu pour classifier (D3.2)"),
+    ("LMC", 2008, "CENT", "Majorité-Centre — UDF sphère 2008 (D3.2)"),
+    ("LSOC", 2008, "GAU", "Socialiste (D3.2)"),
+    ("LUG", 2008, "GAU", "Union de la Gauche (D3.2)"),
+    ("LVEC", 2008, "GAU", "Verts / Écologistes (D3.2)"),
+    # LMAJ (543 occurrences) : non inséré — liste de la majorité sortante,
+    # indique le statut et non l'orientation idéologique (D3.2, Q1 validé)
+    # ── 2014 — seuil 1 000 hab — ~3 778 communes HdF nuancées ────────────────
+    ("LCOM", 2014, "EXG", "Communiste — PCF (D3.2)"),
+    ("LDIV", 2014, "DIV", "Divers (D3.2)"),
+    ("LDVD", 2014, "DTE", "Divers Droite (D3.2)"),
+    ("LDVG", 2014, "GAU", "Divers Gauche (D3.2)"),
+    ("LEXD", 2014, "EXD", "Extrême droite (D3.2)"),
+    ("LEXG", 2014, "EXG", "Extrême gauche (D3.2)"),
+    (
+        "LFG",
+        2014,
+        "GAU",
+        "Front de Gauche (PCF + Parti de Gauche, 2012-2016) — "
+        "GAU per ADR-0005 ; bascule EXG concerne LFI/Mélenchon en 2026 seulement (D3.2)",
+    ),
+    ("LFN", 2014, "EXD", "Front National (D3.2)"),
+    ("LMDM", 2014, "CENT", "Mouvement Démocrate — MoDem (D3.2)"),
+    (
+        "LPG",
+        2014,
+        "GAU",
+        "Parti de Gauche (Mélenchon, 2008-2016) — dans le Front de Gauche en 2014 ; "
+        "GAU par cohérence avec LFG (D3.2)",
+    ),
+    ("LSOC", 2014, "GAU", "Socialiste (D3.2)"),
+    ("LUC", 2014, "CENT", "Union Centre (D3.2)"),
+    ("LUD", 2014, "CENT", "Union Démocratique / UDI (D3.2)"),
+    ("LUDI", 2014, "DIV", "Union Divers (D3.2)"),
+    ("LUG", 2014, "GAU", "Union de la Gauche (D3.2)"),
+    ("LUMP", 2014, "DTE", "UMP (devenu LR en 2015) (D3.2)"),
+    ("LVEC", 2014, "GAU", "Verts / EELV (D3.2)"),
+    # NC (~45 281 occurrences HdF t1) : non inséré — Non Classé, indication
+    # administrative pour listes sans investiture, pas un bloc idéologique (D3.2)
+    # ── 2020 — seuil 3 500 hab — ~3 779 communes HdF nuancées ────────────────
+    ("LCOM", 2020, "EXG", "Communiste — PCF (D3.2)"),
+    ("LDIV", 2020, "DIV", "Divers (D3.2)"),
+    (
+        "LDVC",
+        2020,
+        "CENT",
+        "Divers Centre — investiture officielle LREM/MoDem/UDI post-CE 31/01/2020 "
+        "n°437675 (D3.2, LDVC→CENT validé par CE 437675)",
+    ),
+    ("LDVD", 2020, "DTE", "Divers Droite (D3.2)"),
+    ("LDVG", 2020, "GAU", "Divers Gauche (D3.2)"),
+    ("LECO", 2020, "GAU", "Écologiste — EELV principalement (D3.2)"),
+    ("LEXD", 2020, "EXD", "Extrême droite (D3.2)"),
+    ("LEXG", 2020, "EXG", "Extrême gauche (D3.2)"),
+    (
+        "LFI",
+        2020,
+        "GAU",
+        "La France Insoumise 2020 — GAU per circulaire INTA1931378J ; "
+        "bascule EXG uniquement à partir de 2026 (INTP2602966C + CE 27/02/2026 n°512694) (D3.2)",
+    ),
+    ("LLR", 2020, "DTE", "Les Républicains (D3.2)"),
+    # LNC (~1 787 occurrences) : non inséré — parallèle structurel avec NC ;
+    # identité LNC ambiguë (Nouveau Centre ou Liste Non Classée) → NULL (D3.2, Q9 validé)
+    ("LRDG", 2020, "GAU", "Radicaux de Gauche — allié PS (D3.2)"),
+    ("LREM", 2020, "CENT", "La République En Marche (D3.2)"),
+    ("LRN", 2020, "EXD", "Rassemblement National (D3.2)"),
+    ("LSOC", 2020, "GAU", "Socialiste (D3.2)"),
+    ("LUC", 2020, "CENT", "Union Centre (D3.2)"),
+    ("LUD", 2020, "CENT", "Union Démocratique / UDI (D3.2)"),
+    ("LUDI", 2020, "DIV", "Union Divers (D3.2)"),
+    ("LUG", 2020, "GAU", "Union de la Gauche (D3.2)"),
+    ("LVEC", 2020, "GAU", "Verts / EELV (D3.2)"),
+    # NC (~43 074 occurrences HdF t1) : non inséré — voir 2014 NC (D3.2)
+    # ── 2026 — seuil 3 500 hab — ~318 communes HdF nuancées ──────────────────
+    ("LCOM", 2026, "EXG", "Communiste — PCF (D3.2)"),
+    ("LDIV", 2026, "DIV", "Divers (D3.2)"),
+    ("LDVC", 2026, "CENT", "Divers Centre — per circulaire INTP2602966C (2 fév. 2026) (D3.2)"),
+    ("LDVD", 2026, "DTE", "Divers Droite (D3.2)"),
+    ("LDVG", 2026, "GAU", "Divers Gauche (D3.2)"),
+    ("LECO", 2026, "GAU", "Écologiste (D3.2)"),
+    ("LEXD", 2026, "EXD", "Extrême droite (D3.2)"),
+    ("LEXG", 2026, "EXG", "Extrême gauche (D3.2)"),
+    (
+        "LFI",
+        2026,
+        "EXG",
+        "La France Insoumise 2026 — EXG per circulaire INTP2602966C (2 fév. 2026) "
+        "+ CE 27/02/2026 n°512694 (rejet recours LFI) (D3.2)",
+    ),
+    ("LHOR", 2026, "CENT", "Horizons — parti centriste Édouard Philippe (D3.2)"),
+    ("LLR", 2026, "DTE", "Les Républicains (D3.2)"),
+    ("LRN", 2026, "EXD", "Rassemblement National (D3.2)"),
+    ("LSOC", 2026, "GAU", "Socialiste (D3.2)"),
+    ("LUC", 2026, "CENT", "Union Centre (D3.2)"),
+    ("LUDI", 2026, "DIV", "Union Divers (D3.2)"),
+    (
+        "LUDR",
+        2026,
+        "EXD",
+        "Union Droite Républicaine (parti Ciotti, allié RN) — "
+        "per INTP2602966C + CE 27/02/2026 n°512694 (D3.2)",
+    ),
+    ("LUG", 2026, "GAU", "Union de la Gauche / NFP (D3.2)"),
+    ("LUXD", 2026, "EXD", "Union Extrême Droite (D3.2)"),
+    ("LVEC", 2026, "GAU", "Verts / EELV (D3.2)"),
+]
+
+
+# Années gérées par _NUANCES_MUNI (périmètre du DELETE ciblé de populate_nuances_municipales)
+_ANNEES_MUNI: tuple[int, ...] = tuple(sorted({annee for _, annee, _, _ in _NUANCES_MUNI}))
+# Codes municipaux volontairement SANS mapping (ADR-0005) : ne doivent jamais être insérés
+_CODES_MUNI_SANS_MAPPING: frozenset[str] = frozenset({"NC", "LMAJ", "LNC"})
+
 # ── Candidats présidentiels 2017 / 2022 ──────────────────────────────────────
 # La colonne 'nuance' est NULL pour ces scrutins dans le Parquet.
 # Le classement se fait via le nom de famille EXACT tel qu'il apparaît dans le
@@ -671,6 +809,10 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
 def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
     """Remplit les 4 tables de référence. Idempotent (DELETE + INSERT).
 
+    nuances_harmonisees est réinitialisée avec ses trois jeux (présidentielles,
+    législatives, municipales) : relancer cette fonction ne perd plus les nuances
+    municipales (correctif C2, audit 2026-09-24).
+
     Ne touche pas resultats_participation ni resultats_candidats.
     Ordre de suppression respecté pour les FK déclaratives (blocs en dernier).
     """
@@ -689,18 +831,21 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
     logger.info("elections : %d scrutins", len(_ELECTIONS))
 
     # nuances_harmonisees : présidentielles (2002/2007/2012) + législatives
-    # (2002/2007/2012/2017/2022/2024). Chaque entrée porte sa justification (source_bloc).
-    nuances = _NUANCES_PRES + _NUANCES_LEGI
+    # (2002/2007/2012/2017/2022/2024) + municipales (2008/2014/2020/2026).
+    # Chaque entrée porte sa justification (source_bloc).
+    _verifier_nuances_municipales()
+    nuances = _NUANCES_PRES + _NUANCES_LEGI + _NUANCES_MUNI
     if nuances:
         con.executemany(
             "INSERT INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) VALUES (?, ?, ?, ?)",
             nuances,
         )
     logger.info(
-        "nuances_harmonisees : %d entrées (%d pres + %d legi)",
+        "nuances_harmonisees : %d entrées (%d pres + %d legi + %d muni)",
         len(nuances),
         len(_NUANCES_PRES),
         len(_NUANCES_LEGI),
+        len(_NUANCES_MUNI),
     )
 
     # candidats_presidentielle (présidentielles sans nuances : 2017, 2022)
@@ -713,6 +858,64 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
             candidats,
         )
     logger.info("candidats_presidentielle : %d candidats (2017 + 2022)", len(candidats))
+
+
+def _verifier_nuances_municipales() -> None:
+    """Garde-fous sur _NUANCES_MUNI avant écriture en base.
+
+    - NC, LMAJ, LNC doivent rester absents (bloc NULL, décision ADR-0005).
+    - Les années municipales doivent être disjointes des années pres/legi, sinon le
+      DELETE ciblé de populate_nuances_municipales toucherait d'autres scrutins.
+    """
+    codes = {nuance for nuance, _, _, _ in _NUANCES_MUNI}
+    interdits = codes & _CODES_MUNI_SANS_MAPPING
+    if interdits:
+        raise RuntimeError(
+            f"Codes sans mapping détectés dans _NUANCES_MUNI : {sorted(interdits)}. "
+            "Ces codes doivent rester absents de nuances_harmonisees."
+        )
+    annees_autres = {annee for _, annee, _, _ in _NUANCES_PRES + _NUANCES_LEGI}
+    chevauchement = set(_ANNEES_MUNI) & annees_autres
+    if chevauchement:
+        raise RuntimeError(
+            f"Années municipales partagées avec pres/legi : {sorted(chevauchement)}. "
+            "Le remplacement ciblé par année n'est plus sûr (voir audit M5)."
+        )
+
+
+def populate_nuances_municipales(con: duckdb.DuckDBPyConnection) -> int:
+    """Remplace les nuances municipales de nuances_harmonisees. Idempotent et correcteur.
+
+    DELETE ciblé sur les années municipales puis INSERT de _NUANCES_MUNI, dans une
+    transaction : une correction de bloc ou de source_bloc dans le code est appliquée
+    à la relance, et une nuance retirée de la liste disparaît de la base
+    (correctif C3, audit 2026-09-24). Les nuances pres/legi ne sont pas touchées.
+
+    Retourne le nombre d'entrées municipales présentes après l'opération.
+    """
+    _verifier_nuances_municipales()
+    placeholders = ", ".join("?" for _ in _ANNEES_MUNI)
+    con.execute("BEGIN TRANSACTION")
+    try:
+        n_supprimees = con.execute(
+            f"DELETE FROM nuances_harmonisees WHERE annee IN ({placeholders})",  # noqa: S608
+            list(_ANNEES_MUNI),
+        ).fetchone()[0]
+        con.executemany(
+            "INSERT INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) VALUES (?, ?, ?, ?)",
+            _NUANCES_MUNI,
+        )
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    logger.info(
+        "nuances_harmonisees (muni %s) : %d entrées remplacées par %d",
+        "/".join(str(a) for a in _ANNEES_MUNI),
+        n_supprimees,
+        len(_NUANCES_MUNI),
+    )
+    return len(_NUANCES_MUNI)
 
 
 # ── Vues d'agrégation ─────────────────────────────────────────────────────────
