@@ -8,6 +8,8 @@ Fonctions exportées
 - populate_elections_referentiels(con): remplit blocs_politiques, elections,
   nuances_harmonisees (pres + legi + muni) et candidats_presidentielle ;
   idempotent (DELETE + INSERT)
+- populate_nuances_municipales(con)   : remplace les seules nuances municipales
+  (DELETE ciblé par année + INSERT), utilisé par load_elections_municipales.py
 
 Les tables de résultats (resultats_participation, resultats_candidats) sont créées
 vides ici ; le chargement des Parquet est fait en C2b (scripts/load_elections.py).
@@ -519,6 +521,11 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
 ]
 
 
+# Années gérées par _NUANCES_MUNI (périmètre du DELETE ciblé de populate_nuances_municipales)
+_ANNEES_MUNI: tuple[int, ...] = tuple(sorted({annee for _, annee, _, _ in _NUANCES_MUNI}))
+# Codes municipaux volontairement SANS mapping (ADR-0005) : ne doivent jamais être insérés
+_CODES_MUNI_SANS_MAPPING: frozenset[str] = frozenset({"NC", "LMAJ", "LNC"})
+
 # ── Candidats présidentiels 2017 / 2022 ──────────────────────────────────────
 # La colonne 'nuance' est NULL pour ces scrutins dans le Parquet.
 # Le classement se fait via le nom de famille EXACT tel qu'il apparaît dans le
@@ -826,6 +833,7 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
     # nuances_harmonisees : présidentielles (2002/2007/2012) + législatives
     # (2002/2007/2012/2017/2022/2024) + municipales (2008/2014/2020/2026).
     # Chaque entrée porte sa justification (source_bloc).
+    _verifier_nuances_municipales()
     nuances = _NUANCES_PRES + _NUANCES_LEGI + _NUANCES_MUNI
     if nuances:
         con.executemany(
@@ -850,6 +858,64 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
             candidats,
         )
     logger.info("candidats_presidentielle : %d candidats (2017 + 2022)", len(candidats))
+
+
+def _verifier_nuances_municipales() -> None:
+    """Garde-fous sur _NUANCES_MUNI avant écriture en base.
+
+    - NC, LMAJ, LNC doivent rester absents (bloc NULL, décision ADR-0005).
+    - Les années municipales doivent être disjointes des années pres/legi, sinon le
+      DELETE ciblé de populate_nuances_municipales toucherait d'autres scrutins.
+    """
+    codes = {nuance for nuance, _, _, _ in _NUANCES_MUNI}
+    interdits = codes & _CODES_MUNI_SANS_MAPPING
+    if interdits:
+        raise RuntimeError(
+            f"Codes sans mapping détectés dans _NUANCES_MUNI : {sorted(interdits)}. "
+            "Ces codes doivent rester absents de nuances_harmonisees."
+        )
+    annees_autres = {annee for _, annee, _, _ in _NUANCES_PRES + _NUANCES_LEGI}
+    chevauchement = set(_ANNEES_MUNI) & annees_autres
+    if chevauchement:
+        raise RuntimeError(
+            f"Années municipales partagées avec pres/legi : {sorted(chevauchement)}. "
+            "Le remplacement ciblé par année n'est plus sûr (voir audit M5)."
+        )
+
+
+def populate_nuances_municipales(con: duckdb.DuckDBPyConnection) -> int:
+    """Remplace les nuances municipales de nuances_harmonisees. Idempotent et correcteur.
+
+    DELETE ciblé sur les années municipales puis INSERT de _NUANCES_MUNI, dans une
+    transaction : une correction de bloc ou de source_bloc dans le code est appliquée
+    à la relance, et une nuance retirée de la liste disparaît de la base
+    (correctif C3, audit 2026-09-24). Les nuances pres/legi ne sont pas touchées.
+
+    Retourne le nombre d'entrées municipales présentes après l'opération.
+    """
+    _verifier_nuances_municipales()
+    placeholders = ", ".join("?" for _ in _ANNEES_MUNI)
+    con.execute("BEGIN TRANSACTION")
+    try:
+        n_supprimees = con.execute(
+            f"DELETE FROM nuances_harmonisees WHERE annee IN ({placeholders})",  # noqa: S608
+            list(_ANNEES_MUNI),
+        ).fetchone()[0]
+        con.executemany(
+            "INSERT INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) VALUES (?, ?, ?, ?)",
+            _NUANCES_MUNI,
+        )
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    logger.info(
+        "nuances_harmonisees (muni %s) : %d entrées remplacées par %d",
+        "/".join(str(a) for a in _ANNEES_MUNI),
+        n_supprimees,
+        len(_NUANCES_MUNI),
+    )
+    return len(_NUANCES_MUNI)
 
 
 # ── Vues d'agrégation ─────────────────────────────────────────────────────────

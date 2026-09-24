@@ -19,12 +19,14 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from ministere_de_l_info.etl import schema_elections  # noqa: E402
 from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
     _NUANCES_LEGI,
     _NUANCES_MUNI,
     _NUANCES_PRES,
     create_elections_schema,
     populate_elections_referentiels,
+    populate_nuances_municipales,
 )
 
 _ANNEES_MUNI = (2008, 2014, 2020, 2026)
@@ -98,3 +100,102 @@ class TestC2ReferentielsConserventMunicipales:
     def test_script_loader_reutilise_la_liste_centrale(self) -> None:
         loader = _charger_script(ROOT / "scripts" / "load_elections_municipales.py")
         assert loader._NUANCES_MUNI is _NUANCES_MUNI
+
+
+# ── C3 — le remplacement des nuances municipales doit appliquer les corrections ──
+
+
+def _bloc(con: duckdb.DuckDBPyConnection, nuance: str, annee: int) -> tuple | None:
+    return con.execute(
+        "SELECT bloc, source_bloc FROM nuances_harmonisees WHERE nuance = ? AND annee = ?",
+        [nuance, annee],
+    ).fetchone()
+
+
+def _n_hors_muni(con: duckdb.DuckDBPyConnection) -> int:
+    return con.execute(
+        "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee NOT IN (2008, 2014, 2020, 2026)"
+    ).fetchone()[0]
+
+
+class TestC3NuancesMunicipalesCorrectrices:
+    def test_idempotent(self, con: duckdb.DuckDBPyConnection) -> None:
+        n_hors_muni = _n_hors_muni(con)
+        assert populate_nuances_municipales(con) == 67
+        assert populate_nuances_municipales(con) == 67
+        assert _n_muni(con) == 67
+        assert _n_hors_muni(con) == n_hors_muni
+
+    def test_correction_de_bloc_appliquee(
+        self, con: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Scénario audit : un bloc corrigé dans le code doit être écrit en base.
+
+        La correction est fictive (monkeypatch, test uniquement) : aucun classement
+        réel n'est modifié.
+        """
+        bloc_initial = _bloc(con, "LCOM", 2026)
+        assert bloc_initial is not None
+        bloc_fictif = "GAU" if bloc_initial[0] != "GAU" else "DIV"
+        liste = [
+            ("LCOM", 2026, bloc_fictif, "correction fictive de test")
+            if (n, a) == ("LCOM", 2026)
+            else (n, a, b, src)
+            for n, a, b, src in _NUANCES_MUNI
+        ]
+        monkeypatch.setattr(schema_elections, "_NUANCES_MUNI", liste)
+        populate_nuances_municipales(con)
+        assert _bloc(con, "LCOM", 2026) == (bloc_fictif, "correction fictive de test")
+        assert _n_muni(con) == 67
+
+    def test_nuance_retiree_supprimee(
+        self, con: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        liste = [t for t in _NUANCES_MUNI if (t[0], t[1]) != ("LUDI", 2026)]
+        monkeypatch.setattr(schema_elections, "_NUANCES_MUNI", liste)
+        populate_nuances_municipales(con)
+        assert _bloc(con, "LUDI", 2026) is None
+        assert _n_muni(con) == 66
+
+    def test_nuances_pres_legi_intactes(self, con: duckdb.DuckDBPyConnection) -> None:
+        avant = con.execute(
+            "SELECT * FROM nuances_harmonisees WHERE annee NOT IN (2008, 2014, 2020, 2026) "
+            "ORDER BY nuance, annee"
+        ).fetchall()
+        con.execute("DELETE FROM nuances_harmonisees WHERE annee IN (2008, 2014, 2020, 2026)")
+        populate_nuances_municipales(con)
+        apres = con.execute(
+            "SELECT * FROM nuances_harmonisees WHERE annee NOT IN (2008, 2014, 2020, 2026) "
+            "ORDER BY nuance, annee"
+        ).fetchall()
+        assert avant == apres
+        assert _n_muni(con) == 67
+
+    def test_garde_fou_codes_sans_mapping(
+        self, con: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        liste = [*_NUANCES_MUNI, ("NC", 2020, "DIV", "interdit")]
+        monkeypatch.setattr(schema_elections, "_NUANCES_MUNI", liste)
+        with pytest.raises(RuntimeError, match="sans mapping"):
+            populate_nuances_municipales(con)
+        assert _n_muni(con) == 67
+        assert _bloc(con, "NC", 2020) is None
+
+    def test_garde_fou_annees_partagees(
+        self, con: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            schema_elections, "_NUANCES_LEGI", [*_NUANCES_LEGI, ("XYZ", 2020, "DIV", "test")]
+        )
+        with pytest.raises(RuntimeError, match="partagées"):
+            populate_nuances_municipales(con)
+
+    def test_rollback_si_insertion_echoue(
+        self, con: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Doublon de clé : l'INSERT échoue, le DELETE est annulé (pas de table vidée)."""
+        liste = [*_NUANCES_MUNI, _NUANCES_MUNI[0]]
+        monkeypatch.setattr(schema_elections, "_NUANCES_MUNI", liste)
+        with pytest.raises(duckdb.ConstraintException):
+            populate_nuances_municipales(con)
+        assert _n_muni(con) == 67

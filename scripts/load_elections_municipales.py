@@ -26,6 +26,8 @@ Spécificités municipales :
 - 2026 : ~320 communes HdF nuancées (seuil ≥ 3 500 hab), ~3 459 avec nuance NULL
 
 Nuances harmonisées (liste _NUANCES_MUNI définie dans etl/schema_elections.py) :
+- Remplacement ciblé (DELETE années muni + INSERT, populate_nuances_municipales) :
+  une correction de bloc dans le code est appliquée à la relance du loader
 - 67 entrées insérées (2008 : 12, 2014 : 17, 2020 : 19, 2026 : 19)
 - SANS mapping (bloc NULL, UI : Non classé / Liste sortante) : NC, LMAJ, LNC
 - LFI 2020 = GAU ; LFI 2026 = EXG (bascule structurante INTP2602966C + CE 512694)
@@ -42,7 +44,10 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
-from ministere_de_l_info.etl.schema_elections import _NUANCES_MUNI  # noqa: E402
+from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
+    _NUANCES_MUNI,
+    populate_nuances_municipales,
+)
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
 configure_logging()
@@ -64,35 +69,6 @@ def _delete_municipales(con) -> None:
     con.execute(f"DELETE FROM resultats_participation WHERE id_election IN {_MUNI_IDS}")
     con.execute(f"DELETE FROM resultats_candidats WHERE id_election IN {_MUNI_IDS}")
     logger.info("Nettoyage idempotent : municipales supprimées avant rechargement")
-
-
-def _insert_nuances_harmonisees(con) -> int:
-    """Insère les 67 nuances municipales. INSERT OR IGNORE pour ne pas écraser pres/legi."""
-    # Vérification préalable : NC, LMAJ, LNC ne doivent PAS être insérés
-    codes_sans_mapping = {"NC", "LMAJ", "LNC"}
-    codes_a_inserer = {nuance for nuance, _, _, _ in _NUANCES_MUNI}
-    intersection = codes_sans_mapping & codes_a_inserer
-    if intersection:
-        raise RuntimeError(
-            f"Codes sans mapping détectés dans _NUANCES_MUNI : {intersection}. "
-            "Ces codes doivent rester absents de nuances_harmonisees."
-        )
-
-    n_avant = con.execute("SELECT COUNT(*) FROM nuances_harmonisees").fetchone()[0]
-
-    for nuance, annee, bloc, source_bloc in _NUANCES_MUNI:
-        con.execute(
-            "INSERT OR IGNORE INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) "
-            "VALUES (?, ?, ?, ?)",
-            [nuance, annee, bloc, source_bloc],
-        )
-
-    n_apres = con.execute("SELECT COUNT(*) FROM nuances_harmonisees").fetchone()[0]
-    n_inserted = n_apres - n_avant
-    logger.info(
-        "nuances_harmonisees : %d entrées insérées (%d → %d total)", n_inserted, n_avant, n_apres
-    )
-    return n_inserted
 
 
 def _load_participation(con) -> int:
@@ -244,7 +220,7 @@ def main() -> None:
     con = open_connection(_DB_PATH)
     try:
         _delete_municipales(con)
-        _insert_nuances_harmonisees(con)
+        populate_nuances_municipales(con)
         _load_participation(con)
         _load_candidats(con)
         _print_summary(con)
