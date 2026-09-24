@@ -24,6 +24,7 @@ sommaire (`grep -n '^## ' <fichier>`) avant d'ouvrir une section.
 | Fichier | Objet | Taille |
 |---|---|---|
 | [a-faire-sur-le-mac.md](a-faire-sur-le-mac.md) | Liste tenue à jour des tâches à exécuter sur le Mac (base, réseau ministère) | 3 Ko |
+| [synthese-vague-2-2026-09-24.md](synthese-vague-2-2026-09-24.md) | Synthèse de la vague 2 : lots appliqués, décisions secondaires A-G | 5 Ko |
 | [synthese-vague-1-2026-09-24.md](synthese-vague-1-2026-09-24.md) | Synthèse de la vague 1 d'agents, décisions regroupées en lots | 8 Ko |
 | [session-2026-09-24_etat-des-lieux.md](session-2026-09-24_etat-des-lieux.md) | État des lieux complet du projet (dette, écarts doc ↔ code) | 14 Ko |
 

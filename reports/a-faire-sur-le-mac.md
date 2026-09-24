@@ -1,75 +1,149 @@
 # À faire sur le Mac — liste tenue à jour par le directeur
 
-Dernière mise à jour : 2026-09-24
+Dernière mise à jour : 2026-09-24 (fin de la vague 2)
 
-Ce fichier regroupe tout ce qui ne peut être fait que sur le Mac mini (la session cloud n'a ni la base de données, ni accès aux sites du ministère). Suivre les étapes **dans l'ordre**. Chaque étape indique son état :
+Ce fichier regroupe tout ce qui ne peut être fait que sur le Mac mini : la session cloud n'a ni la base de données, ni accès aux sites officiels. **Suivre les étapes dans l'ordre.**
 
-- ✅ **Prête** : peut être faite maintenant.
-- ⏳ **En préparation** : les agents y travaillent ; ne pas la faire encore.
+## Comment procéder (le plus simple)
 
-Toutes les commandes se tapent dans le **Terminal**, dans le dossier du projet :
+Pour chaque étape, ouvrir le Terminal dans le dossier du projet, lancer Claude Code, et lui écrire simplement :
 
-```bash
-cd ~/Documents/Docker/ministere-de-l-info
 ```
+Exécute l'étape N de reports/a-faire-sur-le-mac.md, puis donne-moi le résumé à transmettre au directeur.
+```
+
+(remplacer N par le numéro). Claude Code local fait les commandes, vérifie les résultats et s'arrête s'il y a un problème. Il termine par un **résumé de 5 lignes à copier-coller dans la conversation avec le directeur**. Les commandes sont aussi détaillées ci-dessous pour qu'on puisse les suivre ou les faire à la main.
+
+Dossier du projet : `~/Documents/Docker/ministere-de-l-info`
 
 ---
 
 ## Étape 0 — Récupérer la branche de travail ✅ Prête
 
 ```bash
+cd ~/Documents/Docker/ministere-de-l-info
 git fetch origin
 git switch claude/exciting-dirac-8mogwe
 git pull
+uv sync --frozen --group etl
 ```
 
-Vérification : `git log --oneline -1` affiche un commit récent du directeur.
+Vérification : `git log --oneline -1` affiche un commit du 2026-09-24.
 
 ---
 
 ## Étape 1 — Vérifier les codes de nuances 2008/2014 ✅ Prête
 
-C'est Claude Code sur le Mac qui fait tout seul.
+Dans Claude Code, taper :
 
-1. Lancer Claude Code dans le dossier du projet :
+```
+/verifier-nuances-2008-2014
+```
+
+Claude Code vérifie tout seul sur le site d'archives du ministère, mesure le poids de chaque code dans la base (sans rien modifier) et envoie le résultat sur GitHub. **Copier la phrase « Message à transmettre au directeur »** et la coller dans la conversation avec le directeur.
+
+---
+
+## Étape 2 — Appliquer les corrections à la base ✅ Prête
+
+Ce que cela applique : correctifs des bugs critiques (nuances municipales effacées, corrections ignorées, listes fusionnées), 18 reclassements de nuances (ADR-0010), classement des groupes parlementaires par législature (ADR-0011).
+
+1. **Arrêter l'application** (DuckDB n'accepte qu'un seul écrivain) :
    ```bash
-   claude
+   docker ps
    ```
-2. Taper :
+   puis `docker stop <nom affiché>` (en général `ministere-info` ou `ministere-de-l-info`).
+2. **Copie de sécurité de la base** :
+   ```bash
+   cp data/ministere.duckdb data/ministere.duckdb.bak-2026-09-24
    ```
-   /verifier-nuances-2008-2014
+3. **Appliquer** :
+   ```bash
+   uv run python scripts/init_elections_schema.py
+   uv run python scripts/load_elections_municipales.py
+   uv run python scripts/migrations/0007_add_municipales_views.py
+   uv run python scripts/migrations/0008_legislatif_groupes_par_legislature.py
+   uv run python scripts/load_legislatif.py --source datan
+   uv run python scripts/load_legislatif.py --source overrides
    ```
-3. Laisser travailler jusqu'au message final « ✅ Vérification terminée ».
-4. **Copier la phrase « Message à transmettre au directeur »** et la coller dans la conversation avec le directeur.
+4. **Contrôler** :
+   ```bash
+   uv run pytest -q
+   uv run pytest tests/test_elections_municipales.py tests/test_elections_legislatives.py tests/test_legislatif.py -q
+   ```
+   Et dans DuckDB (Claude Code peut les lancer) :
+   - `SELECT annee, COUNT(*) FROM nuances_harmonisees GROUP BY 1 ORDER BY 1;` → total **226** (municipales : 2008=12, 2014=17, 2020=23, 2026=25)
+   - aucun doublon de liste : requête « doublons » de l'annexe A de `reports/synthese-vague-1-2026-09-24.md` → 0 ligne
+   - aucun groupe parlementaire sans bloc (requêtes de contrôle de `docs/adr/0011-legislatif-groupes-par-legislature.md`)
+   - noter tout message « WARNING groupe non classé » affiché au chargement
+5. **Redémarrer l'application** : `docker start <nom>`.
 
-Ce que fait la commande : lecture des définitions officielles sur le site d'archives du ministère, mesure du poids de chaque code dans la base (sans rien modifier), écriture du résultat, envoi sur la branche `mac/verification-nuances-2008-2014`. Elle ne modifie ni le code, ni la base, ni les classements.
-
----
-
-## Étape 2 — Appliquer les corrections à la base ⏳ En préparation
-
-Correctifs des bugs critiques (déjà faits) + nouveaux classements de nuances (en cours). Les commandes exactes seront ajoutées ici quand tout sera fusionné, pour ne relancer les scripts qu'une seule fois.
-
----
-
-## Étape 3 — Créer l'extrait de base pour les tests ⏳ En préparation
-
-Un script exportera un petit échantillon (département de la Somme, < 5 Mo) pour que les tests fonctionnent partout. Commande à venir.
+À signaler au directeur : tout test en échec, tout WARNING, et le test `test_lille_2020_t1_blocs_cohérents` s'il échoue (cas prévu, à analyser).
 
 ---
 
-## Étape 4 — Passer l'application en direct sur le Mac (sans Docker) ⏳ En préparation
+## Étape 3 — Vérifier visuellement l'application ✅ Prête
 
-Procédure pas à pas avec point d'arrêt, Docker gardé en secours 2 semaines. À venir.
+Ouvrir http://localhost:8501 et contrôler :
+
+- **Accueil** : chaque tuile indique son périmètre (Hauts-de-France ou France) et sa période.
+- **Géographie** : Communes + département Nord → environ 648 lignes (plus de limite à 200), tri par colonne, bouton d'export CSV ; Départements filtrés sur la région Hauts-de-France → 5 lignes seulement.
+- **Élections** : la participation Hauts-de-France a changé de valeur (elle est désormais pondérée) ; zone « 21e circonscription du Nord — Valenciennes » ; passer d'un onglet à l'autre puis revenir : les sélections restent en place ; municipales : nouveaux blocs visibles (ex. listes PCF en gauche, UDI au centre).
+- **Économie** : chômage 2015/2016 affiché (plus de carte grise) ; encadré explicatif RSA ; croisement économie × élections : 1er tour par défaut, seules les années exploitables sont proposées.
+- **Législatif** : l'onglet Activité s'affiche sans avoir à choisir la chambre ; recherche d'un député précis ; groupes LFI 2017-2024 en gauche.
+- **Libellés** des chiffres clés plus foncés et lisibles.
+
+Noter ce qui semble faux ou étrange et le transmettre au directeur.
 
 ---
 
-## Étape 5 — Tester la mise à jour de la base ⏳ En préparation
+## Étape 4 — Créer l'extrait de base pour les tests ✅ Prête
 
-Test réel du script de mise à jour corrigé. À faire après la fusion dans `main`.
+Application arrêtée (comme à l'étape 2), puis :
+
+```bash
+uv run python scripts/export_sample_db.py
+uv run pytest tests/test_sample_db.py -q -rs
+git add tests/fixtures/sample/
+git commit -m "test: échantillon Parquet de la Somme pour tests hermétiques"
+git push
+```
+
+Le script refuse de dépasser 5 Mo. Signaler au directeur tout avertissement `EcartSchemaEchantillon`.
 
 ---
 
-## Étape 6 — Recharger le Sénat après les sénatoriales du 27/09 ⏳ En préparation
+## Étape 5 — Passer l'application en direct sur le Mac (sans Docker) ✅ Prête — avec POINT D'ARRÊT
 
-Après la refonte du module Législatif (en cours). Procédure à venir.
+Procédure complète en 8 étapes dans `docs/deployment.md` §3 (ADR-0012). À faire de préférence avec Claude Code : « Exécute l'étape 5 de reports/a-faire-sur-le-mac.md en suivant docs/deployment.md §3, étape par étape, en t'arrêtant au POINT D'ARRÊT ».
+
+En résumé :
+1. État des lieux (quelle base Docker utilise réellement).
+2. Copie de sécurité de la base.
+3. Code à jour et `uv` installé.
+4. `./deploy/native/install-native.sh` → l'app native tourne sur le **port 8502**, Docker reste sur 8501.
+5. Comparer les 5 pages sur les deux ports.
+6. Régler la sauvegarde vers un **disque externe** (recommandé) ou iCloud : `--sauvegarde-vers`, puis tester `./scripts/backup_db.sh`.
+7. Redémarrer le Mac → `./deploy/native/status.sh` doit dire OK sans rien relancer à la main.
+
+**POINT D'ARRÊT : 2 semaines de double fonctionnement**, puis décision de Mathias avant l'étape 8 (arrêt de Docker, app native sur le port 8501).
+
+---
+
+## Étape 6 — Recharger le Sénat après les sénatoriales du 27/09 ⏳ Après mise à jour de data.senat.fr
+
+```bash
+cp data/ministere.duckdb data/ministere.duckdb.bak-avant-senat-2026
+uv run python scripts/load_legislatif.py --source senat --force
+uv run python scripts/load_legislatif.py --source datan
+uv run python scripts/load_legislatif.py --source overrides
+uv run pytest tests/test_legislatif.py tests/test_legislatif_memoire.py -q
+```
+
+Contrôles : 348 sénateurs actifs, aucun groupe sans bloc. **Tout WARNING « groupe non classé » (nouveau groupe issu du renouvellement) doit être transmis au directeur avant toute publication de la base.** Vérifier aussi les nouveaux sénateurs RN éventuellement non-inscrits (overrides).
+
+---
+
+## Étape 7 — Tester la mise à jour de la base ⏳ Après fusion dans `main`
+
+Les scripts d'installation et de mise à jour des utilisateurs sont lus depuis `main`. Après fusion : lancer `deploy/update.sh` → un retéléchargement unique attendu (dernière fois), puis une seconde exécution doit afficher « déjà à jour ».
