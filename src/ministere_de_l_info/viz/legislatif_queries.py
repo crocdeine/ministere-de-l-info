@@ -8,10 +8,15 @@ Fonctions exportées
 - get_elus_actuels()             : élus actifs avec bloc_final (override ou dérivé)
 - get_composition_politique()    : répartition par bloc_final
 - get_activite_elu()             : scores d'activité d'un élu
-- get_classement_activite()      : top N par indicateur d'activité
+- get_fiche_elu()                : mandats d'un élu avec bloc par législature (ADR-0011)
+- get_classement_activite()      : top N (ou classement complet) par indicateur
 - get_activite_par_bloc()        : moyennes d'activité par bloc
 - get_historique_legislatures_an() : législatures AN avec comptages
 - get_evolution_composition_an() : composition AN par législature et bloc
+
+Blocs : lus dans les vues (``v_elus_actuels``, ``v_mandats_legislatif``), qui appliquent
+le référentiel (groupe, législature) → bloc (ADR-0011) puis ``leg_blocs_override``.
+Un élu non classé est renvoyé avec ``BLOC_NON_CLASSE`` (« NC »), jamais DIV.
 """
 
 from __future__ import annotations
@@ -28,6 +33,9 @@ from ministere_de_l_info.config import get_settings
 logger = logging.getLogger(__name__)
 
 DB_PATH: Path = get_settings().db_path
+
+BLOC_NON_CLASSE = "NC"
+_BLOC_SQL = f"COALESCE(e.bloc_final, '{BLOC_NON_CLASSE}')"
 
 _INDICATEURS_ACTIVITE_VALIDES = frozenset(
     {
@@ -135,12 +143,10 @@ def get_elus_actuels(
             "SELECT e.id, e.chambre, e.nom, e.prenom, "
             "e.code_departement, e.nom_departement, e.num_circo, "
             "e.groupe_sigle, "
-            "COALESCE(o.bloc_force, e.bloc_politique, 'DIV') AS bloc_final, "
+            f"{_BLOC_SQL} AS bloc_final, "
             "e.profession "
-            "FROM leg_elus e "
-            "LEFT JOIN leg_blocs_override o "
-            "ON e.id = o.elu_id AND e.chambre = o.chambre "
-            "WHERE e.est_actif = TRUE"
+            "FROM v_elus_actuels e "
+            "WHERE TRUE"
         )
         params: list = []
         if chambre is not None:
@@ -197,12 +203,10 @@ def get_composition_politique(
     con = _open_ro()
     try:
         sql = (
-            "SELECT COALESCE(o.bloc_force, e.bloc_politique, 'DIV') AS bloc_final, "
+            f"SELECT {_BLOC_SQL} AS bloc_final, "
             "COUNT(*) AS nb_elus "
-            "FROM leg_elus e "
-            "LEFT JOIN leg_blocs_override o "
-            "ON e.id = o.elu_id AND e.chambre = o.chambre "
-            "WHERE e.est_actif = TRUE"
+            "FROM v_elus_actuels e "
+            "WHERE TRUE"
         )
         params: list = []
         if chambre is not None:
@@ -277,66 +281,61 @@ def get_classement_activite(
     chambre: str,
     indicateur: str,
     codes_departement: tuple[str, ...] | None = None,
-    n: int = 20,
+    n: int | None = 20,
 ) -> pl.DataFrame:
-    """Top N élus par indicateur d'activité (AN uniquement — Datan)."""
+    """Top N élus par indicateur d'activité (AN uniquement — Datan).
+
+    ``n=None`` renvoie le classement complet. Colonnes : id, nom, prenom, groupe_sigle,
+    bloc_final, code_departement, indicateur, rang (1 = meilleur score du périmètre).
+    """
     if indicateur not in _INDICATEURS_ACTIVITE_VALIDES:
         raise ValueError(f"Indicateur activité inconnu : {indicateur}")
     if chambre == "SENAT":
         logger.warning("Scores d'activité non disponibles pour le Sénat (source Datan = AN)")
-        return pl.DataFrame(
-            schema={
-                "nom": pl.Utf8,
-                "prenom": pl.Utf8,
-                "groupe_sigle": pl.Utf8,
-                "bloc_final": pl.Utf8,
-                "code_departement": pl.Utf8,
-                indicateur: pl.Float64,
-            }
-        )
+        return _classement_vide(indicateur)
 
     con = _open_ro()
     try:
         sql = (  # noqa: S608
-            f"SELECT e.nom, e.prenom, e.groupe_sigle, "
-            f"COALESCE(o.bloc_force, e.bloc_politique, 'DIV') AS bloc_final, "
-            f"e.code_departement, a.{indicateur} "
-            f"FROM leg_elus e "
+            f"SELECT e.id, e.nom, e.prenom, e.groupe_sigle, "
+            f"{_BLOC_SQL} AS bloc_final, "
+            f"e.code_departement, a.{indicateur}, "
+            f"RANK() OVER (ORDER BY a.{indicateur} DESC) AS rang "
+            f"FROM v_elus_actuels e "
             f"JOIN leg_activite a ON e.id = a.elu_id AND e.chambre = a.chambre "
-            f"LEFT JOIN leg_blocs_override o "
-            f"ON e.id = o.elu_id AND e.chambre = o.chambre "
-            f"WHERE e.est_actif = TRUE AND e.chambre = ? "
+            f"WHERE e.chambre = ? "
             f"AND a.{indicateur} IS NOT NULL"
         )
         params: list = [chambre]
         sql += _dept_clause(codes_departement, params)
-        sql += f" ORDER BY a.{indicateur} DESC LIMIT ?"
-        params.append(n)
+        sql += f" ORDER BY a.{indicateur} DESC, e.nom, e.prenom"
+        if n is not None:
+            sql += " LIMIT ?"
+            params.append(n)
         rows = con.execute(sql, params).fetchall()
     finally:
         con.close()
 
-    if not rows:
-        return pl.DataFrame(
-            schema={
-                "nom": pl.Utf8,
-                "prenom": pl.Utf8,
-                "groupe_sigle": pl.Utf8,
-                "bloc_final": pl.Utf8,
-                "code_departement": pl.Utf8,
-                indicateur: pl.Float64,
-            }
-        )
     return pl.DataFrame(
-        {
-            "nom": [r[0] for r in rows],
-            "prenom": [r[1] for r in rows],
-            "groupe_sigle": [r[2] for r in rows],
-            "bloc_final": [r[3] for r in rows],
-            "code_departement": [r[4] for r in rows],
-            indicateur: [float(r[5]) if r[5] is not None else None for r in rows],
-        }
+        [list(r) for r in rows], schema=_schema_classement(indicateur), orient="row"
     )
+
+
+def _schema_classement(indicateur: str) -> dict[str, type[pl.DataType]]:
+    return {
+        "id": pl.Utf8,
+        "nom": pl.Utf8,
+        "prenom": pl.Utf8,
+        "groupe_sigle": pl.Utf8,
+        "bloc_final": pl.Utf8,
+        "code_departement": pl.Utf8,
+        indicateur: pl.Float64,
+        "rang": pl.Int64,
+    }
+
+
+def _classement_vide(indicateur: str) -> pl.DataFrame:
+    return pl.DataFrame(schema=_schema_classement(indicateur))
 
 
 # ---------------------------------------------------------------------------
@@ -352,16 +351,14 @@ def get_activite_par_bloc(
     con = _open_ro()
     try:
         sql = (
-            "SELECT COALESCE(o.bloc_force, e.bloc_politique, 'DIV') AS bloc, "
+            f"SELECT {_BLOC_SQL} AS bloc, "
             "AVG(a.score_participation) AS moy_participation, "
             "AVG(a.score_loyaute) AS moy_loyaute, "
             "AVG(a.score_majorite) AS moy_majorite, "
             "COUNT(*) AS nb_elus "
-            "FROM leg_elus e "
+            "FROM v_elus_actuels e "
             "JOIN leg_activite a ON e.id = a.elu_id AND e.chambre = a.chambre "
-            "LEFT JOIN leg_blocs_override o "
-            "ON e.id = o.elu_id AND e.chambre = o.chambre "
-            "WHERE e.est_actif = TRUE AND e.chambre = 'AN'"
+            "WHERE e.chambre = 'AN'"
         )
         params: list = []
         sql += _dept_clause(codes_departement, params)
@@ -396,27 +393,41 @@ def get_activite_par_bloc(
 # ---------------------------------------------------------------------------
 
 
+def _granularite_an(con: duckdb.DuckDBPyConnection) -> str | None:
+    """Granularité des mandats AN à utiliser : 'complete' si chargée, sinon Datan."""
+    rows = con.execute("SELECT DISTINCT granularite FROM leg_mandats WHERE chambre = 'AN'")
+    granularites = {r[0] for r in rows.fetchall()}
+    if "complete" in granularites:
+        return "complete"
+    if "derniere_legislature" in granularites:
+        return "derniere_legislature"
+    return None
+
+
 @st.cache_data(ttl=3600)
-def get_historique_legislatures_an() -> pl.DataFrame:
-    """Législatures AN distinctes avec nombre de députés."""
+def get_historique_legislatures_an(
+    codes_departement: tuple[str, ...] | None = None,
+) -> pl.DataFrame:
+    """Législatures AN avec nombre de députés distincts et granularité de la source."""
     con = _open_ro()
     try:
-        rows = con.execute(
-            "SELECT legislature, COUNT(*) AS nb_deputes "
-            "FROM leg_elus WHERE chambre = 'AN' AND legislature IS NOT NULL "
-            "GROUP BY legislature ORDER BY legislature"
-        ).fetchall()
+        granularite = _granularite_an(con)
+        rows: list = []
+        if granularite is not None:
+            params: list = [granularite]
+            sql = (
+                "SELECT e.legislature, COUNT(DISTINCT e.elu_id) AS nb_deputes "
+                "FROM leg_mandats e "
+                "WHERE e.chambre = 'AN' AND e.granularite = ? AND e.legislature IS NOT NULL"
+            )
+            sql += _dept_clause(codes_departement, params)
+            sql += " GROUP BY e.legislature ORDER BY e.legislature"
+            rows = con.execute(sql, params).fetchall()
     finally:
         con.close()
 
-    if not rows:
-        return pl.DataFrame(schema={"legislature": pl.Int64, "nb_deputes": pl.Int64})
-    return pl.DataFrame(
-        {
-            "legislature": [int(r[0]) for r in rows],
-            "nb_deputes": [int(r[1]) for r in rows],
-        }
-    )
+    schema = {"legislature": pl.Int64, "nb_deputes": pl.Int64, "granularite": pl.Utf8}
+    return pl.DataFrame([[r[0], r[1], granularite] for r in rows], schema=schema, orient="row")
 
 
 # ---------------------------------------------------------------------------
@@ -425,36 +436,79 @@ def get_historique_legislatures_an() -> pl.DataFrame:
 
 
 @st.cache_data(ttl=3600)
-def get_evolution_composition_an() -> pl.DataFrame:
-    """Composition AN par législature et bloc_final (tous les élus, pas seulement actifs)."""
+def get_evolution_composition_an(
+    codes_departement: tuple[str, ...] | None = None,
+) -> pl.DataFrame:
+    """Composition AN par législature et bloc_final (ADR-0011).
+
+    Bloc = classement du groupe **pour la législature du mandat** (clé groupe × législature),
+    puis override éventuel. Colonne ``granularite`` : ``derniere_legislature`` (Datan :
+    chaque député n'est compté que dans sa dernière législature) ou ``complete``.
+    """
+    con = _open_ro()
+    try:
+        granularite = _granularite_an(con)
+        rows: list = []
+        if granularite is not None:
+            params: list = [granularite]
+            sql = (
+                f"SELECT e.legislature, {_BLOC_SQL} AS bloc_final, "
+                "COUNT(DISTINCT e.elu_id) AS nb_elus "
+                "FROM v_mandats_legislatif e "
+                "WHERE e.chambre = 'AN' AND e.granularite = ? AND e.legislature IS NOT NULL"
+            )
+            sql += _dept_clause(codes_departement, params)
+            sql += " GROUP BY 1, 2 ORDER BY 1, 2"
+            rows = con.execute(sql, params).fetchall()
+    finally:
+        con.close()
+
+    schema = {
+        "legislature": pl.Int64,
+        "bloc_final": pl.Utf8,
+        "nb_elus": pl.Int64,
+        "granularite": pl.Utf8,
+    }
+    return pl.DataFrame(
+        [[r[0], r[1], r[2], granularite] for r in rows], schema=schema, orient="row"
+    )
+
+
+# ---------------------------------------------------------------------------
+# 11. get_fiche_elu
+# ---------------------------------------------------------------------------
+
+
+@st.cache_data(ttl=3600)
+def get_fiche_elu(elu_id: str, chambre: str) -> pl.DataFrame:
+    """Mandats d'un élu : groupe, bloc du groupe pour la législature, source du bloc."""
     con = _open_ro()
     try:
         rows = con.execute(
-            "SELECT e.legislature, "
-            "COALESCE(o.bloc_force, e.bloc_politique, 'DIV') AS bloc_final, "
-            "COUNT(*) AS nb_elus "
-            "FROM leg_elus e "
-            "LEFT JOIN leg_blocs_override o "
-            "ON e.id = o.elu_id AND e.chambre = o.chambre "
-            "WHERE e.chambre = 'AN' AND e.legislature IS NOT NULL "
-            "GROUP BY e.legislature, bloc_final "
-            "ORDER BY e.legislature, bloc_final"
+            f"SELECT e.nom, e.prenom, e.legislature, e.groupe_sigle, e.groupe_nom, "
+            f"e.code_departement, e.num_circo, e.date_debut, e.date_fin, "
+            f"{_BLOC_SQL} AS bloc_final, e.source_bloc, e.bloc_force IS NOT NULL, "
+            f"e.granularite "
+            f"FROM v_mandats_legislatif e WHERE e.elu_id = ? AND e.chambre = ? "
+            f"ORDER BY e.legislature NULLS LAST, e.date_debut",
+            [elu_id, chambre],
         ).fetchall()
     finally:
         con.close()
 
-    if not rows:
-        return pl.DataFrame(
-            schema={
-                "legislature": pl.Int64,
-                "bloc_final": pl.Utf8,
-                "nb_elus": pl.Int64,
-            }
-        )
-    return pl.DataFrame(
-        {
-            "legislature": [int(r[0]) for r in rows],
-            "bloc_final": [r[1] for r in rows],
-            "nb_elus": [int(r[2]) for r in rows],
-        }
-    )
+    schema = {
+        "nom": pl.Utf8,
+        "prenom": pl.Utf8,
+        "legislature": pl.Int64,
+        "groupe_sigle": pl.Utf8,
+        "groupe_nom": pl.Utf8,
+        "code_departement": pl.Utf8,
+        "num_circo": pl.Int64,
+        "date_debut": pl.Date,
+        "date_fin": pl.Date,
+        "bloc_final": pl.Utf8,
+        "source_bloc": pl.Utf8,
+        "override": pl.Boolean,
+        "granularite": pl.Utf8,
+    }
+    return pl.DataFrame([list(r) for r in rows], schema=schema, orient="row")

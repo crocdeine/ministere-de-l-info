@@ -73,7 +73,7 @@ ministere-de-l-info/
 │   │   ├── views.py                # v_population_{region,departement,epci,commune}
 │   │   ├── schema_elections.py     # Tables électorales + 8 vues (présidentielles, législatives)
 │   │   ├── schema_economie.py      # 5 tables + 6 vues Économie
-│   │   ├── schema_legislatif.py    # 3 tables + 2 vues Législatif
+│   │   ├── schema_legislatif.py    # 5 tables + 5 vues Législatif (ADR-0011)
 │   │   └── loaders/
 │   │       ├── regions.py, departements.py, epci.py, communes.py,
 │   │       │   arrondissements_municipaux.py, circonscriptions.py, populations.py
@@ -84,8 +84,8 @@ ministere-de-l-info/
 │   │       ├── economie_drees.py       # DREES APL → economie_social (upsert)
 │   │       ├── economie_urssaf.py      # URSSAF → economie_emploi_urssaf
 │   │       ├── economie_eurostat.py    # Eurostat SDMX → economie_contexte
-│   │       ├── legislatif_senat.py     # data.senat.fr ODSEN_GENERAL → leg_elus
-│   │       ├── legislatif_datan.py     # Datan (data.gouv.fr) → leg_elus + leg_activite
+│   │       ├── legislatif_senat.py     # data.senat.fr ODSEN_GENERAL → leg_elus + leg_mandats
+│   │       ├── legislatif_datan.py     # Datan → leg_elus + leg_mandats + leg_activite
 │   │       ├── legislatif_overrides.py # Corrections manuelles → leg_blocs_override
 │   │       ├── legislatif_nosdeputes.py  # Source abandonnée (non appelée)
 │   │       └── legislatif_clair.py       # Source abandonnée (non appelée)
@@ -161,7 +161,7 @@ data.gouv.fr (OLAP Filosofi + RP) ─┐
 data.caf.fr (CNAF)                 ├─ loaders/economie_* ─ load_economie.py ──► economie_*, v_* économie
 DREES, open.urssaf.fr, Eurostat    ─┘
 
-data.senat.fr, Datan (data.gouv.fr) ─ loaders/legislatif_* ─ load_legislatif.py ► leg_*, v_elus_hdf_actuels, v_activite_par_bloc
+data.senat.fr, Datan (data.gouv.fr) ─ loaders/legislatif_* ─ load_legislatif.py ► leg_*, v_elus_actuels, v_mandats_legislatif, v_activite_par_bloc
 
                                            ▼
                                    ministere.duckdb ──► viz/*_queries.py (@st.cache_data) ──► pages ──► navigateur
@@ -221,16 +221,21 @@ présidentielles), `v_evolution_economie_hdf`, `v_economie_sociale_commune`,
 
 ### Législatif
 
-Défini dans `etl/schema_legislatif.py` (ADR-0007). Chargé pour la France entière.
+Défini dans `etl/schema_legislatif.py` (ADR-0007, ADR-0011). Chargé pour la France entière.
+Classement des groupes : référentiel `etl/legislatif_groupes.py` → `leg_groupes_blocs`.
 
 | Table | Clé | Contenu | Volume (rapport F) |
 |-------|-----|---------|--------|
 | `leg_elus` | `(id, chambre)` | Identité, département, groupe, `bloc_politique`, `est_actif`, profession, source | 4 065 (2 120 AN + 1 945 Sénat) |
 | `leg_activite` | `(elu_id, chambre, date_extraction)` | Compteurs et scores Datan (AN uniquement) | 1 653 |
 | `leg_blocs_override` | `(elu_id, chambre)` | Bloc forcé + justification | 2 |
+| `leg_mandats` | logique `(elu_id, chambre, legislature, groupe_sigle, date_debut)` | Mandat × groupe ; `granularite` (`derniere_legislature` Datan, `groupe_actuel_ou_dernier` Sénat) | 1 par élu (sources actuelles) |
+| `leg_groupes_blocs` | `(chambre, groupe, [legislature_debut, legislature_fin])` | Groupe × période → bloc + `source_bloc` | ~56 |
 
-Vues : `v_elus_hdf_actuels` (élus actifs, `bloc_final` = override sinon bloc dérivé —
-nationale malgré son nom), `v_activite_par_bloc`.
+Vues : `v_elus_actuels` (élus actifs France entière, `bloc_final` = override sinon bloc du
+groupe pour la législature ; `v_elus_hdf_actuels` en est un alias déprécié),
+`v_mandats_legislatif`, `v_composition_legislature`, `v_activite_par_bloc`. Groupe non
+classé : `bloc_final` NULL (« Non classé » en UI), jamais DIV.
 
 ### Anomalies connues
 
@@ -345,6 +350,7 @@ Hooks : `ruff` (`--fix`), `ruff-format`, `trailing-whitespace`, `end-of-file-fix
 | [0007](adr/0007-module-legislatif-perimetre-et-sources.md) | Module Législatif — périmètre national, Datan + data.senat.fr |
 | [0008](adr/0008-economie-sources-complementaires.md) | Économie — sources complémentaires CNAF, DREES, URSSAF, Eurostat |
 | [0009](adr/0009-design-system-et-navigation.md) | Design system et navigation `st.navigation()` |
+| [0011](adr/0011-legislatif-groupes-par-legislature.md) | Législatif — classement des groupes par législature, mandats |
 
 ## Déploiement
 
