@@ -270,14 +270,30 @@ Chaque module déclare `logger = logging.getLogger(__name__)`.
 Les secrets et paramètres d'environnement sont lus depuis `.env` (gitignored) ;
 `.env.example` documente les variables attendues. Aucune clé API n'est hardcodée.
 
+`ministere_de_l_info.config` (pydantic-settings) centralise les paramètres :
+`get_settings().db_path` donne le chemin de la base, lu depuis `MINISTERE_DB_PATH`
+(environnement puis `.env`), par défaut `<racine du projet>/data/ministere.duckdb`.
+La racine est trouvée en remontant jusqu'au `pyproject.toml` du projet (pas de
+dépendance à une installation éditable). ETL, requêtes, pages et scripts l'utilisent.
+
 ### Tests
 
-- Framework : `pytest` + `pytest-cov`, seuil `--cov-fail-under=60` dans `pyproject.toml`.
-- 394 tests collectés, dont 13 marqués `slow` (Streamlit headless et AppTest) exclus par
-  défaut : `uv run pytest` en exécute 381 ; `uv run pytest -m slow` lance les autres.
+- Framework : `pytest` + `pytest-cov`, seuil `--cov-fail-under=38` dans `pyproject.toml`
+  (39,8 % mesurés le 2026-09-24 sans réseau, sans base ni extension spatial).
+- 442 tests collectés (2026-09-24), dont 13 marqués `slow` (Streamlit headless et AppTest)
+  et 16 marqués `network`, exclus par défaut : `uv run pytest` en sélectionne 413 ;
+  `uv run pytest -m slow` lance les tests `slow`.
 - Les tests d'intégration ouvrent `data/ministere.duckdb` en lecture seule et sont
   ignorés (`pytest.skip`) si la base est absente — c'est le cas en CI.
-- Certains tests appellent des API réelles (IGN, INSEE Mélodi, data.gouv.fr).
+- Les tests qui appellent des API réelles (IGN, INSEE Mélodi, data.gouv.fr) portent le
+  marqueur `network` et sont exclus par défaut (`-m "not slow and not network"`) ;
+  `uv run pytest -m network --no-cov` les lance.
+- Les tests qui exigent l'extension DuckDB `spatial` portent le marqueur `spatial` et
+  sont ignorés proprement si elle n'est pas installée (`tests/conftest.py`).
+- Base échantillon : `scripts/export_sample_db.py` (sur le Mac) exporte la Somme (80)
+  en Parquet dans `tests/fixtures/sample/` ; `tests/fixtures/sample_db.py` reconstruit
+  une base avec les fonctions de schéma du projet (fixtures `echantillon_con`,
+  `echantillon_db_path`). Sans Parquet, les tests concernés sont ignorés.
 - Exclus de la couverture (`[tool.coverage.run] omit`) : loaders ETL, `schema.py`,
   `schema_economie.py`, `schema_legislatif.py`, `views.py`, `_common.py`, les modules
   de pages Élections/Économie/Législatif et `elections_muni_queries.py`,
@@ -287,22 +303,25 @@ Les secrets et paramètres d'environnement sont lus depuis `.env` (gitignored) ;
 
 | Fichier | Périmètre |
 |---------|-----------|
-| `test_etl_territoires.py`, `test_etl_smoke.py`, `test_etl_regions.py`, `smoke_test_fetch_admin.py` | ETL géographie, intégrité de la base |
+| `test_etl_territoires.py`, `test_etl_smoke.py`, `test_etl_regions.py`, `test_fetch_admin_express.py` | ETL géographie, intégrité de la base |
 | `test_insee_populations.py`, `test_circonscriptions.py` | Connecteurs INSEE et circonscriptions |
 | `test_viz_maps.py`, `test_pages_geographie.py` | Carte Géographie |
 | `test_elections_*.py`, `test_pages_legislatives.py`, `test_pages_municipales.py` | Données, vues et requêtes électorales |
 | `test_economie.py` | Module Économie |
 | `test_legislatif.py` | Module Législatif |
 | `test_streamlit_smoke.py` | Démarrage de `app.py` (santé HTTP) + AppTest sur la page Élections (`slow`) |
+| `test_config.py`, `test_sample_db.py` | Configuration centralisée, base échantillon et son export |
 
 ### CI (GitHub Actions)
 
-`ci.yml` — déclenché sur push et pull request vers `main` uniquement :
+`ci.yml` — déclenché sur push vers `main` et `claude/**` et sur pull request vers
+`main` ; un seul run actif par ref (`concurrency`, annulation du précédent) :
 
 | Job | Étapes |
 |-----|--------|
 | **Lint & Format** | `ruff check .` + `ruff format --check .` |
-| **Tests & Coverage** | `uv sync --frozen --group etl`, `pytest` avec rapport de couverture en artefact |
+| **Tests & Coverage** | `uv sync --frozen --group etl`, extension `spatial` installée (cache `~/.duckdb/extensions`), `pytest` avec rapport de couverture en artefact |
+| **Typage** | `uvx pyright@1.1.408` en mode `basic`, non bloquant (`continue-on-error`) |
 
 `docker-publish.yml` — construit et publie l'image multi-architecture sur GHCR à chaque
 tag `v*`, à partir de `deploy/Dockerfile`.
