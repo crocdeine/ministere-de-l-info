@@ -302,7 +302,10 @@ def get_scores_bloc_commune_muni(annee: int, tour: int, code_commune: str) -> pl
 
 @st.cache_data(ttl=3600)
 def get_listes_commune_muni(annee: int, tour: int, code_commune: str) -> pl.DataFrame:
-    """Détail des listes pour une commune (vue liste du drill-down)."""
+    """Détail des listes pour une commune (vue liste du drill-down).
+
+    Une ligne par liste (numéro de panneau ; 2008 : descripteurs de liste), rang par voix.
+    """
     con = _open_ro()
     try:
         rows = con.execute(
@@ -311,7 +314,7 @@ def get_listes_commune_muni(annee: int, tour: int, code_commune: str) -> pl.Data
                    nom_tete_liste, prenom_tete_liste, voix, pct_exprimes
             FROM v_listes_commune_muni
             WHERE annee = ? AND tour = ? AND code_commune = ?
-            ORDER BY voix DESC NULLS LAST
+            ORDER BY voix DESC NULLS LAST, no_panneau NULLS LAST
             """,
             [annee, tour, code_commune],
         ).fetchall()

@@ -3,7 +3,8 @@
 Vues créées (CREATE OR REPLACE, idempotent) :
 - v_scores_commune_muni  : voix par (annee, tour, commune, bloc)
 - v_evolution_blocs_hdf_muni : agrégation HdF par scrutin × bloc
-- v_listes_commune_muni  : détail liste par liste (clé drill-down D3.3)
+- v_listes_commune_muni  : détail liste par liste (clé drill-down D3.3),
+  1 ligne par (annee, tour, commune, no_panneau) ; 2008 : descripteurs de liste
 
 Toutes les vues utilisent LEFT JOIN sur nuances_harmonisees : les nuances sans
 mapping (NC, LMAJ, LNC) produisent bloc = NULL, agrégées sous "Non classé" dans
@@ -119,15 +120,30 @@ def _create_v_evolution_blocs_hdf_muni(con) -> None:
     logger.info("Vue v_evolution_blocs_hdf_muni créée/mise à jour")
 
 
+# Scrutins dont no_panneau est synthétique (NULL dans le Parquet source, ROW_NUMBER par BV
+# au chargement, ADR-0005) : il n'identifie pas une liste d'un BV à l'autre.
+_ANNEES_NO_PANNEAU_SYNTHETIQUE: tuple[int, ...] = (2008,)
+
+
 def _create_v_listes_commune_muni(con) -> None:
     """Détail liste par liste par commune — clé pour le drill-down D3.3.
 
-    1 ligne par (annee, tour, commune, nuance). Conserve les métadonnées liste
-    (libelle_abrege_liste, libelle_etendu_liste, nom_tete_liste, prenom_tete_liste).
+    1 ligne par liste : (annee, tour, commune, no_panneau). no_panneau est le numéro
+    de panneau officiel, identique dans tous les BV d'une commune ; dans les communes
+    au scrutin plurinominal, une ligne = un candidat.
+
+    Cas 2008 (no_panneau synthétique, variable d'un BV à l'autre) : no_panneau = NULL
+    dans la vue et la liste est identifiée par (nuance, libellés, tête de liste).
+    Limite résiduelle : deux listes 2008 de même nuance sans libellé ni tête de liste
+    restent fusionnées (information absente de la source).
+
+    Correctif C1 (audit 2026-09-24) : la vue groupait par nuance, fusionnant les listes
+    de même nuance (voix additionnées, tête de liste arbitraire).
     bloc = NULL pour nuances sans mapping (NC, LMAJ, LNC).
-    pct_exprimes = voix_liste / exprimes_commune * 100.
+    pct_exprimes = voix_liste / exprimes_commune * 100 (NULL si bloc NULL).
     """
-    con.execute("""
+    annees_synth = ", ".join(str(a) for a in _ANNEES_NO_PANNEAU_SYNTHETIQUE)
+    con.execute(f"""
         CREATE OR REPLACE VIEW v_listes_commune_muni AS
         WITH exprimes_commune AS (
             SELECT rp.id_election, rp.code_commune, SUM(rp.exprimes) AS exprimes
@@ -135,31 +151,55 @@ def _create_v_listes_commune_muni(con) -> None:
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'muni'
             GROUP BY rp.id_election, rp.code_commune
+        ),
+        lignes AS (
+            SELECT
+                rc.id_election,
+                e.annee,
+                e.tour,
+                rc.code_commune,
+                CASE WHEN e.annee IN ({annees_synth}) THEN NULL
+                     ELSE rc.no_panneau END AS no_panneau,
+                rc.nuance,
+                nh.bloc,
+                rc.libelle_abrege_liste,
+                rc.libelle_etendu_liste,
+                rc.nom_tete_liste,
+                rc.prenom_tete_liste,
+                rc.voix
+            FROM resultats_candidats rc
+            JOIN elections e
+                ON e.id_election = rc.id_election
+            LEFT JOIN nuances_harmonisees nh
+                ON nh.nuance = rc.nuance AND nh.annee = e.annee
+            WHERE e.type_scrutin = 'muni'
         )
         SELECT
-            e.annee,
-            e.tour,
-            rc.code_commune,
-            rc.nuance,
-            nh.bloc,
-            MAX(rc.libelle_abrege_liste) AS libelle_abrege_liste,
-            MAX(rc.libelle_etendu_liste) AS libelle_etendu_liste,
-            MAX(rc.nom_tete_liste)       AS nom_tete_liste,
-            MAX(rc.prenom_tete_liste)    AS prenom_tete_liste,
-            SUM(rc.voix)                 AS voix,
-            CASE WHEN nh.bloc IS NOT NULL
-                 THEN ROUND(100.0 * SUM(rc.voix) / NULLIF(MAX(ex.exprimes), 0), 2)
-                 ELSE NULL END           AS pct_exprimes
-        FROM resultats_candidats rc
-        JOIN elections e
-            ON e.id_election = rc.id_election
-        LEFT JOIN nuances_harmonisees nh
-            ON nh.nuance = rc.nuance AND nh.annee = e.annee
+            l.annee,
+            l.tour,
+            l.code_commune,
+            l.no_panneau,
+            l.nuance,
+            l.bloc,
+            MAX(l.libelle_abrege_liste) AS libelle_abrege_liste,
+            MAX(l.libelle_etendu_liste) AS libelle_etendu_liste,
+            MAX(l.nom_tete_liste)       AS nom_tete_liste,
+            MAX(l.prenom_tete_liste)    AS prenom_tete_liste,
+            SUM(l.voix)                 AS voix,
+            CASE WHEN l.bloc IS NOT NULL
+                 THEN ROUND(100.0 * SUM(l.voix) / NULLIF(MAX(ex.exprimes), 0), 2)
+                 ELSE NULL END          AS pct_exprimes
+        FROM lignes l
         JOIN exprimes_commune ex
-            ON ex.id_election = rc.id_election AND ex.code_commune = rc.code_commune
-        WHERE e.type_scrutin = 'muni'
-        GROUP BY e.annee, e.tour, rc.code_commune, rc.nuance, nh.bloc
-    """)
+            ON ex.id_election = l.id_election AND ex.code_commune = l.code_commune
+        GROUP BY
+            l.annee, l.tour, l.code_commune, l.no_panneau, l.nuance, l.bloc,
+            -- 2008 (no_panneau NULL) : la liste est identifiée par ses descripteurs
+            CASE WHEN l.no_panneau IS NULL THEN l.libelle_abrege_liste END,
+            CASE WHEN l.no_panneau IS NULL THEN l.libelle_etendu_liste END,
+            CASE WHEN l.no_panneau IS NULL THEN l.nom_tete_liste END,
+            CASE WHEN l.no_panneau IS NULL THEN l.prenom_tete_liste END
+    """)  # noqa: S608
     logger.info("Vue v_listes_commune_muni créée/mise à jour")
 
 

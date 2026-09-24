@@ -199,3 +199,127 @@ class TestC3NuancesMunicipalesCorrectrices:
         with pytest.raises(duckdb.ConstraintException):
             populate_nuances_municipales(con)
         assert _n_muni(con) == 67
+
+
+# ── C1 — v_listes_commune_muni : une ligne par liste, pas par nuance ─────────────
+
+_MIGRATIONS = ROOT / "scripts" / "migrations"
+
+# (id_election, code_commune, code_bv, no_panneau, nuance, libelle, nom_tete, voix)
+_CANDIDATS_MUNI = [
+    # 2020 T1, 59350 : deux listes LDVD + une LSOC, deux BV (scénario de l'audit)
+    ("2020_muni_t1", "59350", "0001", 1, "LDVD", "LISTE A", "DUPONT", 100),
+    ("2020_muni_t1", "59350", "0001", 2, "LDVD", "LISTE B", "MARTIN", 80),
+    ("2020_muni_t1", "59350", "0001", 3, "LSOC", "LISTE C", "DURAND", 120),
+    ("2020_muni_t1", "59350", "0002", 1, "LDVD", "LISTE A", "DUPONT", 100),
+    ("2020_muni_t1", "59350", "0002", 2, "LDVD", "LISTE B", "MARTIN", 70),
+    ("2020_muni_t1", "59350", "0002", 3, "LSOC", "LISTE C", "DURAND", 110),
+    # 2020 T1, 02001 : scrutin plurinominal, nuance NULL, un candidat par panneau
+    ("2020_muni_t1", "02001", "0001", 1, None, None, "LEROY", 60),
+    ("2020_muni_t1", "02001", "0001", 2, None, None, "MOREAU", 55),
+    ("2020_muni_t1", "02001", "0001", 3, None, None, "PETIT", 40),
+    # 2008 T1, 59599 : no_panneau synthétique (ROW_NUMBER par BV, tri nuance + voix DESC)
+    # → ALPHA a le panneau 1 au BV 0001 mais le panneau 2 au BV 0002
+    ("2008_muni_t1", "59599", "0001", 1, "LDVD", "ALPHA", "ALPHA", 300),
+    ("2008_muni_t1", "59599", "0001", 2, "LDVD", "BETA", "BETA", 100),
+    ("2008_muni_t1", "59599", "0001", 3, "LSOC", "GAMMA", "GAMMA", 150),
+    ("2008_muni_t1", "59599", "0002", 1, "LDVD", "BETA", "BETA", 200),
+    ("2008_muni_t1", "59599", "0002", 2, "LDVD", "ALPHA", "ALPHA", 50),
+    ("2008_muni_t1", "59599", "0002", 3, "LSOC", "GAMMA", "GAMMA", 100),
+]
+
+# (id_election, code_commune, code_bv, exprimes)
+_PARTICIPATION_MUNI = [
+    ("2020_muni_t1", "59350", "0001", 300),
+    ("2020_muni_t1", "59350", "0002", 280),
+    ("2020_muni_t1", "02001", "0001", 70),
+    ("2008_muni_t1", "59599", "0001", 550),
+    ("2008_muni_t1", "59599", "0002", 350),
+]
+
+
+@pytest.fixture
+def con_listes(con: duckdb.DuckDBPyConnection) -> duckdb.DuckDBPyConnection:
+    """Base mémoire + colonnes listes (0006) + vue v_listes_commune_muni (0007)."""
+    m0006 = _charger_script(_MIGRATIONS / "0006_add_municipales_schema.py")
+    m0007 = _charger_script(_MIGRATIONS / "0007_add_municipales_views.py")
+    m0006._migrate_resultats_candidats(con, dry_run=False)
+    for id_el, commune, bv, exprimes in _PARTICIPATION_MUNI:
+        con.execute(
+            "INSERT INTO resultats_participation "
+            "(id_election, code_departement, code_commune, code_bv, exprimes) "
+            "VALUES (?, ?, ?, ?, ?)",
+            [id_el, commune[:2], commune, bv, exprimes],
+        )
+    for id_el, commune, bv, panneau, nuance, libelle, tete, voix in _CANDIDATS_MUNI:
+        con.execute(
+            "INSERT INTO resultats_candidats "
+            "(id_election, code_departement, code_commune, code_bv, no_panneau, nuance, voix, "
+            " libelle_abrege_liste, nom_tete_liste) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [id_el, commune[:2], commune, bv, panneau, nuance, voix, libelle, tete],
+        )
+    m0007._create_v_listes_commune_muni(con)
+    return con
+
+
+def _listes(con: duckdb.DuckDBPyConnection, annee: int, commune: str) -> list[tuple]:
+    return con.execute(
+        """
+        SELECT nom_tete_liste, nuance, bloc, voix, pct_exprimes
+        FROM v_listes_commune_muni
+        WHERE annee = ? AND tour = 1 AND code_commune = ?
+        ORDER BY voix DESC, nom_tete_liste
+        """,
+        [annee, commune],
+    ).fetchall()
+
+
+class TestC1VueListesUneLigneParListe:
+    def test_listes_meme_nuance_non_fusionnees(self, con_listes: duckdb.DuckDBPyConnection) -> None:
+        """Scénario audit : 59350 2020 T1, deux LDVD et une LSOC → 3 lignes."""
+        rows = _listes(con_listes, 2020, "59350")
+        assert [(r[0], r[3]) for r in rows] == [
+            ("DURAND", 230),
+            ("DUPONT", 200),
+            ("MARTIN", 150),
+        ]
+
+    def test_pct_exprimes_par_liste(self, con_listes: duckdb.DuckDBPyConnection) -> None:
+        rows = _listes(con_listes, 2020, "59350")
+        assert [float(r[4]) for r in rows] == [39.66, 34.48, 25.86]
+        assert [r[2] for r in rows] == ["GAU", "DTE", "DTE"]
+
+    def test_une_ligne_par_no_panneau(self, con_listes: duckdb.DuckDBPyConnection) -> None:
+        rows = con_listes.execute(
+            """
+            SELECT no_panneau, COUNT(*) FROM v_listes_commune_muni
+            WHERE annee = 2020 AND code_commune = '59350'
+            GROUP BY no_panneau ORDER BY no_panneau
+            """
+        ).fetchall()
+        assert rows == [(1, 1), (2, 1), (3, 1)]
+
+    def test_plurinominal_sans_nuance_un_candidat_par_ligne(
+        self, con_listes: duckdb.DuckDBPyConnection
+    ) -> None:
+        rows = _listes(con_listes, 2020, "02001")
+        assert [(r[0], r[3]) for r in rows] == [("LEROY", 60), ("MOREAU", 55), ("PETIT", 40)]
+        assert all(r[1] is None and r[2] is None and r[4] is None for r in rows)
+
+    def test_2008_no_panneau_synthetique_listes_par_descripteurs(
+        self, con_listes: duckdb.DuckDBPyConnection
+    ) -> None:
+        """2008 : le panneau synthétique varie d'un BV à l'autre, la liste est suivie
+        par ses descripteurs (libellé, tête de liste)."""
+        rows = _listes(con_listes, 2008, "59599")
+        assert [(r[0], r[3]) for r in rows] == [("ALPHA", 350), ("BETA", 300), ("GAMMA", 250)]
+        n_panneau = con_listes.execute(
+            "SELECT COUNT(no_panneau) FROM v_listes_commune_muni WHERE annee = 2008"
+        ).fetchone()[0]
+        assert n_panneau == 0
+
+    def test_total_voix_conserve(self, con_listes: duckdb.DuckDBPyConnection) -> None:
+        total_vue = con_listes.execute("SELECT SUM(voix) FROM v_listes_commune_muni").fetchone()[0]
+        total_table = sum(t[-1] for t in _CANDIDATS_MUNI)
+        assert total_vue == total_table
