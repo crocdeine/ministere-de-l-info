@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from ministere_de_l_info.data_sources.circonscriptions import (
@@ -32,6 +34,7 @@ def test_normalize_code_drom() -> None:
     assert _normalize_code("ZS01", "ZS") == "975-01"
 
 
+@pytest.mark.network
 def test_count() -> None:
     """Le dataset doit contenir entre 550 et 580 features (fourchette tolérante)."""
     data = fetch_circonscriptions_legislatives()
@@ -39,6 +42,7 @@ def test_count() -> None:
     assert 550 <= count <= 580, f"Nombre de features hors fourchette [550-580] : {count}"
 
 
+@pytest.mark.network
 def test_code_format() -> None:
     """Tous les codes normalisés respectent le format {dept}-{num:02d}."""
     data = fetch_circonscriptions_legislatives()
@@ -47,6 +51,7 @@ def test_code_format() -> None:
     assert not invalides, f"Codes invalides : {invalides[:10]}"
 
 
+@pytest.mark.network
 def test_drom_present() -> None:
     """Au moins une feature avec code_departement commençant par '97'."""
     data = fetch_circonscriptions_legislatives()
@@ -54,6 +59,7 @@ def test_drom_present() -> None:
     assert len(drom) >= 19, f"Attendu ≥19 features DROM, obtenu {len(drom)}"
 
 
+@pytest.mark.network
 def test_reprise_disque() -> None:
     """Un second appel force=False ne déclenche aucune requête HTTP."""
     # Premier appel pour s'assurer que le fichier existe

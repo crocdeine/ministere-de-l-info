@@ -8,9 +8,10 @@ import duckdb
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.etl.schema_elections import _CIRCO21_CODES
 
-DB_PATH: Path = Path(__file__).resolve().parents[3] / "data" / "ministere.duckdb"
+DB_PATH: Path = get_settings().db_path
 
 _CIRCO21_SQL: str = ", ".join(f"'{c}'" for c in _CIRCO21_CODES)
 _HDF_DEPTS_SQL: str = "'02', '59', '60', '62', '80'"

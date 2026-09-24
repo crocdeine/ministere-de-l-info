@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import duckdb
 import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
 from ministere_de_l_info._theme import render_page_header
+from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.viz.maps import make_choropleth
 
 render_page_header(
@@ -18,7 +17,7 @@ render_page_header(
     subtitle="Cartographie choroplèthe multi-niveaux et démographie INSEE.",
 )
 
-_DB_PATH = Path(__file__).parent.parent / "data" / "ministere.duckdb"
+_DB_PATH = get_settings().db_path
 
 _NIVEAU_LABELS: dict[str, str] = {
     "region": "Régions (18)",

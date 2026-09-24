@@ -23,4 +23,5 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ['--maxkb=1000']
-        exclude: \.pdf$
+        # Échantillon de test : budget global de 5 Mo contrôlé par scripts/export_sample_db.py
+        exclude: (\.pdf$|^tests/fixtures/sample/.*\.parquet$)

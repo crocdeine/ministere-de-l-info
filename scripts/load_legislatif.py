@@ -30,6 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.etl.loaders.legislatif_datan import load_legislatif_datan  # noqa: E402
 from ministere_de_l_info.etl.loaders.legislatif_overrides import load_overrides  # noqa: E402
@@ -40,7 +41,7 @@ from ministere_de_l_info.etl.schema_legislatif import (  # noqa: E402
 )
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
-_DB_PATH = ROOT / "data" / "ministere.duckdb"
+_DB_PATH = get_settings().db_path
 _RAW_DIR = ROOT / "data" / "raw"
 
 configure_logging()

@@ -13,13 +13,14 @@ import duckdb
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))  # noqa: E402
 
+from ministere_de_l_info.config import get_settings  # noqa: E402, I001
 from ministere_de_l_info.data_sources.geo import POPULATION_2024, fetch_regions_geojson  # noqa: E402, I001
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)
 
 RAW_PATH = ROOT / "data" / "raw" / "regions_2024.geojson"
-DB_PATH = ROOT / "data" / "ministere.duckdb"
+DB_PATH = get_settings().db_path
 
 
 def download_if_needed(force: bool) -> None:

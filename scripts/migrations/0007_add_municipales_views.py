@@ -24,13 +24,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
 configure_logging()
 logger = logging.getLogger(__name__)
 
-_DB_PATH = ROOT / "data" / "ministere.duckdb"
+_DB_PATH = get_settings().db_path
 
 
 def _create_v_scores_commune_muni(con) -> None:
