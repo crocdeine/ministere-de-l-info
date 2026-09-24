@@ -227,7 +227,8 @@ def exporter(
                 f"COPY (SELECT {select} FROM {_quote(spec.nom)}{where} ORDER BY ALL) "
                 f"TO '{chemin_sql}' (FORMAT parquet, COMPRESSION zstd)"
             )
-            n = con.execute(f"SELECT COUNT(*) FROM read_parquet('{chemin_sql}')").fetchone()[0]
+            ligne = con.execute(f"SELECT COUNT(*) FROM read_parquet('{chemin_sql}')").fetchone()
+            n = ligne[0] if ligne else 0
             taille = fichier.stat().st_size
             total += taille
             manifest["tables"][spec.nom] = {
@@ -266,7 +267,9 @@ def exporter(
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p = argparse.ArgumentParser(
+        description="Exporte un échantillon départemental de la base réelle en Parquet."
+    )
     p.add_argument("--source", type=Path, default=None, help="Base DuckDB source (défaut : config)")
     p.add_argument("--dest", type=Path, default=DEST_DEFAUT, help="Répertoire de sortie")
     p.add_argument("--departement", default=DEPARTEMENT_DEFAUT, help="Code département (80)")

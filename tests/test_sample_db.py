@@ -13,6 +13,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 
@@ -32,6 +33,13 @@ from fixtures.sample_db import (
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def _ligne(con: duckdb.DuckDBPyConnection, sql: str) -> tuple:
+    """Première ligne d'une requête (échec explicite si vide)."""
+    ligne = con.execute(sql).fetchone()
+    assert ligne is not None, sql
+    return ligne
+
+
 def _charger_script(chemin: Path) -> ModuleType:
     spec = importlib.util.spec_from_file_location(f"_test_{chemin.stem}", chemin)
     assert spec is not None and spec.loader is not None
@@ -48,7 +56,7 @@ _CARRE_WKT = "POLYGON ((2 49, 2.1 49, 2.1 49.1, 2 49.1, 2 49))"
 
 
 @pytest.fixture
-def source_synthetique() -> duckdb.DuckDBPyConnection:
+def source_synthetique() -> Iterator[duckdb.DuckDBPyConnection]:
     """Base source synthétique : schéma réel du projet, données inventées (80 et 59)."""
     con = duckdb.connect()
     creer_schema(con)
@@ -144,20 +152,22 @@ class TestExportAllerRetour:
             assert con.execute(
                 "SELECT DISTINCT code_departement FROM resultats_candidats"
             ).fetchall() == [("80",)]
-            wkt = con.execute(
-                "SELECT ST_AsText(geometry) FROM geographies_communes WHERE code_insee = '80001'"
-            ).fetchone()[0]
+            wkt = _ligne(
+                con,
+                "SELECT ST_AsText(geometry) FROM geographies_communes WHERE code_insee = '80001'",
+            )[0]
             assert wkt == "POLYGON ((2 49, 2.1 49, 2.1 49.1, 2 49.1, 2 49))"
-            type_geom = con.execute(
+            type_geom = _ligne(
+                con,
                 "SELECT data_type FROM information_schema.columns "
-                "WHERE table_name = 'geographies_communes' AND column_name = 'geometry'"
-            ).fetchone()[0]
+                "WHERE table_name = 'geographies_communes' AND column_name = 'geometry'",
+            )[0]
             assert type_geom.startswith("GEOMETRY")
             for vue in manifest_vues(tmp_path):
                 con.execute(f"SELECT * FROM {vue} LIMIT 1").fetchall()
-            n = con.execute(
-                "SELECT COUNT(*) FROM v_population_commune WHERE code_commune = '80001'"
-            ).fetchone()[0]
+            n = _ligne(
+                con, "SELECT COUNT(*) FROM v_population_commune WHERE code_commune = '80001'"
+            )[0]
             assert n == 1
         finally:
             con.close()
@@ -247,7 +257,7 @@ class TestEchantillonReel:
             "nuances_harmonisees",
             "leg_elus",
         ):
-            n = echantillon_con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            n = _ligne(echantillon_con, f"SELECT COUNT(*) FROM {table}")[0]
             assert n > 0, table
 
     def test_toutes_les_vues_executables(
@@ -279,14 +289,15 @@ class TestEchantillonReel:
         """Contrôle géométrique : centroïdes des communes dans le polygone du département."""
         con = construire_base(charger_spatial=True)
         try:
-            n_total, n_dedans = con.execute(
+            n_total, n_dedans = _ligne(
+                con,
                 """
                 SELECT COUNT(*),
                        COUNT(*) FILTER (WHERE ST_Within(ST_Centroid(c.geometry), d.geometry))
                 FROM geographies_communes c
                 JOIN geographies_departements d ON d.code_insee = c.code_departement
-                """
-            ).fetchone()
+                """,
+            )
         finally:
             con.close()
         assert n_total > 0

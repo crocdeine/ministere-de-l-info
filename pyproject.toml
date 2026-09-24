@@ -56,7 +56,7 @@ addopts = [
     "--cov-report=html",
     "--cov-report=xml",
     # Seuil mesuré le 2026-09-24 sans réseau, sans base et sans extension spatial :
-    # 40,0 % (tests network et slow exclus). Fixé un peu en dessous pour rester honnête.
+    # 39,8 % (tests network et slow exclus). Fixé un peu en dessous pour rester honnête.
     # Objectif : le remonter (vers 60-70 %) une fois les Parquet de
     # tests/fixtures/sample/ committés et les tests de vues/requêtes branchés dessus.
     "--cov-fail-under=38",
@@ -122,3 +122,18 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pyright]
+# QA4 : typage vérifié en mode basic, non bloquant en CI dans un premier temps
+# (voir .github/workflows/ci.yml, job typecheck).
+typeCheckingMode = "basic"
+pythonVersion = "3.12"
+include = ["src", "pages", "app.py", "scripts", "tests"]
+exclude = [".claude", ".venv", "data", "notebooks", "**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+executionEnvironments = [
+    { root = "tests", extraPaths = ["tests", "src"] },
+    { root = "scripts", extraPaths = ["src"] },
+    { root = "." },
+]

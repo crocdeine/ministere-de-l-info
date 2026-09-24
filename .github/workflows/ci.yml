@@ -2,9 +2,17 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "claude/**"]
   pull_request:
     branches: [main]
+
+# Un seul run actif par workflow et par ref : un nouveau push annule le précédent.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   lint:
@@ -51,10 +59,24 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --group etl
 
+      # Extension spatial : téléchargée une fois puis mise en cache. Les tests marqués
+      # `spatial` (test_viz_maps, contrôles géométriques de l'échantillon) s'exécutent
+      # alors ; sans elle ils sont ignorés (conftest.py), jamais en échec.
+      - name: Cache DuckDB extensions
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.duckdb/extensions
+          key: duckdb-ext-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+
+      - name: Install DuckDB spatial extension
+        run: uv run python -c "import duckdb; duckdb.connect().install_extension('spatial')"
+
+      # Par défaut (pyproject.toml) : -m "not slow and not network" et seuil de couverture.
       - name: Run tests with coverage
         run: uv run pytest --cov-report=xml
 
       - name: Upload coverage report
+        if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
           name: coverage-report
@@ -62,3 +84,29 @@ jobs:
             htmlcov/
             coverage.xml
           retention-days: 30
+
+  typecheck:
+    name: Typage (pyright basic, non bloquant)
+    runs-on: ubuntu-latest
+    # Non bloquant dans un premier temps (QA4) : le job peut échouer sans faire
+    # échouer le workflow. 178 erreurs relevées le 2026-09-24 (pyright 1.1.408).
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen --group etl
+
+      # Configuration dans pyproject.toml ([tool.pyright]) ; version figée.
+      - name: Pyright
+        run: uvx pyright@1.1.408

@@ -26,7 +26,7 @@ def test_project_root_contient_pyproject() -> None:
 
 def test_defaut_sous_data(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("MINISTERE_DB_PATH", raising=False)
-    s = Settings(_env_file=None)
+    s = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
     assert s.db_path == DEFAULT_DB_PATH
     assert s.db_path == PROJECT_ROOT / "data" / "ministere.duckdb"
 
@@ -50,7 +50,8 @@ def test_tilde_developpe(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
 
 def test_variable_vide_ignoree(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MINISTERE_DB_PATH", "")
-    assert Settings(_env_file=None).db_path == DEFAULT_DB_PATH
+    s = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    assert s.db_path == DEFAULT_DB_PATH
 
 
 def test_get_settings_en_cache(monkeypatch: pytest.MonkeyPatch) -> None:
