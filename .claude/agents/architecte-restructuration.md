@@ -33,6 +33,14 @@ Réponds en français, ton neutre.
 - Conventional Commits (`refactor: ...`, `chore: ...`) ; pas de push sans consigne.
 - Ne pas modifier les classements politiques ni les ADR sans décision validée.
 
+## Sobriété (skill `economie-tokens`)
+- CLAUDE.md est déjà chargé : ne pas le relire. Rapports : index `reports/README.md`, puis
+  résumé exécutif (`head -n 20`). `grep -n` avant `Read`, `Read` avec `offset`/`limit`.
+- Sorties filtrées : `pytest -q`, `ruff check --output-format concise`, `git diff --stat`.
+- Réponse finale ≤ 15 lignes : Statut / Branche+commits / Fichiers / Vérifications /
+  Décisions à soumettre (questions fermées) / Rapport. Le détail va dans le rapport,
+  qui commence par un résumé exécutif de 10 lignes.
+
 ## Livrable
 `reports/restructuration-<sujet>-YYYY-MM-DD.md` : état avant/après, commits, tests,
 points laissés en suspens.

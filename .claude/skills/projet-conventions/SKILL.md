@@ -1,6 +1,6 @@
 ---
 name: projet-conventions
-description: Conventions complètes du projet ministere-de-l-info. À charger pour toute tâche de développement dans ce projet : nouveau script ETL, nouvelle page Streamlit, nouvelle vue SQL, nouveau test, nouvelle table DuckDB, nouveau loader, refactorisation. Contient le schéma DuckDB réel (tables et vues par module), la structure des fichiers, les conventions de code et de nommage, les commandes courantes.
+description: "Conventions du projet ministere-de-l-info : schéma DuckDB réel (tables et vues par module), arborescence, nommage, commandes courantes. À charger avant de créer ou modifier un loader, une table, une vue SQL, une page, un test, ou de refactoriser."
 ---
 
 # Conventions projet — ministere-de-l-info
