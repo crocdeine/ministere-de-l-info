@@ -106,3 +106,6 @@ nohup.out
 
 # ===== Claude Code (worktrees temporaires des agents) =====
 .claude/worktrees/
+
+# Échantillon de test commité (données publiques, < 5 Mo) : exception à *.parquet
+!tests/fixtures/sample/*.parquet

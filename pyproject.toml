@@ -59,7 +59,9 @@ addopts = [
     "--cov-config=pyproject.toml",
 ]
 markers = [
-    "slow: tests démarant un processus externe (Streamlit). Lancer avec: pytest -m slow",
+    "slow: tests démarrant un processus externe (Streamlit). Lancer avec : pytest -m slow",
+    "network: tests appelant un service externe (IGN, INSEE, data.gouv). Lancer avec : pytest -m network",
+    "spatial: tests exigeant l'extension DuckDB spatial (ignorés si elle n'est pas installée)",
 ]
 testpaths = ["tests"]
 
