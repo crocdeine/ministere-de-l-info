@@ -22,7 +22,8 @@ mkdir -p "$BACKUP_DIR"
 
 # Logger qui écrit dans le log et stdout
 log() {
-    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+    local msg
+    msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
     echo "$msg" | tee -a "$LOG_FILE"
 }
 

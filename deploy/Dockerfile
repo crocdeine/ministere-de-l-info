@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
-# uv depuis l'image officielle
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+# uv depuis l'image officielle — version figée, alignée sur le Dockerfile racine
+COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /uvx /usr/local/bin/
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
