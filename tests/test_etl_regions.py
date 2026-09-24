@@ -5,9 +5,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from ministere_de_l_info.data_sources.geo import POPULATION_2024, fetch_regions_geojson
+
+# Appels réels à l'API IGN / geo : exclus par défaut (voir pyproject.toml).
+pytestmark = pytest.mark.network
 
 _CODES_METRO_ATTENDUS = frozenset(POPULATION_2024.keys())
 
