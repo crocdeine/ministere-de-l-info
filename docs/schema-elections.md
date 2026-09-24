@@ -1,7 +1,11 @@
 # Schéma électoral DuckDB
 
 Référence des 6 tables électorales créées par `create_elections_schema()` dans
-`src/ministere_de_l_info/etl/schema_elections.py`.
+`src/ministere_de_l_info/etl/schema_elections.py`, complétées par les migrations
+`scripts/migrations/0006_add_municipales_schema.py` (colonnes de liste) et
+`0007_add_municipales_views.py` (vues municipales).
+
+Mis à jour le 2026-09-24 sur la base du code (ADR-0010).
 
 **Périmètre géographique** : Hauts-de-France uniquement (code_region = `'32'`).
 Le filtrage est appliqué au chargement des résultats (C2b), pas dans ce schéma.
@@ -98,9 +102,19 @@ Résultats par candidat, par bureau de vote. Correspond au fichier source
 | `prenom` | `VARCHAR` | Prénom |
 | `voix` | `INTEGER` | Nombre de voix obtenues dans ce bureau |
 
-**Colonnes de liste non stockées** (scrutins de liste : euro, regi, muni) :
-`liste`, `libelle_abrege_liste`, `libelle_etendu_liste`, `nom_tete_liste`, `binome`.
-Ces colonnes seront ajoutées en version C2c lors de l'extension aux autres scrutins.
+**Colonnes de liste** (ajoutées par la migration 0006, renseignées pour les municipales) :
+
+| Colonne | Type | Description |
+|---------|------|-------------|
+| `liste` | `VARCHAR` | Identifiant de liste du Parquet |
+| `libelle_abrege_liste` | `VARCHAR` | Libellé court de la liste |
+| `libelle_etendu_liste` | `VARCHAR` | Libellé long de la liste |
+| `nom_tete_liste` | `VARCHAR` | Nom de la tête de liste |
+| `prenom_tete_liste` | `VARCHAR` | Toujours NULL (absent du Parquet) |
+
+Municipales : `nom` et `prenom` sont NULL (scrutin de liste). En 2008, `no_panneau` est
+synthétique (`ROW_NUMBER()` par bureau, ADR-0005) et n'identifie pas une liste d'un
+bureau à l'autre.
 
 ---
 
@@ -108,10 +122,14 @@ Ces colonnes seront ajoutées en version C2c lors de l'extension aux autres scru
 
 Référentiel des **6 blocs de clivages officiels** du Ministère de l'Intérieur.
 
-**Origine** : circulaire IOMA2322276J du 16 août 2023 (sénatoriales 2023), première
-circulaire à formaliser ce regroupement. Pour les scrutins antérieurs à 2023, les blocs
-sont reconstruits selon la logique officielle, avec classement "de l'époque"
-(voir [ADR-0005](adr/0005-nuances-et-blocs-officiels.md) et
+**Origine** : la première grille officielle de blocs est l'annexe 3 de la circulaire
+INTA1931378J du 3 février 2020 (municipales 2020), où le bloc « divers » s'appelle
+`AUT`. Suivent IOMA2322276J (sénatoriales 2023, « Autres ») et INTP2602966C
+(municipales 2026, `DIV`). Pour un scrutin sans grille, la doctrine de
+l'[ADR-0010](adr/0010-revision-nuances-et-blocs.md) s'applique : grille la plus proche
+dans le temps (antérieure de préférence) si le code y désigne la même famille
+politique, sinon classement reconstruit justifié (voir aussi
+[ADR-0005](adr/0005-nuances-et-blocs-officiels.md) et
 [index des circulaires archivées](sources-officielles/nuances/index.md)).
 
 | Colonne | Type | Description |
@@ -134,9 +152,11 @@ sont reconstruits selon la logique officielle, avec classement "de l'époque"
 
 Les couleurs sont indicatives et ajustables sans toucher au schéma.
 
-**Note** : la grille officielle ne comporte pas de bloc "écologistes" distinct.
-Les formations écologistes sont classées selon leur position sur l'axe gauche-droite
-(EELV/Verts → `GAU` ; écologie centriste type Cap21 → `CENT`).
+**Note** : les grilles officielles ne comportent pas de bloc "écologistes" distinct.
+Règle (ADR-0010) : `VEC`/`LVEC` (Verts, EELV, Les Écologistes) → `GAU` sur tous les
+scrutins ; `ECO`/`LECO` (autres écologistes, dont Cap 21) → `DIV`, comme dans les grilles
+2020, 2023 et 2026, sauf pour les législatives 2017 et 2022 où le code `ECO` englobe EELV
+(pas de code `VEC`) et reste `GAU`.
 
 ---
 
@@ -151,10 +171,29 @@ Mapping `(nuance, annee) → bloc` pour les scrutins **avec nuances** dans le Pa
 | `bloc` | `VARCHAR` NN | FK → `blocs_politiques.bloc` |
 | `source_bloc` | `VARCHAR` | Justification courte du classement (1 ligne, modèle `candidats_presidentielle`) |
 
-**Couverture** : **149 entrées** = 38 présidentielles (codes-candidats 2002/2007/2012)
-+ **111 législatives** (codes partisans, 2002-2024). Détail et validation des nuances
-législatives : `reports/mapping-nuances-legislatives-validated.md`, méthodologie en
-ADR-0005 (§ « Application aux législatives 2002-2024 »).
+**Couverture** : **226 entrées**, source unique `schema_elections.py` (listes
+`_NUANCES_PRES`, `_NUANCES_LEGI`, `_NUANCES_MUNI`) :
+
+| Jeu | Années | Entrées |
+|-----|--------|---------|
+| Présidentielles (codes-candidats) | 2002 (16), 2007 (12), 2012 (10) | 38 |
+| Législatives (codes partisans) | 2002 (22), 2007 (17), 2012 (17), 2017 (17), 2022 (16), 2024 (22) | 111 |
+| Municipales (codes de liste) | 2008 (12), 2014 (17), 2020 (23), 2026 (25) | 77 |
+
+Les listes municipales 2020 et 2026 reprennent intégralement les codes de liste des
+grilles officielles (INTA1931378J et INTP2602966C, annexes 3). Codes municipaux
+volontairement **non insérés** (bloc NULL dans les vues) : `NC` (2014, 2020), `LNC`
+(2020), `LMAJ` (2008, exclusion en attente de vérification, ADR-0010).
+
+Chargement : `populate_elections_referentiels()` réécrit les trois jeux ;
+`populate_nuances_municipales()` (appelée par `scripts/load_elections_municipales.py`)
+remplace les seules années municipales (`DELETE` ciblé + `INSERT`, transaction). Un
+garde-fou refuse l'écriture si une année municipale est partagée avec pres/legi : la clé
+ne contient pas `type_scrutin` (audit M5, point ouvert de l'ADR-0010).
+
+Détail et validation : `reports/mapping-nuances-legislatives-validated.md`,
+`reports/mapping-nuances-municipales-validated.md`, ADR-0005 (§ « Application… ») et
+ADR-0010 (reclassements du 2026-09-24).
 
 **Note** : pour les présidentielles 2002/2007/2012, les codes nuances sont des
 **codes-candidats** (ex. `CHIR` = Chirac, `JOSP` = Jospin), différents des codes
@@ -248,32 +287,64 @@ et [l'index des circulaires](sources-officielles/nuances/index.md) pour les sour
 
 | Candidat / Nuance | Bloc retenu | Justification |
 |-------------------|-------------|---------------|
-| MÉLENCHON (2012, 2017, 2022) | `GAU` | LFI classé GAU par circulaire IOMA2322276J (2023) ; bascule EXG seulement avec INTP2602966C (2026) |
-| ROUSSEL Fabien (2022) | `GAU` | PCF = nuance gauche dans logique officielle |
-| DUPONT-AIGNAN (2012, 2017, 2022) | `DTE` | DLR/DLF = souverainiste gaulliste droite ; CE 31/01/2020 n°437675 suspend classement EXD |
+| MÉLENCHON (2012, 2017, 2022) | `GAU` | FI → GAU dans les grilles 2020 (INTA1931378J) et 2023 (IOMA2322276J) ; bascule EXG seulement avec INTP2602966C (2026) |
+| ROUSSEL Fabien (2022) | `GAU` | PCF : COM/LCOM → GAU dans toutes les grilles officielles |
+| DUPONT-AIGNAN (2012, 2017, 2022) | `DTE` | DLF → DTE dans la grille 2020 (INTA1931378J) ; CE 31/01/2020 n°437675 suspend le classement EXD |
 | de VILLIERS (2007) | `DTE` | MPF = nuance DVDR (divers droite) dans logiques de l'époque |
 | BOVÉ (2007) | `GAU` | Écologie de gauche ; nuances Verts classées GAU dans logique officielle |
-| LEPAGE (2002) | `CENT` | Cap21 = écologie centriste libérale ; pas de bloc écolo officiel |
-| MAMÈRE (2002), VOYNET (2007), JOLY (2012) | `GAU` | Verts/EELV = allié PS, nuances classées GAU |
+| LEPAGE (2002) | `DIV` | Cap 21 rangé dans ECO → AUT (= DIV) par la grille 2020 (ADR-0010 ; avant : CENT) |
+| MAMÈRE (2002), VOYNET (2007), JOLY (2012) | `GAU` | Verts/EELV = VEC → GAU dans toutes les grilles |
+| SAINT-JOSSE (2002), NIHOUS (2007), CPNT (legi 2002, 2007) | `DIV` | CPNT autonome à l'époque ; son rangement dans DVD (grille 2020) reflète l'association à l'UMP/LR après 2010 (ADR-0010) |
 | ASSELINEAU (2017) | `DIV` | UPR = souverainiste inclassable, nuance DIVC |
+| ECO (legi 2002, 2007, 2012, 2024) | `DIV` | Écologistes hors Verts/EELV (VEC distinct) ; grilles 2020/2023 : ECO → AUT/Autres (ADR-0010) |
+| ECO (legi 2017, 2022) | `GAU` | ECO englobe EELV (pas de code VEC) : sens différent de la grille 2020 (ADR-0010) |
+| UDI (legi 2024) | `DTE` | Grille antérieure la plus proche IOMA2322276J (2023) : UDI → Droite (ADR-0010) |
+| UDI (legi 2017, 2022) | `CENT` | Grille la plus proche INTA1931378J (2020) : UDI → CENT |
+| PRV (legi 2012) | `CENT` | Mouvement radical (successeur du PRV) → CENT en 2020 (ADR-0010 ; avant : DTE) |
+| LCOM (muni 2008-2026) | `GAU` | Grilles 2020 et 2026 ; 2008/2014 par la grille 2020 (ADR-0010 ; avant : EXG) |
+| LUDI / LUD / LECO (muni) | `CENT` / `DTE` / `DIV` | Grilles 2020 et 2026 (ADR-0010) |
+| LCMD, LGC, LMC (muni 2008), LMAJ (exclu) | inchangés | Libellés 2008 à vérifier sur les archives du ministère (ADR-0010, points ouverts) |
 
 Toute modification doit être tracée (commit motivé + mise à jour de `source_bloc`).
 
 ---
 
-## Vues d'agrégation (C2b)
+## Vues d'agrégation
 
-Cinq vues créées par `create_elections_views()` dans `schema_elections.py`,
-appelée par `scripts/init_elections_schema.py`. Idempotentes (`CREATE OR REPLACE`).
+**11 vues**, toutes idempotentes (`CREATE OR REPLACE VIEW`) :
+
+| Vue | Créée par | Scrutin | Grain |
+|-----|-----------|---------|-------|
+| `v_resultats_candidats_avec_bloc` | `create_elections_views()` | tous | BV × candidat |
+| `v_scores_commune_pres` | `create_elections_views()` | pres | commune × bloc |
+| `v_participation_commune_pres` | `create_elections_views()` | pres | commune |
+| `v_scores_circo21_pres` | `create_elections_views()` | pres | commune (circo 59-21) × bloc |
+| `v_evolution_blocs_circo21` | `create_elections_views()` | pres | année × tour × bloc |
+| `v_scores_circo_legi` | `create_elections_views()` | legi | circonscription × bloc |
+| `v_participation_circo_legi` | `create_elections_views()` | legi | circonscription |
+| `v_evolution_blocs_hdf_legi` | `create_elections_views()` | legi | année × tour × bloc |
+| `v_scores_commune_muni` | migration 0007 | muni | commune × bloc |
+| `v_evolution_blocs_hdf_muni` | migration 0007 | muni | année × tour × bloc |
+| `v_listes_commune_muni` | migration 0007 | muni | commune × liste |
+
+`create_elections_views()` est appelée par `scripts/init_elections_schema.py` ; les vues
+municipales par `uv run python scripts/migrations/0007_add_municipales_views.py`.
+
+**Résolution du bloc selon le scrutin** (conséquence visible des reclassements) :
+- présidentielles : `COALESCE(nh.bloc, cp.bloc)` ; bloc NULL si le code est absent ;
+- législatives : `COALESCE(nh.bloc, 'DIV')` — une nuance absente du référentiel tombe
+  en `DIV` (le test `test_elections_legislatives.py` vérifie qu'aucune n'est absente) ;
+- municipales : `LEFT JOIN` sans repli — bloc NULL (« Non classé ») pour `NC`, `LNC`,
+  `LMAJ` et les communes sans nuance ; `pct_exprimes` est alors NULL.
 
 ### `v_resultats_candidats_avec_bloc`
 
-Résultats au bureau de vote avec le **bloc politique résolu** pour chaque candidat.
-Couvre les présidentielles 2002–2022 (et tout autre scrutin chargé ultérieurement).
+Résultats au bureau de vote avec le **bloc politique résolu** pour chaque candidat,
+tous scrutins chargés (colonne `type_scrutin`).
 
 Résolution du bloc via `COALESCE(nh.bloc, cp.bloc)` :
-- 2002/2007/2012 : jointure `nuances_harmonisees` sur `(nuance, annee)`
-- 2017/2022 : jointure `candidats_presidentielle` sur `(nom, annee)` (nuance NULL)
+- scrutins avec nuance : jointure `nuances_harmonisees` sur `(nuance, annee)`
+- présidentielles 2017/2022 : jointure `candidats_presidentielle` sur `(nom, annee)` (nuance NULL)
 
 | Colonne | Description |
 |---------|-------------|
@@ -328,7 +399,44 @@ Exemple de résultat (1er tour) :
 | 2017 | EXD | 18 311 |
 | 2022 | EXD | 21 637 |
 
+(Valeurs relevées avant l'ADR-0010 ; le reclassement de Lepage 2002 de CENT en DIV
+modifie la ventilation 2002 sans changer le bloc dominant.)
+
+### `v_scores_circo_legi`, `v_participation_circo_legi`, `v_evolution_blocs_hdf_legi`
+
+Législatives : voix par `(id_election, annee, tour, ancien_decoupage, code_circo, bloc)`,
+participation par circonscription (`taux_participation_pct`), puis agrégat HdF par
+`(annee, tour, ancien_decoupage, bloc)`. Seuls les bureaux dont `code_circo` est renseigné
+sont comptés. `ancien_decoupage` = TRUE pour 2002/2007 (avant le redécoupage de 2010).
+
+### `v_scores_commune_muni`
+
+Municipales : `(annee, tour, code_commune, bloc)` → `voix`, `pct_exprimes`
+(voix / exprimés de la commune, NULL si bloc NULL).
+
+### `v_evolution_blocs_hdf_muni`
+
+Municipales, agrégat HdF : `(annee, tour, bloc)` → `voix`, `pct_exprimes`
+(voix / exprimés HdF, NULL si bloc NULL).
+
+### `v_listes_commune_muni`
+
+Détail liste par liste (drill-down) : une ligne par `(annee, tour, code_commune,
+no_panneau)` avec nuance, bloc, libellés, tête de liste, voix, `pct_exprimes`. En 2008,
+`no_panneau` est NULL et la liste est identifiée par ses descripteurs (correctif C1).
+
 ---
+
+## Tables économiques
+
+Déplacé : le schéma économique (5 tables, 6 vues) est documenté dans
+[`docs/architecture.md`](architecture.md), l'[ADR-0006](adr/0006-module-economie-sources-et-schema.md)
+et l'[ADR-0008](adr/0008-economie-sources-complementaires.md) ; source de vérité :
+`src/ministere_de_l_info/etl/schema_economie.py`. L'ancienne section ci-dessous est
+conservée pour mémoire et n'est **plus à jour** (millésimes et colonnes).
+
+<details>
+<summary>Ancienne section (Phase E, non maintenue)</summary>
 
 ## Tables économiques (Phase E — ADR-0006)
 
@@ -372,3 +480,5 @@ Deux tables séparées par source, structure large cohérente avec les tables
 | `v_economie_commune` | Commune × an | Fusion Filosofi + RP, indicateurs bruts |
 | `v_croisement_eco_elections` | Commune × élection | Croisement `v_scores_commune_pres` + éco (n-1) |
 | `v_evolution_economie_hdf` | An | Agrégats régionaux (moyennes HdF) |
+
+</details>
