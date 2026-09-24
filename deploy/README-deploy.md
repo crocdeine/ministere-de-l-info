@@ -1,5 +1,11 @@
 # Guide de déploiement — ministere-de-l-info
 
+> Sur le Mac mini de Mathias, l'application tourne désormais **en natif** (uv + LaunchAgent,
+> [ADR-0012](../docs/adr/0012-execution-native-mac.md)) : scripts dans `deploy/native/`,
+> procédure dans [`docs/deployment.md`](../docs/deployment.md). Ce guide couvre la
+> publication des releases (image + base) et l'installation Docker (`install.sh`,
+> `update.sh`), conservée en repli et pour la distribution.
+
 ## Publier une nouvelle version
 
 1. S'assurer que les tests passent :
