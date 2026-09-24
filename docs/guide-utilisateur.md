@@ -65,7 +65,9 @@ Le menu **« Niveau territorial »** propose 6 découpages :
 - Carte de population : **jaune clair** = faible population, **rouge foncé** = forte
   population. Carte d'évolution : du rouge (baisse) au vert (hausse).
 - La **légende** indique les seuils. **Survoler** un territoire affiche son nom et sa valeur.
-- Sous la carte, un **tableau** liste les territoires (200 premiers, triés par population).
+- Sous la carte, un **tableau** liste tous les territoires correspondant aux filtres, triés
+  par population décroissante. Cliquer sur un en-tête de colonne le trie ; « n.d. » signale
+  une donnée non disponible. Le bouton **Télécharger le tableau en CSV** l'exporte.
 
 ### Filtres
 
@@ -86,10 +88,12 @@ propres sélecteurs, placés au-dessus de la carte.
 
 ### Onglet Présidentielles (2002-2022)
 
-- Choisir l'**année**, le **tour**, la **zone** (circonscription 21 — Valenciennes, 20
-  communes ; ou Hauts-de-France entière, plus lente à afficher) et le **mode de carte** :
+- Choisir l'**année**, le **tour**, la **zone** (21e circonscription du Nord — Valenciennes,
+  20 communes ; ou Hauts-de-France entière, plus lente à afficher) et le **mode de carte** :
   - **Bloc dominant** : chaque commune prend la couleur du bloc arrivé en tête ;
   - **Score d'un bloc** : choisir un bloc, la carte montre son pourcentage par commune.
+- La métrique **Participation** est le taux de la zone : total des votants divisé par le
+  total des inscrits (chaque commune pèse selon son nombre d'inscrits).
 - **Évolution des blocs sur 25 ans** : graphique par tour, en voix ou en part des
   suffrages exprimés.
 - **Détail par commune** puis **Détail par bureau de vote** : choisir une commune dans la
@@ -170,20 +174,25 @@ onglets.
 |------------|--------|--------|
 | Taux de pauvreté, niveau de vie médian | INSEE Filosofi | 2017-2021 |
 | Taux de chômage (recensement), part ouvriers + employés, part emploi industriel, part logements sociaux | INSEE Recensement | 2015-2021 |
-| Allocataires du RSA (foyers) | CNAF | 2020-2024 |
+| Allocataires du RSA (nombre de foyers, pas un taux) | CNAF | 2020-2024 |
 | Accessibilité aux médecins généralistes (APL) | DREES | 2023 |
 
 - Les communes en **gris** n'ont pas de donnée (secret statistique de l'INSEE pour les
   très petites communes, ou valeur manquante).
-- **Drill-down commune** (encadré repliable sous la carte) : choisir une commune pour
+- La carte du RSA montre un **nombre** de foyers : les communes les plus peuplées
+  ressortent mécaniquement.
+- **Détail d'une commune** (encadré repliable sous la carte) : choisir une commune pour
   voir tous ses indicateurs et leur évolution.
 
 ### Onglet Évolution HdF
 
 Trois vues au choix :
 
-- **Revenus & emploi (INSEE 2017-2021)** : moyennes régionales (pauvreté, niveau de vie,
-  chômage) ;
+- **Revenus & emploi (INSEE)** : agrégats régionaux calculés depuis les communes. Le taux
+  de chômage est pondéré par le nombre d'actifs (≈ chômeurs / actifs de la région,
+  2015-2021) ; le taux de pauvreté est une moyenne simple des communes et le niveau de
+  vie une médiane des médianes communales (2017-2021) : ce ne sont pas les valeurs
+  régionales officielles de l'INSEE ;
 - **Allocataires RSA (CNAF 2020-2024)** ;
 - **Contexte HdF vs France (Eurostat)** : taux de chômage au sens du BIT et PIB par
   habitant, région comparée à la France, avec l'écart de la dernière année.
@@ -191,11 +200,15 @@ Trois vues au choix :
 ### Onglet Économie × Élections
 
 Nuage de points : chaque point est une commune. Axe horizontal = un indicateur
-économique ; axe vertical = le pourcentage de voix d'un bloc au **second tour** de la
-présidentielle choisie. La taille du point dépend de la population active.
+économique ; axe vertical = le pourcentage des suffrages exprimés d'un bloc au **1er ou
+au 2e tour** de la présidentielle choisie. La taille du point dépend du nombre d'actifs
+de 15 à 64 ans.
 
-- Les données économiques utilisées sont celles de l'**année précédant l'élection** : en
-  pratique, seule la présidentielle **2022** dispose de données (elles commencent en 2017).
+- Les données économiques utilisées sont celles de l'**année précédant l'élection**. Seules
+  les présidentielles pour lesquelles ces données existent sont proposées : 2022 pour
+  tous les indicateurs, et aussi 2017 pour les indicateurs du recensement (chômage,
+  catégories socioprofessionnelles, emploi industriel, logements sociaux).
+- Au 2e tour, seuls les blocs des deux finalistes ont des voix.
 - **Une corrélation n'est pas une causalité** : le graphique montre une tendance
   territoriale, pas une explication du vote.
 
@@ -204,7 +217,7 @@ présidentielle choisie. La taille du point dépend de la population active.
 - **Emploi industriel 2006-2025** : effectifs salariés du secteur privé dans l'industrie
   en Hauts-de-France (source URSSAF). Les bandes grisées signalent la crise de 2008-2010
   et la période 2020-2021.
-- **Drill-down commune** : même courbe pour une commune.
+- **Détail d'une commune** : même courbe pour une commune.
 - **Déserts médicaux** : carte des communes où l'accessibilité aux médecins généralistes
   est inférieure à 2,5 consultations par habitant et par an (seuil DREES), en rouge.
 
