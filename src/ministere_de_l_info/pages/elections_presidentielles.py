@@ -7,9 +7,11 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._theme import render_donnees_indisponibles
 from ministere_de_l_info.viz.elections_queries import (
     _BLOCS_ORDERED,
     DB_PATH,
+    format_pct_fr,
     get_blocs_meta,
     get_bounds,
     get_bv_details_pres,
@@ -20,6 +22,7 @@ from ministere_de_l_info.viz.elections_queries import (
     get_participation_communes,
     get_scores_communes,
     is_data_loaded,
+    taux_participation_agrege,
 )
 from ministere_de_l_info.viz.maps_elections import (
     make_choropleth_elections_bloc_dominant,
@@ -28,8 +31,8 @@ from ministere_de_l_info.viz.maps_elections import (
 
 _ANNEES: list[int] = [2002, 2007, 2012, 2017, 2022]
 _ZONES: dict[str, str] = {
-    "circo21": "Circo 21 — Valenciennes (20 communes)",
-    "hdf": "Hauts-de-France entière ⚠️ lent",
+    "circo21": "21e circonscription du Nord — Valenciennes (20 communes)",
+    "hdf": "Hauts-de-France entière (chargement plus long)",
 }
 _MODES_CARTE: list[str] = ["Bloc dominant", "Score d'un bloc"]
 
@@ -38,16 +41,14 @@ def render() -> None:
     """Vue Streamlit pour les présidentielles HdF 2002-2022."""
     # DB path vérifiée dans l'entrée page — ici on vérifie uniquement les données
     if not DB_PATH.exists():
-        st.error(
-            "Base de données absente. Lancez d'abord :\n\n"
-            "```bash\nuv run python scripts/init_elections_schema.py\n```"
-        )
+        render_donnees_indisponibles("électorales", base_absente=True)
         return
 
     if not is_data_loaded():
-        st.warning(
-            "Données électorales non chargées. Lancez :\n\n"
-            "```bash\nuv run python scripts/load_elections_presidentielles.py\n```"
+        render_donnees_indisponibles(
+            "des présidentielles",
+            base_absente=False,
+            commande_dev="uv run python scripts/load_elections_presidentielles.py",
         )
         return
 
@@ -103,7 +104,7 @@ def render() -> None:
     # ── Métriques ────────────────────────────────────────────────────────────────
     n_communes = scores_df["code_commune"].n_unique()
     inscrits_tot = int(part_df["inscrits"].sum()) if not part_df.is_empty() else 0
-    taux_moy = float(part_df["taux_participation_pct"].mean()) if not part_df.is_empty() else 0.0
+    taux_zone = taux_participation_agrege(part_df)
     bloc_zone = (
         scores_df.group_by("bloc")
         .agg(pl.sum("voix").alias("voix_total"))
@@ -112,9 +113,13 @@ def render() -> None:
     )
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Communes", f"{n_communes:,}")
+    m1.metric("Communes", f"{n_communes:,}".replace(",", " "))
     m2.metric("Inscrits", f"{inscrits_tot:,}".replace(",", " "))
-    m3.metric("Participation", f"{taux_moy:.1f} %")
+    m3.metric(
+        "Participation",
+        format_pct_fr(taux_zone),
+        help="Total des votants divisé par le total des inscrits de la zone.",
+    )
     m4.metric("Bloc majoritaire", libelles.get(bloc_zone, "—"))
 
     st.caption(
@@ -197,7 +202,9 @@ def render() -> None:
         height=380,
         margin={"t": 30, "b": 30},
     )
-    fig.update_traces(hovertemplate="<b>%{x}</b><br>%{y:,.0f}<extra>%{fullData.name}</extra>")
+    fig.update_layout(separators=", ")
+    fmt_y = "%{y:.1f} %" if y_col == "pct" else "%{y:,.0f} voix"
+    fig.update_traces(hovertemplate=f"<b>%{{x}}</b><br>{fmt_y}<extra>%{{fullData.name}}</extra>")
     with ev_right:
         st.plotly_chart(fig, width="stretch")
 
@@ -277,7 +284,7 @@ def render() -> None:
 
     # ── Section drill-down BV ────────────────────────────────────────────────────
     st.divider()
-    st.subheader("🔍 Détail par bureau de vote")
+    st.subheader("Détail par bureau de vote")
 
     communes_list = get_communes_hdf_pres(annee, tour)
     commune_options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes_list]

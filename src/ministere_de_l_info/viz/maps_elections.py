@@ -307,7 +307,7 @@ def _legend_muni_html(
         '<div style="width:20px;height:14px;border:1px solid #bbb;flex-shrink:0;'
         "background:repeating-linear-gradient(135deg,#9E9E9E 0px,#9E9E9E 3px,"
         '#bbb 3px,#bbb 6px);"></div>'
-        '<span style="white-space:nowrap;">Non classé (commune &lt; seuil)</span>'
+        '<span style="white-space:nowrap;">Non classé (liste non nuancée en tête<br>ou commune sous le seuil)</span>'
         "</div>"
     )
     return (

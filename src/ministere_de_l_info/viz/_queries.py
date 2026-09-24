@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 import duckdb
+import polars as pl
 
 from ministere_de_l_info.viz._config import (
     _CLE_JOIN,
@@ -229,3 +230,84 @@ def _fit_bounds_for_filter(
         return None
     miny, minx, maxy, maxx = row
     return [[float(miny), float(minx)], [float(maxy), float(maxx)]]
+
+
+# Colonne complémentaire affichée dans le tableau pour les niveaux sans population
+_COLONNE_EXTRA_TABLEAU: dict[str, str] = {
+    "arrondissement_municipal": "code_commune_mere",
+    "circonscription": "code_departement",
+}
+
+
+def get_tableau_territoires(
+    con: duckdb.DuckDBPyConnection,
+    niveau: str,
+    annee: int,
+    annee_ref: int | None = None,
+    filtre_departement: str | None = None,
+    filtre_region: str | None = None,
+) -> pl.DataFrame:
+    """Tableau des entités d'un niveau territorial (page Géographie), sans limite de lignes.
+
+    Les filtres géographiques sont appliqués dans un `WHERE` (et non dans le `ON`
+    du `LEFT JOIN`, cf. audit I6) : seules les entités filtrées sont renvoyées.
+    La population absente reste NULL (affichée « n.d. »), jamais 0.
+
+    Colonnes : `code`, `nom`, puis `population`, et `delta_abs`, `delta_pct`
+    si `annee_ref` est fourni (niveaux avec population) ; `extra` sinon.
+    """
+    if niveau not in _TABLE_PAR_NIVEAU:
+        raise ValueError(f"Niveau inconnu : {niveau}")
+    table = _TABLE_PAR_NIVEAU[niveau]
+    code_col = _COLONNE_CODE[niveau]
+
+    where: list[str] = []
+    geo_params: list = []
+    dept_col = _FILTRE_DEPARTEMENT_COL.get(niveau)
+    if filtre_departement and dept_col:
+        where.append(f"g.{dept_col} = ?")
+        geo_params.append(filtre_departement)
+    region_col = _FILTRE_REGION_COL.get(niveau)
+    if filtre_region and region_col:
+        where.append(f"g.{region_col} = ?")
+        geo_params.append(filtre_region)
+    where_sql = f" WHERE {' AND '.join(where)}" if where else ""
+
+    params: list
+    if niveau in _VUE_PAR_NIVEAU:
+        vue = _VUE_PAR_NIVEAU[niveau]
+        _, col_vue = _CLE_JOIN[niveau]
+        if annee_ref is not None:
+            sql = (  # noqa: S608
+                f"SELECT g.{code_col} AS code, g.nom,"
+                f" p_main.population_municipale AS population,"
+                f" (p_main.population_municipale - p_ref.population_municipale) AS delta_abs,"
+                f" 100.0 * (p_main.population_municipale - p_ref.population_municipale)"
+                f" / NULLIF(p_ref.population_municipale, 0) AS delta_pct"
+                f" FROM {table} g"
+                f" LEFT JOIN {vue} p_main"
+                f"   ON g.{code_col} = p_main.{col_vue} AND p_main.annee = ?"
+                f" LEFT JOIN {vue} p_ref"
+                f"   ON g.{code_col} = p_ref.{col_vue} AND p_ref.annee = ?"
+                f"{where_sql}"
+                f" ORDER BY population DESC NULLS LAST, g.nom"
+            )
+            params = [annee, annee_ref, *geo_params]
+        else:
+            sql = (  # noqa: S608
+                f"SELECT g.{code_col} AS code, g.nom, p.population_municipale AS population"
+                f" FROM {table} g"
+                f" LEFT JOIN {vue} p ON g.{code_col} = p.{col_vue} AND p.annee = ?"
+                f"{where_sql}"
+                f" ORDER BY population DESC NULLS LAST, g.nom"
+            )
+            params = [annee, *geo_params]
+    else:
+        extra_col = _COLONNE_EXTRA_TABLEAU[niveau]
+        sql = (  # noqa: S608
+            f"SELECT g.{code_col} AS code, g.nom, g.{extra_col} AS extra"
+            f" FROM {table} g{where_sql} ORDER BY g.{code_col}"
+        )
+        params = geo_params
+
+    return con.execute(sql, params).pl()

@@ -21,24 +21,28 @@ _MODULES: list[dict[str, str]] = [
         "page": "pages/1_📍_Géographie.py",
         "icon": "map",
         "label": "Géographie territoriale",
+        "perimetre": "France entière — recensements 2013, 2018 et 2023",
         "description": "Cartographie choroplèthe multi-niveaux (régions, départements, EPCI, communes) et démographie INSEE.",
     },
     {
         "page": "pages/2_🗳️_Élections.py",
         "icon": "how_to_vote",
         "label": "Élections",
+        "perimetre": "Hauts-de-France uniquement — scrutins 2002-2026",
         "description": "Présidentielles, législatives et municipales 2002-2026, drill-down jusqu'au bureau de vote.",
     },
     {
         "page": "pages/3_🏛️_Législatif.py",
         "icon": "account_balance",
         "label": "Législatif",
+        "perimetre": "France entière (filtre Hauts-de-France disponible) — depuis 2002",
         "description": "Composition politique et activité parlementaire de l'Assemblée nationale et du Sénat.",
     },
     {
         "page": "pages/4_📊_Économie.py",
         "icon": "bar_chart",
         "label": "Économie",
+        "perimetre": "Hauts-de-France uniquement — 2006-2025 selon les sources",
         "description": "Indicateurs socio-économiques (pauvreté, chômage, désindustrialisation) croisés avec les résultats électoraux.",
     },
 ]
@@ -49,6 +53,7 @@ for module, col in zip(_MODULES, [*row1, *row2], strict=True):
     with col, st.container(border=True):
         st.page_link(module["page"], label=module["label"], icon=f":material/{module['icon']}:")
         st.caption(module["description"])
+        st.markdown(f"**Périmètre** : {module['perimetre']}")
 
 st.divider()
 

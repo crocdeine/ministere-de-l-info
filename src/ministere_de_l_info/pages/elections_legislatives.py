@@ -7,6 +7,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._theme import render_donnees_indisponibles
 from ministere_de_l_info.viz.elections_legi_queries import (
     get_bv_details_legi,
     get_circo_bounds,
@@ -24,7 +25,12 @@ from ministere_de_l_info.viz.elections_legi_queries import (
     get_scores_hdf_legi,
     is_legi_data_loaded,
 )
-from ministere_de_l_info.viz.elections_queries import _BLOCS_ORDERED, get_blocs_meta
+from ministere_de_l_info.viz.elections_queries import (
+    _BLOCS_ORDERED,
+    format_pct_fr,
+    get_blocs_meta,
+    taux_participation_agrege,
+)
 from ministere_de_l_info.viz.maps_elections import (
     make_choropleth_elections_bloc_dominant,
     make_choropleth_legi_circos_bloc_dominant,
@@ -46,9 +52,10 @@ _WARNING_ANCIEN_DECOUPAGE = (
 def render() -> None:
     """Vue Streamlit pour les législatives HdF 2002-2024."""
     if not is_legi_data_loaded():
-        st.info(
-            "Données législatives non chargées. Lancez :\n\n"
-            "```bash\nuv run python scripts/load_elections_legislatives.py\n```"
+        render_donnees_indisponibles(
+            "des législatives",
+            base_absente=False,
+            commande_dev="uv run python scripts/load_elections_legislatives.py",
         )
         return
 
@@ -106,7 +113,7 @@ def _render_vue_hdf(
 
     # Métriques HdF
     inscrits_tot = int(part_df["inscrits"].sum()) if not part_df.is_empty() else 0
-    taux_moy = float(part_df["taux_participation_pct"].mean()) if not part_df.is_empty() else 0.0
+    taux_hdf = taux_participation_agrege(part_df)
     dominant_hdf = (
         scores_df.group_by("bloc")
         .agg(pl.sum("voix").alias("voix_total"))
@@ -115,9 +122,16 @@ def _render_vue_hdf(
     )
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Inscrits HdF", f"{inscrits_tot:,}".replace(",", " "))
-    m2.metric("Participation moy.", f"{taux_moy:.1f} %")
+    m2.metric(
+        "Participation HdF",
+        format_pct_fr(taux_hdf),
+        help="Total des votants divisé par le total des inscrits des circonscriptions HdF.",
+    )
     m3.metric("Bloc dominant HdF", libelles.get(dominant_hdf, dominant_hdf))
-    m4.metric("Circos 1er tour", f"{scores_df['code_circo'].n_unique()}")
+    m4.metric(
+        f"Circonscriptions ({'1er' if tour == 1 else '2e'} tour)",
+        f"{scores_df['code_circo'].n_unique()}",
+    )
 
     st.caption(
         "Source : data.gouv.fr — Données des élections agrégées. "
@@ -278,7 +292,7 @@ def _render_vue_circo(
 
     # ── Section drill-down BV ────────────────────────────────────────────────────
     st.divider()
-    st.subheader("🔍 Détail par bureau de vote")
+    st.subheader("Détail par bureau de vote")
 
     communes_list = get_communes_circo_legi_list(annee, tour, code_circo)
     commune_options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes_list]

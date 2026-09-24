@@ -449,7 +449,9 @@ samp {
   font-weight: var(--type-overline-weight);
   letter-spacing: var(--type-overline-tracking);
   text-transform: uppercase;
-  color: var(--text-muted);
+  /* --text-secondary (#595959) : 7:1 sur fond blanc, 6,5:1 sur --grey-50.
+     --text-muted (#929292) ne donnait que 2,9:1 (< 4,5:1 exigé, WCAG 1.4.3 / RGAA 3.2). */
+  color: var(--text-secondary);
 }
 
 /* Libellés longs (ex. "Extrême gauche") sur métriques étroites (rangées de 6+
