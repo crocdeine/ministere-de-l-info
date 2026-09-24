@@ -30,6 +30,8 @@ from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
 )
 
 _ANNEES_MUNI = (2008, 2014, 2020, 2026)
+# Référentiel municipal après ADR-0010 : 12 (2008) + 17 (2014) + 23 (2020) + 25 (2026)
+_N_MUNI = 77
 
 
 def _charger_script(chemin: Path) -> ModuleType:
@@ -64,15 +66,15 @@ class TestC2ReferentielsConserventMunicipales:
     def test_referentiel_contient_les_trois_jeux(self, con: duckdb.DuckDBPyConnection) -> None:
         n_total = con.execute("SELECT COUNT(*) FROM nuances_harmonisees").fetchone()[0]
         assert n_total == len(_NUANCES_PRES) + len(_NUANCES_LEGI) + len(_NUANCES_MUNI)
-        assert _n_muni(con) == 67
+        assert _n_muni(con) == _N_MUNI
 
-    def test_relance_referentiels_conserve_les_67_nuances_muni(
+    def test_relance_referentiels_conserve_les_nuances_muni(
         self, con: duckdb.DuckDBPyConnection
     ) -> None:
         """Scénario audit : relancer init_elections_schema après le chargement municipal."""
-        assert _n_muni(con) == 67
+        assert _n_muni(con) == _N_MUNI
         populate_elections_referentiels(con)
-        assert _n_muni(con) == 67, "Nuances municipales perdues après relance des référentiels"
+        assert _n_muni(con) == _N_MUNI, "Nuances municipales perdues après relance des référentiels"
 
     def test_relance_referentiels_bloc_muni_resolu(self, con: duckdb.DuckDBPyConnection) -> None:
         populate_elections_referentiels(con)
@@ -121,9 +123,9 @@ def _n_hors_muni(con: duckdb.DuckDBPyConnection) -> int:
 class TestC3NuancesMunicipalesCorrectrices:
     def test_idempotent(self, con: duckdb.DuckDBPyConnection) -> None:
         n_hors_muni = _n_hors_muni(con)
-        assert populate_nuances_municipales(con) == 67
-        assert populate_nuances_municipales(con) == 67
-        assert _n_muni(con) == 67
+        assert populate_nuances_municipales(con) == _N_MUNI
+        assert populate_nuances_municipales(con) == _N_MUNI
+        assert _n_muni(con) == _N_MUNI
         assert _n_hors_muni(con) == n_hors_muni
 
     def test_correction_de_bloc_appliquee(
@@ -146,7 +148,7 @@ class TestC3NuancesMunicipalesCorrectrices:
         monkeypatch.setattr(schema_elections, "_NUANCES_MUNI", liste)
         populate_nuances_municipales(con)
         assert _bloc(con, "LCOM", 2026) == (bloc_fictif, "correction fictive de test")
-        assert _n_muni(con) == 67
+        assert _n_muni(con) == _N_MUNI
 
     def test_nuance_retiree_supprimee(
         self, con: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
@@ -155,7 +157,7 @@ class TestC3NuancesMunicipalesCorrectrices:
         monkeypatch.setattr(schema_elections, "_NUANCES_MUNI", liste)
         populate_nuances_municipales(con)
         assert _bloc(con, "LUDI", 2026) is None
-        assert _n_muni(con) == 66
+        assert _n_muni(con) == _N_MUNI - 1
 
     def test_nuances_pres_legi_intactes(self, con: duckdb.DuckDBPyConnection) -> None:
         avant = con.execute(
@@ -169,7 +171,7 @@ class TestC3NuancesMunicipalesCorrectrices:
             "ORDER BY nuance, annee"
         ).fetchall()
         assert avant == apres
-        assert _n_muni(con) == 67
+        assert _n_muni(con) == _N_MUNI
 
     def test_garde_fou_codes_sans_mapping(
         self, con: duckdb.DuckDBPyConnection, monkeypatch: pytest.MonkeyPatch
@@ -178,7 +180,7 @@ class TestC3NuancesMunicipalesCorrectrices:
         monkeypatch.setattr(schema_elections, "_NUANCES_MUNI", liste)
         with pytest.raises(RuntimeError, match="sans mapping"):
             populate_nuances_municipales(con)
-        assert _n_muni(con) == 67
+        assert _n_muni(con) == _N_MUNI
         assert _bloc(con, "NC", 2020) is None
 
     def test_garde_fou_annees_partagees(
@@ -198,7 +200,7 @@ class TestC3NuancesMunicipalesCorrectrices:
         monkeypatch.setattr(schema_elections, "_NUANCES_MUNI", liste)
         with pytest.raises(duckdb.ConstraintException):
             populate_nuances_municipales(con)
-        assert _n_muni(con) == 67
+        assert _n_muni(con) == _N_MUNI
 
 
 # ── C1 — v_listes_commune_muni : une ligne par liste, pas par nuance ─────────────

@@ -14,11 +14,12 @@ décision est révisée, un nouvel ADR est créé avec le statut "Remplace 000X"
 | [0002](0002-streamlit-vs-fastapi.md) | Streamlit plutôt que FastAPI + frontend JS | Accepté |
 | [0003](0003-uv-vs-pip-poetry.md) | uv plutôt que pip / poetry | Accepté |
 | [0004](0004-polars-vs-pandas.md) | Polars prioritaire, Pandas en fallback | Accepté |
-| [0005](0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère — 6 blocs | Accepté |
+| [0005](0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère — 6 blocs | Accepté — partiellement révisé par 0010 |
 | [0006](0006-module-economie-sources-et-schema.md) | Module Économie — sources, indicateurs et schéma DuckDB | Accepté (note d'exécution 2026-09-24) |
 | [0007](0007-module-legislatif-perimetre-et-sources.md) | Module Législatif — périmètre national, sources Datan + data.senat.fr | Accepté (rédigé a posteriori le 2026-09-24) |
 | [0008](0008-economie-sources-complementaires.md) | Module Économie — sources complémentaires CNAF, DREES, URSSAF, Eurostat | Accepté (rédigé a posteriori le 2026-09-24) |
 | [0009](0009-design-system-et-navigation.md) | Design system et navigation `st.navigation()` / `st.Page()` | Accepté (rédigé a posteriori le 2026-09-24) |
+| [0010](0010-revision-nuances-et-blocs.md) | Révision des classements nuances → blocs : grilles 2020/2023/2026, doctrine, reclassements | Accepté — révise 0005 |
 
 ## Format
 

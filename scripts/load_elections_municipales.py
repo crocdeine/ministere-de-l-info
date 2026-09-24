@@ -28,10 +28,11 @@ Spécificités municipales :
 Nuances harmonisées (liste _NUANCES_MUNI définie dans etl/schema_elections.py) :
 - Remplacement ciblé (DELETE années muni + INSERT, populate_nuances_municipales) :
   une correction de bloc dans le code est appliquée à la relance du loader
-- 67 entrées insérées (2008 : 12, 2014 : 17, 2020 : 19, 2026 : 19)
+- 77 entrées insérées (2008 : 12, 2014 : 17, 2020 : 23, 2026 : 25), ADR-0010
+- 2020 / 2026 : grilles officielles de blocs (INTA1931378J, INTP2602966C, annexes 3)
 - SANS mapping (bloc NULL, UI : Non classé / Liste sortante) : NC, LMAJ, LNC
 - LFI 2020 = GAU ; LFI 2026 = EXG (bascule structurante INTP2602966C + CE 512694)
-- LCMD 2008 = GAU (analyse contextuelle — libellés Parquet NULL, bassin minier HdF)
+- LCMD 2008 = GAU (classement D3.2 conservé, vérification en attente — ADR-0010)
 """
 
 from __future__ import annotations
@@ -60,8 +61,8 @@ _PARQUET_PARTICIPATION = ROOT / "data" / "exploration" / "candidats-results.parq
 _MUNI_FILTER = "type_scrutin = 'muni'"
 _MUNI_IDS = f"(SELECT id_election FROM elections WHERE {_MUNI_FILTER})"
 
-# 67 nuances municipales : source unique dans etl/schema_elections.py (correctif C2)
-assert len(_NUANCES_MUNI) == 67, f"_NUANCES_MUNI : {len(_NUANCES_MUNI)} entrées (attendu 67)"
+# 77 nuances municipales : source unique dans etl/schema_elections.py (correctif C2, ADR-0010)
+assert len(_NUANCES_MUNI) == 77, f"_NUANCES_MUNI : {len(_NUANCES_MUNI)} entrées (attendu 77)"
 
 
 def _delete_municipales(con) -> None:
