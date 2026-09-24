@@ -103,3 +103,6 @@ coverage.xml
 logs/
 nohup.out
 /tmp/
+
+# ===== Claude Code (worktrees temporaires des agents) =====
+.claude/worktrees/
