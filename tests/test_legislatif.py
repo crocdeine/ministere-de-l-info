@@ -219,18 +219,52 @@ def test_overrides_hochart_szczurek(con: duckdb.DuckDBPyConnection) -> None:
     assert "21069M" in matricules, "Override Szczurek (21069M) manquant"
 
 
-def test_vue_elus_hdf_actuels(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute("SELECT COUNT(*) FROM v_elus_hdf_actuels").fetchone()[0]
-    assert n >= 28, f"Vue v_elus_hdf_actuels : attendu ≥28, trouvé {n}"
+def test_vue_elus_actuels(con: duckdb.DuckDBPyConnection) -> None:
+    n = con.execute("SELECT COUNT(*) FROM v_elus_actuels").fetchone()[0]
+    assert n >= 900, f"Vue v_elus_actuels (nationale) : attendu ≥900, trouvé {n}"
+    n_alias = con.execute("SELECT COUNT(*) FROM v_elus_hdf_actuels").fetchone()[0]
+    assert n_alias == n, "L'alias v_elus_hdf_actuels doit renvoyer v_elus_actuels"
+
+
+def _exige_leg_mandats(con: duckdb.DuckDBPyConnection) -> None:
+    tables = {r[0] for r in con.execute("SHOW TABLES").fetchall()}
+    if "leg_mandats" not in tables:
+        pytest.skip("leg_mandats absente : appliquer la migration 0008 ou recharger (ADR-0011)")
+
+
+def test_aucun_mandat_non_classe(con: duckdb.DuckDBPyConnection) -> None:
+    """ADR-0011 : tout groupe présent dans la base doit figurer dans leg_groupes_blocs."""
+    _exige_leg_mandats(con)
+    rows = con.execute(
+        "SELECT chambre, groupe_sigle, legislature, COUNT(*) FROM v_mandats_legislatif "
+        "WHERE bloc_groupe IS NULL GROUP BY ALL ORDER BY 4 DESC"
+    ).fetchall()
+    assert rows == [], f"Groupes non classés (compléter etl/legislatif_groupes.py) : {rows}"
+
+
+def test_lfi_gauche_par_legislature(con: duckdb.DuckDBPyConnection) -> None:
+    """ADR-0011 / ADR-0005 n° 3 : FI (15), LFI-NUPES (16), LFI-NFP (17) = GAU."""
+    _exige_leg_mandats(con)
+    rows = con.execute(
+        "SELECT DISTINCT bloc_groupe FROM v_mandats_legislatif "
+        "WHERE chambre = 'AN' AND groupe_sigle IN ('FI', 'LFI-NUPES', 'LFI-NFP')"
+    ).fetchall()
+    assert rows == [("GAU",)], f"Blocs LFI inattendus : {rows}"
+
+
+def test_dates_fin_non_inventees(con: duckdb.DuckDBPyConnection) -> None:
+    """ADR-0011 : plus de date de fin égale à la date du chargement (Sénat) ou à dateMaj."""
+    _exige_leg_mandats(con)
+    n = con.execute("SELECT COUNT(*) FROM leg_elus WHERE date_fin_mandat IS NOT NULL").fetchone()[0]
+    assert n == 0
 
 
 def test_vue_bloc_final_override(con: duckdb.DuckDBPyConnection) -> None:
     rows = con.execute(
-        "SELECT id, bloc_politique, bloc_final FROM v_elus_hdf_actuels "
-        "WHERE id IN ('21085M', '21069M')"
+        "SELECT id, bloc_politique, bloc_final FROM v_elus_actuels WHERE id IN ('21085M', '21069M')"
     ).fetchall()
     if not rows:
-        pytest.skip("Hochart/Szczurek absents de v_elus_hdf_actuels (peut-être non actifs)")
+        pytest.skip("Hochart/Szczurek absents de v_elus_actuels (peut-être non actifs)")
     for elu_id, bloc_politique, bloc_final in rows:
         assert bloc_final == "EXD", f"{elu_id} : bloc_final attendu EXD, trouvé {bloc_final}"
         assert bloc_politique == "DIV", (

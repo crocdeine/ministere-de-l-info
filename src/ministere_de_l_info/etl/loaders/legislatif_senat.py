@@ -10,15 +10,24 @@ Portée   : France entière par défaut (departements=None).
 Inclut les anciens sénateurs (État='ANCIEN') pour couverture historique.
 
 Mapping département : nom circonscription → code INSEE 2-3 caractères
-Mapping groupe politique → bloc officiel (6 blocs, ADR-0005)
+Groupe politique → bloc : référentiel ``etl/legislatif_groupes.py`` (ADR-0011) ;
+groupe non classé → bloc NULL + WARNING (plus de repli DIV).
 
-Règle blocs : PCF/communiste = GAU (pas EXG).
-EXG réservé à LFI et l'extrême gauche stricto sensu.
+Dates (ADR-0011) : le fichier ne contient aucune date de mandat. ``date_debut_mandat``
+et ``date_fin_mandat`` restent NULL (auparavant, la fin valait la date du chargement).
+
+Périmètre temporel (ADR-0011) : le projet couvre 2002-présent. Faute de dates de mandat,
+seuls les anciens sénateurs **certainement** antérieurs au renouvellement du
+29 septembre 2002 sont écartés : circonscriptions disparues (code ``XX`` : Seine,
+Seine-et-Oise, Algérie, anciens territoires, toutes antérieures à 1968) et sénateurs
+décédés avant cette date (colonne « Date de décès », si présente). Les autres anciens
+sénateurs sont conservés ; un filtre exact exige une source datée des mandats.
 """
 
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
@@ -27,6 +36,7 @@ import httpx
 import polars as pl
 
 from ministere_de_l_info.etl._common import upsert_metadata
+from ministere_de_l_info.etl.legislatif_groupes import journaliser_non_classes, resoudre_bloc
 
 logger = logging.getLogger(__name__)
 
@@ -37,16 +47,9 @@ _COMMENT_LINES = 18
 # Subset HdF pour usage UI (filtre optionnel côté appelant)
 _CIRCOS_HDF: frozenset[str] = frozenset({"Aisne", "Nord", "Oise", "Pas-de-Calais", "Somme"})
 
-# PCF/GDR = GAU (pas EXG) — cohérent avec grille data-viz-politique
-# EXG réservé à LFI et l'extrême gauche stricto sensu
-_GROUPE_BLOCS: dict[str, str] = {
-    "CRCE-K": "GAU",
-    "SER": "GAU",
-    "UC": "CENT",
-    "Les Indépendants": "DTE",
-    "Les Républicains": "DTE",
-    "NI": "DIV",
-}
+# Début du périmètre temporel du projet pour le Sénat : renouvellement de 2002.
+DEBUT_PERIMETRE_SENAT = date(2002, 9, 29)
+GRANULARITE_SENAT = "groupe_actuel_ou_dernier"
 
 # Mapping complet circonscription Sénat → code département INSEE
 # Inclut les dpts historiques (Algérie, Seine-et-Oise...) → "XX"
@@ -217,17 +220,29 @@ def _parse_date(val: str | None) -> date | None:
         return None
 
 
+def _hors_perimetre(est_actif: bool, code_dep: str, date_deces: date | None) -> bool:
+    """Vrai si un ancien sénateur est certainement antérieur au renouvellement de 2002."""
+    if est_actif:
+        return False
+    if code_dep == "XX":
+        return True
+    return date_deces is not None and date_deces < DEBUT_PERIMETRE_SENAT
+
+
 def load_legislatif_senat(
     con: duckdb.DuckDBPyConnection,
     raw_dir: Path,
     departements: list[str] | None = None,
     force: bool = False,
+    inclure_anterieurs_2002: bool = False,
 ) -> None:
-    """Charge les sénateurs depuis ODSEN_GENERAL.csv dans leg_elus.
+    """Charge les sénateurs depuis ODSEN_GENERAL.csv dans leg_elus et leg_mandats.
 
     departements : liste de noms de circonscription (ex. ['Nord', 'Oise']).
                    None = France entière (défaut).
-    Idempotent : DELETE leg_elus WHERE source='senat_csv' puis INSERT.
+    inclure_anterieurs_2002 : conserver les anciens sénateurs certainement antérieurs
+                   au renouvellement de 2002 (défaut : écartés, voir docstring du module).
+    Idempotent : DELETE leg_elus/leg_mandats WHERE source='senat_csv' puis INSERT.
     """
     csv_path = _download_cache(raw_dir, force=force)
 
@@ -248,9 +263,10 @@ def load_legislatif_senat(
         logger.error("Aucun sénateur trouvé dans %s — vérifier colonnes CSV", csv_path)
         return
 
-    today = date.today()
-
     rows: list[tuple] = []
+    mandat_rows: list[tuple] = []
+    non_classes: Counter[tuple[str, int | None]] = Counter()
+    n_hors_perimetre = 0
     for row in df.iter_rows(named=True):
         matricule = str(row["Matricule"]).strip() if row["Matricule"] else None
         if not matricule:
@@ -262,12 +278,20 @@ def load_legislatif_senat(
         circo_nom = str(row["Circonscription"]).strip() if row["Circonscription"] else ""
         code_dep = _ALL_CIRCOS.get(circo_nom, "XX")
 
+        date_deces = _parse_date(row.get("Date de décès"))
+        if not inclure_anterieurs_2002 and _hors_perimetre(est_actif, code_dep, date_deces):
+            n_hors_perimetre += 1
+            continue
+
         groupe = str(row["Groupe politique"]).strip() if row["Groupe politique"] else None
-        bloc = _GROUPE_BLOCS.get(groupe, "DIV") if groupe else None
+        bloc = resoudre_bloc("SENAT", groupe, None)
+        if bloc is None:
+            non_classes[(groupe or "(vide)", None)] += 1
 
         date_naissance = _parse_date(row.get("Date naissance"))
+        # Aucune date de mandat dans ODSEN_GENERAL : NULL plutôt que la date du jour.
         date_debut = None
-        date_fin = None if est_actif else today
+        date_fin = None
 
         profession = str(row.get("Description de la profession", "") or "").strip() or None
 
@@ -295,6 +319,29 @@ def load_legislatif_senat(
                 "senat_csv",
             )
         )
+        mandat_rows.append(
+            (
+                matricule,
+                "SENAT",
+                None,  # pas de législature au Sénat
+                groupe,
+                groupe,
+                code_dep,
+                None,
+                date_debut,
+                date_fin,
+                GRANULARITE_SENAT,
+                "senat_csv",
+            )
+        )
+
+    if n_hors_perimetre:
+        logger.info(
+            "Sénat : %d ancien(s) sénateur(s) écarté(s), antérieurs au renouvellement de "
+            "2002 (circonscription disparue ou décès avant le %s)",
+            n_hors_perimetre,
+            DEBUT_PERIMETRE_SENAT.isoformat(),
+        )
 
     con.execute("DELETE FROM leg_elus WHERE source = 'senat_csv'")
 
@@ -317,12 +364,26 @@ def load_legislatif_senat(
             groupe_sigle     = excluded.groupe_sigle,
             groupe_nom       = excluded.groupe_nom,
             bloc_politique   = excluded.bloc_politique,
+            date_debut_mandat = excluded.date_debut_mandat,
+            date_fin_mandat  = excluded.date_fin_mandat,
             est_actif        = excluded.est_actif,
             profession       = excluded.profession,
             source           = excluded.source
         """,
         rows,
     )
+
+    con.execute("DELETE FROM leg_mandats WHERE source = 'senat_csv'")
+    con.executemany(
+        """
+        INSERT INTO leg_mandats (
+            elu_id, chambre, legislature, groupe_sigle, groupe_nom,
+            code_departement, num_circo, date_debut, date_fin, granularite, source
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """,
+        mandat_rows,
+    )
+    journaliser_non_classes("SENAT", non_classes)
 
     total = con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'").fetchone()[0]
     actifs = con.execute(
@@ -338,3 +399,6 @@ def load_legislatif_senat(
     )
 
     upsert_metadata(con, "leg_elus_senat", total, "senat/ODSEN_GENERAL")
+    upsert_metadata(
+        con, "leg_mandats_senat", len(mandat_rows), f"senat/ODSEN_GENERAL ({GRANULARITE_SENAT})"
+    )
