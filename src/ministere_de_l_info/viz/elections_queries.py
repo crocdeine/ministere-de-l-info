@@ -17,6 +17,30 @@ _HDF_DEPTS_SQL: str = "'02', '59', '60', '62', '80'"
 _BLOCS_ORDERED: list[str] = ["EXG", "GAU", "DIV", "CENT", "DTE", "EXD"]
 
 
+def taux_participation_agrege(part_df: pl.DataFrame) -> float | None:
+    """Taux de participation d'une zone : 100 × Σ votants / Σ inscrits (pondéré).
+
+    Remplace la moyenne des taux communaux (audit I4), où une commune de
+    80 inscrits pesait autant que Lille. Renvoie None si aucun inscrit
+    (affiché « n.d. »). Les lignes sans votants ou sans inscrits sont exclues
+    des deux sommes.
+    """
+    if part_df.is_empty():
+        return None
+    valides = part_df.filter(pl.col("inscrits").is_not_null() & pl.col("votants").is_not_null())
+    inscrits = valides["inscrits"].sum()
+    if not inscrits:
+        return None
+    return 100.0 * float(valides["votants"].sum()) / float(inscrits)
+
+
+def format_pct_fr(valeur: float | None, decimales: int = 1) -> str:
+    """Formate un pourcentage à la française (« 72,4 % ») ; « n.d. » si absent."""
+    if valeur is None or valeur != valeur:  # None ou NaN
+        return "n.d."
+    return f"{valeur:.{decimales}f} %".replace(".", ",")
+
+
 def _open_ro() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(str(DB_PATH), read_only=True)
     con.execute("LOAD spatial")

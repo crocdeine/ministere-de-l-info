@@ -7,6 +7,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._theme import render_donnees_indisponibles
 from ministere_de_l_info.viz.elections_muni_queries import (
     get_communes_hdf_muni_list,
     get_communes_muni_geo,
@@ -73,14 +74,15 @@ _ANNOTATION_LFI = (
 def render() -> None:
     """Vue Streamlit pour les municipales HdF 2008-2026."""
     if not is_muni_data_loaded():
-        st.info(
-            "Données municipales non chargées. Lancez :\n\n"
-            "```bash\nuv run python scripts/load_elections_municipales.py\n"
-            "uv run python scripts/migrations/0007_add_municipales_views.py\n```"
+        render_donnees_indisponibles(
+            "des municipales",
+            base_absente=False,
+            commande_dev=(
+                "uv run python scripts/load_elections_municipales.py\n"
+                "uv run python scripts/migrations/0007_add_municipales_views.py"
+            ),
         )
         return
-
-    st.subheader("🗳️ Municipales — Hauts-de-France")
 
     blocs_meta = get_blocs_meta()
     couleurs: dict[str, str] = {b[0]: b[2] for b in blocs_meta}
@@ -113,7 +115,7 @@ def render() -> None:
 
     # Drill-down commune
     st.divider()
-    st.subheader("🔍 Détail par commune")
+    st.subheader("Détail par commune")
     _render_drilldown_commune(annee, tour, libelles)
 
 
