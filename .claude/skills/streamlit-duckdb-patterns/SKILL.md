@@ -1,6 +1,6 @@
 ---
 name: streamlit-duckdb-patterns
-description: Patterns d'architecture Streamlit + DuckDB pour ministere-de-l-info. À charger pour toute tâche UI Streamlit du projet : nouvelle page, optimisation de cache, performance, visualisation Folium dans Streamlit, requêtes DuckDB depuis pages Streamlit, croisement économie/élections, gestion valeurs manquantes dans l'UI, carte choroplèthe communale HdF.
+description: Patterns Streamlit + DuckDB du projet : cache, connexion read-only, cartes Folium choroplèthes HdF, valeurs manquantes, croisement économie × élections. À charger pour toute page, onglet ou requête d'interface.
 ---
 
 # Streamlit + DuckDB : patterns du projet

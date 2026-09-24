@@ -1,6 +1,6 @@
 ---
 name: latex-rapport-fr
-description: Génération de rapports LaTeX professionnels en français selon la charte orthotypographique du Journal officiel (DILA, 2021). Couvre le préambule type avec babel/siunitx/biblatex, les règles d'écriture (guillemets, abréviations, majuscules, exposants, dates, heures), les graphies officielles des départements et régions, la structure des annexes et notes, et le workflow Jinja2 → Tectonic → PDF.
+description: Rapports LaTeX en français (charte orthotypographique JO/DILA 2021) : préambule babel/siunitx/biblatex, typographie, graphies officielles des territoires, workflow Jinja2 puis Tectonic vers PDF. À charger uniquement pour produire un document LaTeX ou PDF.
 ---
 
 # Rapports LaTeX en français (charte JORF)

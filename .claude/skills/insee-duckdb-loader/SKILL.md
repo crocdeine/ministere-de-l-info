@@ -1,6 +1,6 @@
 ---
 name: insee-duckdb-loader
-description: Conventions de chargement des données INSEE (Filosofi, Recensement de la population, Sirene, BPE) et des sources économiques associées (CNAF, DREES, URSSAF, Eurostat) dans DuckDB pour le projet ministere-de-l-info. À charger pour toute tâche impliquant charger données INSEE, ETL économie, Filosofi, données revenus/pauvreté, chômage communal, tissu entreprises, Recensement de la population, Sirene, BPE, données économiques INSEE, taux de pauvreté, niveau de vie, CSP, catégories socioprofessionnelles.
+description: Chargement dans DuckDB des sources économiques (INSEE Filosofi et RP, CNAF, DREES, URSSAF, Eurostat) : encodage, secret statistique, codes INSEE, idempotence. À charger pour tout ETL économie ou donnée INSEE (revenus, pauvreté, chômage, CSP, logements sociaux).
 ---
 
 # INSEE → DuckDB : conventions de chargement
