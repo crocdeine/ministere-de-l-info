@@ -268,11 +268,14 @@ rapport annonce un chômage depuis 1999.
 | Format | CSV UTF-8, séparateur virgule |
 | Auth | Aucune |
 | Couverture | Législatures 12 à 17 (2002-présent), France entière ; 2 120 députés, 1 653 lignes d'activité (rapport Phase F) |
-| Tables | `leg_elus` (chambre `AN`), `leg_activite` |
+| Tables | `leg_elus` (chambre `AN`), `leg_mandats`, `leg_activite` |
 | Loader | `etl/loaders/legislatif_datan.py` |
 
-**Limites** : pas de région dans le CSV (`region_nom` NULL) ; un député est rattaché à sa
-dernière législature (`legislatureLast`) ; scores d'activité uniquement pour l'AN.
+**Limites** : pas de région dans le CSV (`region_nom` NULL) ; une ligne par député,
+rattachée à sa dernière législature (`legislatureLast`) et au groupe de celle-ci
+(`groupeAbrev`) : aucun historique des groupes (ADR-0011, `leg_mandats.granularite =
+'derniere_legislature'`) ; `dateMaj` est une date de mise à jour, pas une fin de mandat
+(`date_fin_mandat` NULL) ; scores d'activité uniquement pour l'AN.
 
 ---
 
@@ -284,11 +287,14 @@ dernière législature (`legislatureLast`) ; scores d'activité uniquement pour 
 | Format | CSV cp1252, séparateur virgule, 18 lignes de commentaires `%` en tête |
 | Auth | Aucune |
 | Couverture | Sénateurs actifs et anciens, France entière (y compris circonscriptions historiques, codées `XX`) ; 1 945 sénateurs (rapport Phase F) |
-| Table | `leg_elus` (chambre `SENAT`) |
+| Table | `leg_elus` (chambre `SENAT`), `leg_mandats` |
 | Loader | `etl/loaders/legislatif_senat.py` |
 
-**Limites** : pas de score d'activité ; pas de date de début de mandat ; la date de fin
-des anciens sénateurs vaut la date de chargement.
+**Limites** : pas de score d'activité ; aucune date de mandat (`date_debut_mandat` et
+`date_fin_mandat` NULL depuis l'ADR-0011) ; groupe actuel ou dernier seulement, sans
+date. Filtre 2002-présent partiel : sont écartés les anciens sénateurs des
+circonscriptions disparues (`XX`) et ceux décédés avant le 29/09/2002 ; un filtre exact
+exigerait les fichiers de mandats de data.senat.fr (non chargés).
 
 ---
 

@@ -19,6 +19,7 @@ décision est révisée, un nouvel ADR est créé avec le statut "Remplace 000X"
 | [0007](0007-module-legislatif-perimetre-et-sources.md) | Module Législatif — périmètre national, sources Datan + data.senat.fr | Accepté (rédigé a posteriori le 2026-09-24) |
 | [0008](0008-economie-sources-complementaires.md) | Module Économie — sources complémentaires CNAF, DREES, URSSAF, Eurostat | Accepté (rédigé a posteriori le 2026-09-24) |
 | [0009](0009-design-system-et-navigation.md) | Design system et navigation `st.navigation()` / `st.Page()` | Accepté (rédigé a posteriori le 2026-09-24) |
+| [0011](0011-legislatif-groupes-par-legislature.md) | Législatif — classement des groupes par législature et modèle de mandats | Accepté (décision Mathias 2026-09-24) |
 
 ## Format
 
