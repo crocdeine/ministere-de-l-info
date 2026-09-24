@@ -1,260 +1,186 @@
 ---
 name: streamlit-duckdb-patterns
-description: Patterns d'architecture Streamlit + DuckDB pour ministere-de-l-info. À charger pour toute tâche UI Streamlit du projet : nouvelle page, optimisation de cache, performance, visualisation Folium dans Streamlit, requêtes DuckDB depuis pages Streamlit, split screen économie/élections, gestion valeurs manquantes dans l'UI, carte choroplèthe communale HdF.
+description: Patterns d'architecture Streamlit + DuckDB pour ministere-de-l-info. À charger pour toute tâche UI Streamlit du projet : nouvelle page, optimisation de cache, performance, visualisation Folium dans Streamlit, requêtes DuckDB depuis pages Streamlit, croisement économie/élections, gestion valeurs manquantes dans l'UI, carte choroplèthe communale HdF.
 ---
 
 # Streamlit + DuckDB : patterns du projet
 
+> Vérifié contre le code au 2026-09-24 (`app.py`, `pages/`, `src/ministere_de_l_info/pages/`,
+> `viz/*_queries.py`). Modèles de référence : `viz/economie_queries.py`, `pages/economie.py`.
+
 ## 1. Connexion DuckDB depuis Streamlit
 
-**Règle** : toujours ouvrir en read-only depuis les pages. Écriture uniquement dans les scripts ETL.
+**Règle** : lecture seule depuis l'UI. Écriture uniquement dans les scripts ETL.
+
+Pattern standard des modules `viz/*_queries.py` : connexion courte, ouverte **dans** une fonction
+`@st.cache_data`, fermée dans `finally`. Le cache porte sur le résultat, pas sur la connexion.
 
 ```python
-import duckdb
-import streamlit as st
 from pathlib import Path
 
-@st.cache_resource
-def _get_con() -> duckdb.DuckDBPyConnection:
-    db_path = Path(__file__).resolve().parents[3] / "data" / "ministere.duckdb"
-    return duckdb.connect(str(db_path), read_only=True)
+import duckdb
+import polars as pl
+import streamlit as st
+
+DB_PATH: Path = Path(__file__).resolve().parents[3] / "data" / "ministere.duckdb"
+
+
+def _open_ro() -> duckdb.DuckDBPyConnection:
+    con = duckdb.connect(str(DB_PATH), read_only=True)
+    con.execute("LOAD spatial")  # nécessaire pour ST_AsGeoJSON
+    return con
+
+
+@st.cache_data(ttl=60)
+def is_data_loaded() -> bool:
+    con = _open_ro()
+    try:
+        return con.execute("SELECT COUNT(*) FROM economie_filosofi").fetchone()[0] > 0
+    finally:
+        con.close()
 ```
 
-`parents[3]` : depuis `src/ministere_de_l_info/pages/`, remonter à la racine du projet.
+`parents[3]` : depuis `src/ministere_de_l_info/viz/<fichier>.py`, remonte à la racine.
+Exception historique : `pages/1_📍_Géographie.py` garde une connexion partagée `@st.cache_resource`.
+Chaque page vérifie la présence des données (`is_data_loaded()`) et affiche un message clair sinon.
 
 ## 2. Cache des requêtes
 
-| Cas | Décorateur | Raison |
+| Cas | Décorateur | Usage dans le projet |
 |---|---|---|
-| Connexion DuckDB | `@st.cache_resource` | Singleton, une seule instance |
-| Requête → DataFrame | `@st.cache_data` | Sérialisable, par arguments |
-| GeoDataFrame Folium | `@st.cache_data` + `hash_funcs` | GeoPandas non sérialisable nativement |
+| Test de présence des données | `@st.cache_data(ttl=60)` | `is_data_loaded()` |
+| Requête → DataFrame Polars | `@st.cache_data(ttl=3600)` | toutes les `get_*()` ; `show_spinner="…"` pour les longues |
+| Connexion partagée | `@st.cache_resource` | Géographie uniquement |
+| CSS | aucun | `_theme._load_css()` relu à chaque rerun (volontaire) |
+
+Arguments des fonctions cachées : types hashables (`int`, `str`, `tuple`), pas de DataFrame.
+
+## 3. DuckDB → DataFrame
 
 ```python
-import polars as pl
-
-@st.cache_data(ttl=3600)
-def get_economie_commune(code_commune: str) -> pl.DataFrame:
-    con = _get_con()
-    return con.execute(
-        "SELECT * FROM v_economie_commune WHERE code_commune = ?",
-        [code_commune],
-    ).pl()
-
-
-@st.cache_data
-def get_filosofi_hdf(annee: int) -> pl.DataFrame:
-    con = _get_con()
-    return con.execute(
-        "SELECT code_commune, taux_pauvrete, niveau_vie_median "
-        "FROM economie_filosofi WHERE annee = ?",
-        [annee],
-    ).pl()
+df: pl.DataFrame = con.execute("SELECT ... WHERE annee = ?", [annee]).pl()  # prioritaire
+df_pd = con.execute("SELECT ...").df()  # seulement si l'API aval l'exige (folium.Choropleth)
 ```
 
-## 3. DuckDB → DataFrame dans les pages
+SQL paramétré (`?`). Si un nom de colonne doit être injecté (indicateur choisi), le valider contre
+une liste blanche (`_INDICATEURS_VALIDES`) avant la f-string.
+
+## 4. Cartes Folium
+
+Les géométries sont **pré-simplifiées en base** (`geometry_simplified_communal`, `_circo`,
+`_epci`, `_national`...) et sérialisées en SQL — pas de GeoPandas ni de `simplify()` à l'affichage.
+La clé commune des tables géo est `code_insee` (pas `code_commune`) ; filtre HdF = `code_region = '32'`.
 
 ```python
-# Polars (prioritaire)
-df: pl.DataFrame = con.execute("SELECT ...").pl()
-
-# Pandas (fallback si Plotly Express l'exige, ou st.dataframe avec filtre)
-df_pd = con.execute("SELECT ...").df()
-
-# ÉVITER sur gros volumes
-rows = con.execute("SELECT ...").fetchall()  # liste de tuples → pas de vectorisation
+@st.cache_data(ttl=3600, show_spinner="Chargement des données communales…")
+def get_scores_commune(annee: int, indicateur: str) -> pl.DataFrame:
+    if indicateur not in _INDICATEURS_VALIDES:
+        raise ValueError(f"Indicateur inconnu : {indicateur}")
+    con = _open_ro()
+    try:
+        return con.execute(f"""
+            SELECT gc.code_insee AS code_commune, gc.nom AS nom_commune,
+                   v.{indicateur} AS valeur, COALESCE(v.secret_partiel, FALSE) AS secret,
+                   ST_AsGeoJSON(gc.geometry_simplified_communal) AS geojson
+            FROM geographies_communes gc
+            LEFT JOIN v_economie_commune v
+                ON gc.code_insee = v.code_commune AND v.annee = ?
+            WHERE gc.code_region = '32'
+        """, [annee]).pl()
+    finally:
+        con.close()
 ```
 
-## 4. Folium dans Streamlit
-
-```python
-import geopandas as gpd
-import folium
-from streamlit_folium import st_folium
-
-@st.cache_data
-def get_geo_hdf() -> gpd.GeoDataFrame:
-    con = _get_con()
-    gdf = gpd.GeoDataFrame(
-        con.execute(
-            "SELECT code_commune, nom, geom FROM communes "
-            "WHERE LEFT(code_commune, 2) IN ('02','59','60','62','80')"
-        ).df(),
-        geometry="geom",
-        crs="EPSG:4326",
-    )
-    # Simplifier pour la performance — niveau communal HdF
-    gdf["geometry"] = gdf["geometry"].simplify(0.0005)
-    return gdf
-
-
-def render_carte_choropleth(gdf: gpd.GeoDataFrame, colonne: str) -> None:
-    # Toujours convertir en EPSG:4326 avant Folium
-    if gdf.crs and gdf.crs.to_epsg() != 4326:
-        gdf = gdf.to_crs(epsg=4326)
-
-    m = folium.Map(location=[50.3, 2.9], zoom_start=8)
-    folium.Choropleth(
-        geo_data=gdf.__geo_interface__,
-        data=gdf,
-        columns=["code_commune", colonne],
-        key_on="feature.properties.code_commune",
-        fill_color="YlOrRd",
-        nan_fill_color="#CCCCCC",  # gris pour secret statistique
-        legend_name=colonne,
-    ).add_to(m)
-
-    st_folium(m, use_container_width=True, height=500)
-```
+Construction de la carte : voir `pages/economie.py::_make_choropleth` (FeatureCollection bâtie
+depuis la colonne `geojson`, `folium.Choropleth` + `GeoJsonTooltip`) et `viz/maps_elections.py`
+(bloc dominant, couleurs issues de `_blocs_politiques.COULEURS_BLOCS`).
 
 **Règles Folium** :
-- `use_container_width=True` obligatoire
-- `gdf.simplify(0.0005)` pour HdF niveau communal (0.001 si national)
-- Convertir en EPSG:4326 **avant** tout appel Folium
-- `nan_fill_color="#CCCCCC"` pour les valeurs manquantes (secret statistique)
+- géométries en EPSG:4326 (stockage) ; si un GeoDataFrame intervient : `gdf.to_crs(epsg=4326)` avant Folium ;
+- `folium.Map(location=[50.3, 2.9], zoom_start=8)` pour les Hauts-de-France ;
+- `nan_fill_color="#CCCCCC"` pour secret statistique / valeur manquante ;
+- `st_folium(m, use_container_width=True, height=540, returned_objects=[])` sauf besoin d'interaction.
 
-## 5. Pattern de page Streamlit — module Économie
+## 5. Structure d'une page
 
-Structure standard à suivre pour [pages/4_💶_Économie.py](../pages/4_💶_Économie.py) :
+`app.py` appelle **une seule fois** `st.set_page_config`, `inject_css()` et `st.navigation()`.
+Les fichiers de `pages/` ne doivent pas rappeler `st.set_page_config`.
 
 ```python
-import streamlit as st
-from src.ministere_de_l_info.pages.economie import render
+# pages/4_📊_Économie.py
+"""Page Économie — ministere-de-l-info."""
 
-st.set_page_config(page_title="Économie — Hauts-de-France", layout="wide")
+from ministere_de_l_info.pages.economie import render
+
 render()
 ```
 
-Et dans [src/ministere_de_l_info/pages/economie.py](../src/ministere_de_l_info/pages/economie.py) :
-
 ```python
-INDICATEURS = {
-    "taux_pauvrete": "Taux de pauvreté (%)",
-    "niveau_vie_median": "Niveau de vie médian (€/an)",
-    "taux_chomage_rp": "Taux de chômage déclaratif (%)",
-    "part_ouvriers": "Part d'ouvriers (%)",
-}
-ANNEES = list(range(2012, 2024))
-
+# src/ministere_de_l_info/pages/economie.py (extrait)
+from ministere_de_l_info._theme import render_page_header
 
 def render() -> None:
-    st.header("Économie — Hauts-de-France")
-
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        indicateur = st.selectbox("Indicateur", list(INDICATEURS.keys()),
-                                  format_func=lambda k: INDICATEURS[k])
-        annee = st.selectbox("Année", ANNEES, index=len(ANNEES) - 1)
-
-    with col2:
-        # Carte choroplèthe ici
-        ...
+    if not is_data_loaded():
+        st.warning("Données économiques non chargées. Lancez :")
+        st.code("uv run python scripts/load_economie.py")
+        return
+    render_page_header(icon="bar_chart", title="Économie", subtitle="Hauts-de-France")
+    tab_carte, tab_evolution, tab_croisement, tab_industrie = st.tabs([...])
+    with tab_carte:
+        _render_carte_tab()
+    ...
 ```
 
-## 6. Split screen économie × élections
+Ajouter une page = créer `src/.../pages/<module>.py::render()`, un fichier mince dans `pages/`,
+et une entrée `st.Page(..., icon=":material/<nom>:", url_path="<slug>")` dans `app.py`
+(changement de navigation → validation Mathias).
 
-Pattern pour la comparaison croisée (fonctionnalité différenciante du projet) :
+Indicateurs économiques réels (`viz/economie_queries.py`) : `taux_pauvrete`, `niveau_vie_median`,
+`tx_chomage_dec`, `part_ouvriers_employes`, `part_emploi_industriel`, `part_logements_sociaux`,
+`nb_foyers_rsa`, `apl_medecins` ; contexte Eurostat : `tx_chomage_bit`, `pib_eur_hab`.
+Années : lire `get_annees_par_indicateur()`, ne pas coder de plage en dur.
 
-```python
-def render_split_screen(annee: int, scrutin_id: str) -> None:
-    col_eco, col_elect = st.columns(2)
+## 6. Croisement économie × élections
 
-    with col_eco:
-        st.subheader("Économie")
-        st.caption(f"Taux de pauvreté — Filosofi {annee}")
-        # carte économique
+Implémenté dans l'onglet « Économie × Élections » (`_render_croisement_tab`) : `px.scatter`
+commune par commune, indicateur économique (année n-1) × score d'un bloc à la présidentielle,
+via `get_croisement_eco_elections()` (jointure SQL `v_scores_commune_pres` +
+`v_participation_commune_pres` + `v_economie_commune` ; la vue `v_croisement_eco_elections`
+existe mais n'est pas utilisée par l'UI). Deux cartes côte à côte (`st.columns(2)`) restent
+possibles ; la synchronisation du survol entre cartes Folium n'est pas faisable nativement.
 
-    with col_elect:
-        st.subheader("Résultats électoraux")
-        st.caption(f"Scrutin : {scrutin_id}")
-        # carte électorale (réutiliser maps_elections.py)
-```
+## 7. Valeurs manquantes dans l'UI
 
-Synchronisation du survol : non implémentée nativement dans Folium/Streamlit. Alternative : utiliser un `st.selectbox` de commune et afficher les deux cartes + métriques côte à côte.
-
-## 7. Gestion des valeurs manquantes dans l'UI
-
-**Secret statistique INSEE** : communes < 50 ménages (fréquent en Picardie, Thiérache)
+Secret statistique INSEE (petites communes) et données absentes : afficher « n.d. » ou
+« Données non disponibles », **jamais** `None`, `nan`, `NULL` ni 0.
 
 ```python
-# Afficher NULL comme donnée indisponible, jamais comme 0
 def format_valeur(val: float | None, suffixe: str = "%") -> str:
-    if val is None or (isinstance(val, float) and pl.Series([val]).is_nan().all()):
+    if val is None or val != val:  # None ou NaN
         return "Données non disponibles"
-    return f"{val:.1f} {suffixe}".replace(".", ",")  # virgule décimale française
-
-
-# Dans un tooltip Folium
-tooltip_html = """
-<b>{nom}</b><br>
-Taux de pauvreté : {taux}<br>
-<small style="color:#888">
-  {note}
-</small>
-"""
-note = "Secret statistique (commune < 50 ménages)" if pd.isna(taux) else f"Source : Filosofi {annee}"
+    return f"{val:.1f} {suffixe}".replace(".", ",")  # virgule décimale
 ```
+
+## 8. Performance
+
+- Jointures en SQL DuckDB, jamais en Python.
+- Ne sélectionner que les colonnes utiles ; GeoJSON uniquement quand une carte est affichée.
+- Données stables : `ttl=3600` ; tests de présence : `ttl=60`.
+
+## 9. Citation des sources
+
+Toujours un `st.caption` : producteur, dataset, millésime, licence, niveau géographique.
 
 ```python
-# Dans st.metric
-st.metric(
-    label="Taux de pauvreté",
-    value=format_valeur(taux_pauvrete),
-    help="Source : INSEE Filosofi. Seuil : 60% du revenu médian national.",
-)
+st.caption(f"Source : INSEE — Filosofi {annee} | Licence Ouverte v2.0 | Niveau : commune")
+st.caption("Sources : INSEE (économie) + Ministère de l'Intérieur via data.gouv.fr (élections)")
 ```
 
-**Règle** : ne jamais afficher `None`, `nan`, ou `NULL` brut à l'utilisateur.
+## 10. Pièges spécifiques
 
-## 8. Performance et mémoire
-
-```python
-# Chargement géographique une seule fois (singleton via cache_resource)
-# Données économiques : cache_data avec ttl=3600 (données stables)
-# Jamais de jointure Python — toujours faire les jointures en SQL DuckDB
-
-# Jointure eco + geo dans DuckDB (pattern recommandé)
-@st.cache_data
-def get_filosofi_geo(annee: int) -> dict:
-    con = _get_con()
-    return con.execute("""
-        SELECT c.code_commune, c.nom, c.geom,
-               f.taux_pauvrete, f.niveau_vie_median
-        FROM communes c
-        LEFT JOIN economie_filosofi f
-            ON c.code_commune = f.code_commune AND f.annee = ?
-        WHERE LEFT(c.code_commune, 2) IN ('02','59','60','62','80')
-    """, [annee]).fetchdf()
-```
-
-## 9. Citation des sources dans l'UI
-
-Toujours ajouter un footer ou un `st.caption` :
-
-```python
-st.caption(
-    f"Source : INSEE — Filosofi {annee} | "
-    "Licence Ouverte v2.0 | "
-    "Niveau géographique : commune"
-)
-```
-
-Pour la superposition économie/élections :
-```python
-st.caption(
-    "Sources : INSEE Filosofi (revenus) + "
-    "Ministère de l'Intérieur via data.gouv.fr (élections)"
-)
-```
-
-## 10. Pièges Streamlit spécifiques au projet
-
-- **Rerun** : Streamlit ré-exécute tout le script à chaque interaction — tout chargement non caché sera re-déclenché
-- **GeoDataFrame** : non sérialisable directement par `@st.cache_data` → wrapper via `hash_funcs` ou retourner un dict GeoJSON
-- **Connexion DuckDB** : une seule instance via `@st.cache_resource` — ne jamais ouvrir/fermer dans une fonction appelée souvent
-- **st_folium** : retourne un dict avec la dernière interaction (clic, zoom) — utiliser `returned_objects=[]` si non nécessaire pour éviter les reruns parasites
-
-```python
-# Éviter les reruns parasites
-result = st_folium(m, use_container_width=True, returned_objects=[])
-```
+- **Rerun** : tout le script est ré-exécuté à chaque interaction → tout chargement lourd en cache.
+- **Couleurs de blocs** : uniquement `_blocs_politiques.py` (alignée sur `--nuance-*` de `custom.css`).
+- **Couleurs d'interface** : tokens CSS de `custom.css`, pas de valeurs en dur.
+- **`st_folium`** : `returned_objects=[]` pour éviter les reruns parasites.
+- **Session cloud** : pas de base → les pages affichent leur message d'absence ; les tests
+  d'interface (`tests/test_pages_*.py`, `test_streamlit_smoke.py`) sont majoritairement ignorés.
