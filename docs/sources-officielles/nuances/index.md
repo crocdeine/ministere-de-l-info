@@ -27,16 +27,13 @@ la logique officielle datée de l'[ADR-0005](../../adr/0005-nuances-et-blocs-off
 
 | Fichier | NOR | Date | Scrutin | Nuances | Blocs ? | Fait notable |
 |---|---|---|---|---|---|---|
+| 2020-municipales_INTA1931378J.pdf | INTA1931378J | 3 fév. 2020 | Municipales 2020 | 23 (grille des listes) | Annexe « grilles de regroupement des nuances par blocs de clivages » | Nuançage des listes dans les communes de 3 500 hab et plus et les chefs-lieux d'arrondissement ; circulaire postérieure à l'ordonnance CE n°437675 |
 | 2022-legislatives_INTA2212053C.pdf | INTA2212053C | avr. 2022 | Législatives 2022 | 19 | Non | Pas de regroupement en blocs |
 | 2023-senatoriales_IOMA2322276J.pdf | IOMA2322276J | 16 août 2023 | Sénatoriales 2023 | 21 | Oui (1re fois) | Naissance des 6 blocs. LFI → gauche. RN → extrême droite |
 | 2024-legislatives_IOMA2415630C.pdf | IOMA2415630C | juin 2024 | Législatives 2024 | 24 | Oui | Création nuance UG (union gauche) |
 | 2026-municipales_INTP2602966C.pdf | INTP2602966C | 2 fév. 2026 | Municipales 2026 | 26 | Oui | LFI bascule → extrême gauche ; seuil 3 500 hab |
 
-## Circulaires archivées (notes texte — PDF Légifrance non téléchargeable automatiquement)
-
-| Fichier | NOR | Date | Scrutin | Statut |
-|---|---|---|---|---|
-| 2020-municipales_INTA1931378J_lien.md | INTA1931378J | 3 fév. 2020 | Municipales 2020 | ⚠️ PDF à télécharger manuellement — URL dans le fichier note |
+Note sur INTA1931378J (PDF de 10 pages, archivé en Phase D3, commit `f7e9629`) : l'objet de la circulaire annonce en annexe des « grilles de regroupement des nuances par blocs de clivages ». L'articulation de ce point avec l'affirmation « blocs officiels depuis 2023 seulement » (ADR-0005, IOMA2322276J ci-dessus) n'a pas été instruite ; la colonne « Blocs ? » ne tranche pas.
 
 ## Décisions du Conseil d'État (archivées en texte intégral)
 
@@ -63,4 +60,4 @@ Ces circulaires alimentent :
 - la table `blocs_politiques` (les 6 blocs officiels : EXG, GAU, DIV, CENT, DTE, EXD)
 - la table `candidats_presidentielle` (classement sourcé des candidats 2017/2022)
 - la table `nuances_harmonisees` (mapping nuance→bloc pour présidentielles et législatives)
-- la future table d'extension pour les municipales (mapping 34 nuances muni → blocs — prévu D3.2)
+- les entrées municipales de `nuances_harmonisees` (67 entrées 2008-2026, chargées en D3.2 — voir ADR-0005 § « Application aux municipales 2008-2026 »)

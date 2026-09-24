@@ -1,7 +1,17 @@
 # Sources de données
 
-Référence des sources utilisées ou prévues. Pour le flux d'ingestion, voir
-[docs/architecture.md](architecture.md).
+Référence des sources utilisées, abandonnées ou envisagées. Pour le flux d'ingestion,
+voir [docs/architecture.md](architecture.md). Dernière mise à jour : 2026-09-24.
+
+| Module | Sources | Script de chargement |
+|--------|---------|----------------------|
+| Géographie | IGN ADMIN-EXPRESS-COG, INSEE Mélodi, circonscriptions data.gouv.fr | `scripts/etl_territoires.py` |
+| Élections | Données des élections agrégées (ministère de l'Intérieur, data.gouv.fr) | `scripts/load_elections_{presidentielles,legislatives,municipales}.py` |
+| Économie | Dataset OLAP INSEE Filosofi + RP (data.gouv.fr), CNAF, DREES, URSSAF, Eurostat | `scripts/load_economie.py` |
+| Législatif | Datan (data.gouv.fr), Sénat (data.senat.fr) | `scripts/load_legislatif.py` |
+
+Les volumes cités proviennent des rapports de clôture de phase (`reports/`), pas d'une
+mesure sur la base.
 
 ---
 
@@ -38,9 +48,9 @@ DuckDB (`geometry_simplified_national`, `_regional`, `_departemental`, `_communa
 
 | Aspect | Valeur |
 |--------|--------|
-| URL | `https://api.insee.fr/melodi/file` |
+| URL | `https://api.insee.fr/melodi/file/DS_POPULATIONS_HISTORIQUES/DS_POPULATIONS_HISTORIQUES_CSV_FR` |
 | Dataset | `DS_POPULATIONS_HISTORIQUES` |
-| Format | JSON (clé `value`, tableau de séries temporelles) |
+| Format | ZIP contenant un CSV UTF-8 `;`, format long (une ligne par mesure × commune × année) |
 | Auth | Aucune (endpoint public Mélodi sans OAuth2) |
 | Fréquence de mise à jour | Annuelle (après chaque campagne de recensement) |
 | Millésimes chargés | 2013, 2018, 2023 |
@@ -77,21 +87,19 @@ plus récents. À remplacer par un export officiel AN dès disponibilité.
 
 ---
 
----
-
 ## Données des élections agrégées (data.gouv.fr / Ministère de l'Intérieur)
 
 | Aspect | Valeur |
 |--------|--------|
 | URL dataset | `https://www.data.gouv.fr/datasets/donnees-des-elections-agregees/` |
 | Producteur | Ministère de l'Intérieur / data.gouv.fr |
-| Format | Parquet (téléchargement direct) |
+| Format | Parquet — à télécharger manuellement dans `data/exploration/` (les scripts ne téléchargent pas) |
 | Auth | Aucune |
 | Granularité | Bureau de vote |
 | Couverture | 56 scrutins de 1999 à 2026 (euro, pres, legi, regi, muni, dpmt, cant) |
 | Volume | ~28 M lignes / 222 MB (deux fichiers Parquet) |
 | Filtrage | Hauts-de-France uniquement (code_region = '32') au chargement |
-| Module cible | `scripts/load_elections.py` (C2b) |
+| Scripts | `scripts/load_elections_presidentielles.py`, `load_elections_legislatives.py`, `load_elections_municipales.py` |
 
 Le dataset est distribué en deux fichiers Parquet au nommage contre-intuitif :
 
@@ -141,27 +149,167 @@ Types : `pres`, `legi`, `euro`, `regi`, `muni`, `dpmt`, `cant`.
 
 ### Filtrage Hauts-de-France
 
-Le chargement (C2b) jointure sur `geographies_communes.code_region = '32'` pour ne
+Les scripts de chargement joignent sur `geographies_communes.code_region = '32'` pour ne
 conserver que les communes des 5 départements HdF (02, 59, 60, 62, 80). Ce filtrage
 réduit le volume d'un facteur ~10.
 
-**Référence** : `reports/exploration-elections.md` — analyse structurelle complète des Parquet.
+**Références** : `reports/exploration-elections-legislatives.md` (exploration des législatives). Le rapport d'exploration initial `reports/exploration-elections.md`, cité dans les versions précédentes de ce document, n'existe pas dans le dépôt.
 
 **Schéma détaillé** : `docs/schema-elections.md`.
 
 ---
 
-## Sources prévues (modules futurs)
+## Dataset OLAP INSEE — Filosofi + Recensement de la population (data.gouv.fr)
 
-| Source | Module cible | Données |
-|--------|-------------|---------|
-| INSEE Sirene (`portail-api.insee.fr`) | `Économie` | Établissements, entreprises |
-| PISTE — Légifrance / JORF (`api.piste.gouv.fr`) | `Législatif` | Textes de loi, JO, décrets |
-| Banque de France Webstat | `Économie` | Séries macroéconomiques |
-| HATVP open-data (`hatvp.fr/open-data`) | `Élus` | Déclarations d'intérêts, patrimoines |
-| data.assemblee-nationale.fr | `Législatif` | Votes, amendements, dossiers législatifs |
-| NosDéputés / NosSénateurs (Regards Citoyens) | `Élus` | Mandats, présences, groupes |
-| Overpass API (OpenStreetMap) | `Géographie` | POI, équipements locaux |
+| Aspect | Valeur |
+|--------|--------|
+| Dataset | « Recensement de la population communal et Filosofi depuis 2015 », id `67289477639527408ae687da` |
+| Fichier | `https://static.data.gouv.fr/resources/recensement-de-la-population-communal-et-filosofi-depuis-2015-france-metropolitaine/20241104-093439/donnees-insee-olap.parquet` |
+| Format | Parquet, format long (OLAP) : `code_com, nom_commune, annee, source, clef_json, valeur` |
+| Volume | 1,73 Go national ; cache HdF local `data/raw/economie/donnees-insee-olap-hdf.parquet` (~40 Mo selon le rapport Phase E) |
+| Accès | Lecture distante par DuckDB `httpfs` avec filtre HdF poussé, puis cache local |
+| Auth | Aucune |
+| Couverture chargée | Filosofi 2017-2021 (`source = 'filosofi_disponible'`) ; RP 2015-2021 (`rp_actifs_emploi`, `rp_logements`) |
+| Tables | `economie_filosofi`, `economie_rp` |
+| Loaders | `etl/loaders/economie_filosofi.py`, `etl/loaders/economie_rp.py` |
 
-Pour les sources nécessitant une authentification (INSEE Sirene OAuth2, PISTE OAuth2),
+**Pièges** :
+
+- Suffixe RP `_p` = effectif **pondéré**, pas un pourcentage ; `_c` = effectif. Les taux
+  sont calculés par le loader (ex. `tx_chomage_dec = chomeurs_15_64_ans_p / actifs_15_64_ans_p`).
+- `part_emploi_industriel` = emplois **au lieu de travail** industriels / emplois au lieu
+  de travail (et non la population résidente).
+- Secret statistique : valeur NULL dans le Parquet → colonne `secret = TRUE` dans DuckDB.
+- Le fichier couvre la France métropolitaine (d'après son nom).
+
+---
+
+## CNAF — allocataires du RSA (data.caf.fr)
+
+| Aspect | Valeur |
+|--------|--------|
+| URL | `https://data.caf.fr/explore/dataset/rsa_s_type_com_f/download/?format=csv` (OpenDataSoft) |
+| Format | CSV `;`, UTF-8 |
+| Auth | Aucune |
+| Granularité | Commune × type de RSA × période (`dtreffre` AAAAMM) |
+| Couverture chargée | 2020-2024, snapshot de décembre ; 17 381 lignes HdF (rapport Phase E+) |
+| Table | `economie_social` (`nb_foyers_rsa`, `taux_foyers_rsa`) |
+| Loader | `etl/loaders/economie_cnaf.py` |
+
+**Pièges** : secret statistique CNAF = arrondi au multiple de 5 (aucun NULL, aucun
+drapeau) ; `taux_foyers_rsa` utilise `pop_active` du RP comme dénominateur, donc NULL
+après 2021.
+
+---
+
+## DREES — Accessibilité potentielle localisée (APL) aux médecins généralistes
+
+| Aspect | Valeur |
+|--------|--------|
+| URL | `https://data.drees.solidarites-sante.gouv.fr/api/v2/catalog/datasets/530_l-accessibilite-potentielle-localisee-apl/attachments/…_xlsx` |
+| Format | XLSX multi-onglets (un onglet par millésime), 8 lignes d'en-tête |
+| Auth | Aucune |
+| Granularité | Commune |
+| Couverture chargée | Dernier millésime disponible : 2023 ; 3 788 lignes HdF (rapport Phase E+) |
+| Table | `economie_social` (`apl_medecins`, `desert_medical`) |
+| Loader | `etl/loaders/economie_drees.py` (pandas + openpyxl, groupe `etl`) |
+
+**Règle** : `desert_medical = TRUE` si APL < 2,5 consultations/habitant/an — 943 communes
+HdF en 2023 selon le rapport Phase E+. Upsert `ON CONFLICT` pour coexister avec les
+lignes CNAF de même clé.
+
+---
+
+## URSSAF — effectifs salariés et établissements par commune × APE (open.urssaf.fr)
+
+| Aspect | Valeur |
+|--------|--------|
+| URL | `https://open.urssaf.fr/explore/dataset/etablissements-et-effectifs-salaries-au-niveau-commune-x-ape-last/download/?format=csv` |
+| Format | CSV `;`, UTF-8, format large (`effectifs_salaries_AAAA`, `nombre_d_etablissements_AAAA`) |
+| Auth | Aucune |
+| Champ | Salariés du secteur privé |
+| Couverture chargée | 2006-2025 ; 1 157 338 lignes HdF après passage au format long (rapport Phase E+) |
+| Table | `economie_emploi_urssaf` ; vue `v_desindustrialisation_commune` |
+| Loader | `etl/loaders/economie_urssaf.py` (Polars) |
+
+**Piège** : la vue de désindustrialisation sélectionne les lignes dont le libellé
+`secteur_gs` contient « Industrie » (grand secteur `GS1 Industrie`).
+
+---
+
+## Eurostat — contexte macro-économique HdF vs France
+
+| Aspect | Valeur |
+|--------|--------|
+| URL | `https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/{dataset}?format=TSV&geo=FRE&geo=FR&sinceTimePeriod=2000` |
+| Datasets | `lfst_r_lfu3rt` (taux de chômage BIT) ; `nama_10r_2gdp` (PIB par habitant, remplace `tgs00005`) |
+| Format | TSV SDMX (valeurs suivies de drapeaux de qualité) |
+| Auth | Aucune |
+| Granularité | NUTS2 `FRE` (Hauts-de-France) et `FR` (France) |
+| Couverture | Chômage 1999-2025, PIB 2000-2024 selon le rapport Phase E++ ; 104 lignes |
+| Table | `economie_contexte` ; vue `v_contexte_hdf_vs_france` |
+| Loader | `etl/loaders/economie_eurostat.py` (chargé par `--source eurostat`, hors `all`) |
+
+**Pièges** : drapeaux `u`, `b`, `d`, `p` à retirer, `:` = valeur manquante ; filtres
+chômage `isced11=TOTAL, sex=T, age=Y15-74, unit=PC`, PIB `unit=EUR_HAB`. L'API INSEE
+BDM/IDBank, envisagée pour la même série, était bloquée par une protection anti-robot
+(rapport Phase E++). Écart non résolu : l'URL demande `sinceTimePeriod=2000` alors que le
+rapport annonce un chômage depuis 1999.
+
+---
+
+## Datan — historique des députés depuis 2002 (data.gouv.fr)
+
+| Aspect | Valeur |
+|--------|--------|
+| Dataset | `historique-des-deputes-de-lassemblee-nationale-depuis-2002-informations-et-statistiques` |
+| Accès | URL du CSV résolue via `https://www.data.gouv.fr/api/1/datasets/{slug}/` ; URL statique de secours (ressource du 2026-06-17) |
+| Producteur | Datan (scores calculés par Datan à partir des données AN) |
+| Format | CSV UTF-8, séparateur virgule |
+| Auth | Aucune |
+| Couverture | Législatures 12 à 17 (2002-présent), France entière ; 2 120 députés, 1 653 lignes d'activité (rapport Phase F) |
+| Tables | `leg_elus` (chambre `AN`), `leg_activite` |
+| Loader | `etl/loaders/legislatif_datan.py` |
+
+**Limites** : pas de région dans le CSV (`region_nom` NULL) ; un député est rattaché à sa
+dernière législature (`legislatureLast`) ; scores d'activité uniquement pour l'AN.
+
+---
+
+## Sénat — ODSEN_GENERAL (data.senat.fr)
+
+| Aspect | Valeur |
+|--------|--------|
+| URL | `https://data.senat.fr/data/senateurs/ODSEN_GENERAL.csv` |
+| Format | CSV cp1252, séparateur virgule, 18 lignes de commentaires `%` en tête |
+| Auth | Aucune |
+| Couverture | Sénateurs actifs et anciens, France entière (y compris circonscriptions historiques, codées `XX`) ; 1 945 sénateurs (rapport Phase F) |
+| Table | `leg_elus` (chambre `SENAT`) |
+| Loader | `etl/loaders/legislatif_senat.py` |
+
+**Limites** : pas de score d'activité ; pas de date de début de mandat ; la date de fin
+des anciens sénateurs vaut la date de chargement.
+
+---
+
+## Sources abandonnées
+
+| Source | Module | Raison | Code |
+|--------|--------|--------|------|
+| NosDéputés.fr (Regards Citoyens) | Législatif | Endpoint de métriques vide depuis la dissolution de juin 2024 | `etl/loaders/legislatif_nosdeputes.py`, non appelé |
+| API CLAIR (`api.clair.vote`) | Législatif | HTTP 500 sur tous les endpoints | `etl/loaders/legislatif_clair.py`, non appelé |
+| INSEE Sirene | Économie | Prévu par l'ADR-0006 pour l'emploi industriel ; remplacé par le RP (communal) et l'URSSAF (série longue) | — |
+| INSEE BDM / IDBank | Économie | Protection anti-robot ; remplacé par Eurostat | — |
+
+## Sources envisagées (non intégrées)
+
+| Source | Module | Données |
+|--------|--------|---------|
+| data.assemblee-nationale.fr (dumps XML) | Législatif | Votes nominatifs, amendements, dossiers législatifs |
+| PISTE — Légifrance / JORF (`api.piste.gouv.fr`) | Législatif | Textes de loi, JO, décrets |
+| HATVP open-data (`hatvp.fr/open-data`) | Législatif | Déclarations d'intérêts, patrimoines |
+| ANCT (QPV, ZRR, typologies) | Économie | Zonages pour filtrer les territoires |
+| Overpass API (OpenStreetMap) | Géographie | POI, équipements locaux |
+
+Pour les sources nécessitant une authentification (PISTE OAuth2, INSEE OAuth2),
 les identifiants sont à renseigner dans `.env` — voir `.env.example`.
