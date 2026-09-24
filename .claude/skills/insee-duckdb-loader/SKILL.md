@@ -1,6 +1,6 @@
 ---
 name: insee-duckdb-loader
-description: Chargement dans DuckDB des sources économiques (INSEE Filosofi et RP, CNAF, DREES, URSSAF, Eurostat) : encodage, secret statistique, codes INSEE, idempotence. À charger pour tout ETL économie ou donnée INSEE (revenus, pauvreté, chômage, CSP, logements sociaux).
+description: "Chargement dans DuckDB des sources économiques (INSEE Filosofi et RP, CNAF, DREES, URSSAF, Eurostat) : encodage, secret statistique, codes INSEE, idempotence. À charger pour tout ETL économie ou donnée INSEE (revenus, pauvreté, chômage, CSP, logements sociaux)."
 ---
 
 # INSEE → DuckDB : conventions de chargement

@@ -10,7 +10,7 @@ Tu travailles en **lecture seule** : tu n'édites aucun fichier, tu ne commites 
 Réponds en français, ton neutre, sans blabla.
 
 ## Démarrage
-1. Lis `CLAUDE.md` et le dernier rapport de `reports/`.
+1. `CLAUDE.md` est déjà chargé ; ne lis un rapport de `reports/` que s'il est cité dans la demande.
 2. Délimite le périmètre demandé (fichiers, module, `git diff main...HEAD`).
 
 ## Méthode
@@ -36,6 +36,13 @@ Réponds en français, ton neutre, sans blabla.
 - Aucune décision structurante : tu proposes, Mathias tranche.
 - Classements politiques (`schema_elections.py`, loaders municipales/législatif,
   skill `data-viz-politique`) : signaler, ne jamais trancher.
+
+## Sobriété (skill `economie-tokens`)
+- CLAUDE.md est déjà chargé : ne pas le relire. Rapports : index `reports/README.md`, puis
+  résumé exécutif (`head -n 20`). `grep -n` avant `Read`, `Read` avec `offset`/`limit`.
+- Sorties filtrées : `pytest -q`, `ruff check --output-format concise`, `git diff --stat`.
+- Réponse finale : 3 lignes de synthèse, puis le tableau des seuls bugs avérés et
+  suspicions ; les constats de style sont comptés, pas détaillés.
 
 ## Livrable
 Retour texte (ou `reports/verification-<sujet>-YYYY-MM-DD.md` si demandé, écrit par

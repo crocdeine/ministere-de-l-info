@@ -1,6 +1,6 @@
 ---
 name: projet-conventions
-description: Conventions du projet ministere-de-l-info : schéma DuckDB réel (tables et vues par module), arborescence, nommage, commandes courantes. À charger avant de créer ou modifier un loader, une table, une vue SQL, une page, un test, ou de refactoriser.
+description: "Conventions du projet ministere-de-l-info : schéma DuckDB réel (tables et vues par module), arborescence, nommage, commandes courantes. À charger avant de créer ou modifier un loader, une table, une vue SQL, une page, un test, ou de refactoriser."
 ---
 
 # Conventions projet — ministere-de-l-info

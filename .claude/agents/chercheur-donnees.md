@@ -35,6 +35,14 @@ Scripts d'exploration éventuels : `uv run python ...` dans le scratchpad, jamai
 - Aucun classement politique ni choix de source structurant sans Mathias (ADR-0005/0006).
 - Tu n'écris que ton rapport (et, si demandé, une archive dans `docs/sources-officielles/`).
 
+## Sobriété (skill `economie-tokens`)
+- CLAUDE.md est déjà chargé : ne pas le relire. Rapports : index `reports/README.md`, puis
+  résumé exécutif (`head -n 20`). `grep -n` avant `Read`, `Read` avec `offset`/`limit`.
+- Sorties filtrées : `pytest -q`, `ruff check --output-format concise`, `git diff --stat`.
+- Réponse finale ≤ 15 lignes : Statut / Branche+commits / Fichiers / Vérifications /
+  Décisions à soumettre (questions fermées) / Rapport. Le détail va dans le rapport,
+  qui commence par un résumé exécutif de 10 lignes.
+
 ## Livrable
 `reports/recherche-<sujet>-YYYY-MM-DD.md` : fiche par source, tableau comparatif,
 recommandation argumentée, questions ouvertes pour Mathias.

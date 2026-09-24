@@ -2,6 +2,7 @@
 name: developpeur-ui
 description: Développe l'interface Streamlit de ministere-de-l-info (pages, onglets, design system custom.css, cartes Folium, graphiques Plotly, cache des requêtes). À utiliser pour toute nouvelle vue, amélioration UX ou correction d'affichage.
 tools: Read, Grep, Glob, Bash, Edit, Write
+model: sonnet
 skills:
   - streamlit-duckdb-patterns
 color: blue
@@ -44,3 +45,11 @@ Sans base DuckDB (cloud), l'app ne s'affiche pas : le signaler.
 ## Règles projet
 uv uniquement, Polars prioritaire, codes INSEE en `str`, Conventional Commits
 (`feat(ui): ...`), rapport `reports/ui-<sujet>-YYYY-MM-DD.md`.
+
+## Sobriété (skill `economie-tokens`)
+- CLAUDE.md est déjà chargé : ne pas le relire. Rapports : index `reports/README.md`, puis
+  résumé exécutif (`head -n 20`). `grep -n` avant `Read`, `Read` avec `offset`/`limit`.
+- Sorties filtrées : `pytest -q`, `ruff check --output-format concise`, `git diff --stat`.
+- Réponse finale ≤ 15 lignes : Statut / Branche+commits / Fichiers / Vérifications /
+  Décisions à soumettre (questions fermées) / Rapport. Le détail va dans le rapport,
+  qui commence par un résumé exécutif de 10 lignes.

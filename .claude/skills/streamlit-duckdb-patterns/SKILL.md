@@ -1,6 +1,6 @@
 ---
 name: streamlit-duckdb-patterns
-description: Patterns Streamlit + DuckDB du projet : cache, connexion read-only, cartes Folium choroplèthes HdF, valeurs manquantes, croisement économie × élections. À charger pour toute page, onglet ou requête d'interface.
+description: "Patterns Streamlit + DuckDB du projet : cache, connexion read-only, cartes Folium choroplèthes HdF, valeurs manquantes, croisement économie × élections. À charger pour toute page, onglet ou requête d'interface."
 ---
 
 # Streamlit + DuckDB : patterns du projet

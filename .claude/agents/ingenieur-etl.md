@@ -42,6 +42,14 @@ Réponds en français, ton neutre.
 - Jamais `data/raw/*`, `data/processed/*`, `*.duckdb` dans git.
 - Conventional Commits (`feat(etl): ...`, `fix(etl): ...`).
 
+## Sobriété (skill `economie-tokens`)
+- CLAUDE.md est déjà chargé : ne pas le relire. Rapports : index `reports/README.md`, puis
+  résumé exécutif (`head -n 20`). `grep -n` avant `Read`, `Read` avec `offset`/`limit`.
+- Sorties filtrées : `pytest -q`, `ruff check --output-format concise`, `git diff --stat`.
+- Réponse finale ≤ 15 lignes : Statut / Branche+commits / Fichiers / Vérifications /
+  Décisions à soumettre (questions fermées) / Rapport. Le détail va dans le rapport,
+  qui commence par un résumé exécutif de 10 lignes.
+
 ## Livrable
 Code + tests (`uv run pytest tests/<fichier> -q`), et
 `reports/etl-<sujet>-YYYY-MM-DD.md` : sources, volumétrie attendue, requêtes de contrôle.
