@@ -15,15 +15,49 @@
    → GitHub Actions build automatiquement l'image Docker multi-arch (arm64 + amd64)
    → L'image est publiée sur `ghcr.io/crocdeine/ministere-de-l-info`
 
-3. Attacher la DB à la release (si la DB a changé) :
+3. Attacher la DB à la release (si la DB a changé) — toujours via le script :
    ```bash
-   gzip -k data/ministere.duckdb                              # crée data/ministere.duckdb.gz
-   shasum -a 256 data/ministere.duckdb > data/ministere.duckdb.gz.sha256
-   gh release upload v0.X-description \
+   ./scripts/publish_db.sh v0.X-description   # crée data/ministere.duckdb.gz + .sha256
+   gh release upload v0.X-description --clobber \
      data/ministere.duckdb.gz \
      data/ministere.duckdb.gz.sha256
    ```
    Note : la DB fait ~900 Mo, la compression prend quelques minutes.
+   Ne pas générer l'empreinte à la main (voir « Convention d'empreinte » ci-dessous).
+
+   Une release sans DB est possible (changement de code seul) : `install.sh` et
+   `update.sh` prennent la release **la plus récente qui contient** `ministere.duckdb.gz`.
+
+## Convention d'empreinte de la base
+
+Une seule convention, appliquée par `scripts/publish_db.sh`, `deploy/install.sh`,
+`deploy/update.sh` et `scripts/download_db.sh` :
+
+| Élément | Contenu |
+|---|---|
+| `ministere.duckdb.gz` | Base compressée (`gzip -n`, archive reproductible) |
+| `ministere.duckdb.gz.sha256` | SHA256 **du fichier compressé**, format `<hash>  ministere.duckdb.gz` |
+
+Contrôle manuel dans le dossier de l'archive : `shasum -a 256 -c ministere.duckdb.gz.sha256`.
+Le digest affiché par GitHub pour l'asset `.gz` (`sha256:…`) doit être identique.
+
+**Rétrocompatibilité** : les clients lisent uniquement le premier champ du `.sha256`
+(le chemin éventuel, ex. `data/ministere.duckdb.gz` dans la release v0.5, est ignoré) et
+acceptent aussi une empreinte égale au SHA256 de la base **décompressée** (ancienne variante
+documentée ici). Une release publiée par l'une ou l'autre méthode reste donc installable.
+
+**État local** : `install.sh` et `update.sh` écrivent `~/.ministere-info/db-release.state`
+(tag, empreinte publiée, SHA256 de l'archive et de la base). `update.sh` compare l'empreinte
+publiée de la dernière release à celle de l'état : la base n'est retéléchargée que si elle a
+changé, sans recalculer l'empreinte de la base locale. Sans état (installation antérieure à
+ce mécanisme), `update.sh` compare au SHA256 de la base locale ; si la release utilise la
+convention « archive », un unique retéléchargement a lieu, puis l'état est écrit.
+
+La base téléchargée est vérifiée (intégrité gzip + empreinte) dans un dossier temporaire
+de `~/.ministere-info/` avant de remplacer l'ancienne : en cas d'échec, la base en place
+et l'état sont conservés.
+
+Tests simulés (sans réseau ni Docker) : `bash deploy/tests/test_db_checksum.sh`.
 
 4. Vérifier la release :
    ```bash
@@ -56,7 +90,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-inf
 
 Ce script :
 - Télécharge la nouvelle image Docker
-- Compare le checksum de la DB locale avec la release — met à jour seulement si différent
+- Compare l'empreinte publiée de la dernière release contenant une DB à l'état local — met à jour seulement si différente (voir « Convention d'empreinte »)
 - Redémarre l'application
 
 ## Commandes de diagnostic
@@ -84,6 +118,7 @@ ls -lh ~/.ministere-info/data/
 ~/.ministere-info/
 ├── docker-compose.yml   # Config Docker téléchargée depuis le repo
 ├── .env                 # Port + chemin DB (généré par install.sh)
+├── db-release.state     # Release et empreintes de la DB installée (install.sh / update.sh)
 ├── start.sh             # Script de démarrage (utilisé par LaunchAgent)
 ├── launch.log           # Logs de démarrage automatique
 ├── launch-error.log     # Erreurs de démarrage automatique
