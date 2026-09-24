@@ -87,6 +87,7 @@ Toute décision d'architecture non triviale est documentée dans `docs/adr/`. Ne
 | [0007](docs/adr/0007-module-legislatif-perimetre-et-sources.md) | Module Législatif — périmètre et sources | National, Datan (AN) + data.senat.fr, abandon NosDéputés/CLAIR, `leg_blocs_override`. Rétroactif. |
 | [0008](docs/adr/0008-economie-sources-complementaires.md) | Économie — sources complémentaires | CNAF, DREES, URSSAF, Eurostat ; tables `economie_social`, `economie_emploi_urssaf`, `economie_contexte`. Rétroactif. |
 | [0009](docs/adr/0009-design-system-et-navigation.md) | Design system et navigation | Tokens CSS, `app.py` routeur `st.navigation()`/`st.Page()`, `_blocs_politiques.py`. Rétroactif. |
+| [0010](docs/adr/0010-revision-nuances-et-blocs.md) | Révision nuances et blocs | Grilles officielles dès 2020, doctrine « grille la plus proche », 18 reclassements. Révise 0005. |
 
 ---
 
@@ -138,7 +139,7 @@ Toute décision d'architecture non triviale est documentée dans `docs/adr/`. Ne
 8. **Nommage Parquet inversé** : `general-results.parquet` = résultats candidats ; `candidats-results.parquet` = participation. Ne pas se fier aux noms de fichiers, utiliser les noms de tables DuckDB. (→ `docs/data-sources.md`)
 9. **Nuances NULL** : colonne `nuance` = NULL pour présidentielles 2017/2022 et européennes 2019. Résolution via table `candidats_presidentielle` (jointure sur `nom`). (→ `docs/schema-elections.md`)
 10. **Codes circo sur le web peu fiables** : les listes de communes par circonscription trouvées sur le web sont souvent erronées. Toujours valider par jointure spatiale `ST_Within` sur `geographies_circonscriptions`.
-11. **Blocs officiels depuis 2023 seulement** : le regroupement en blocs de clivages n'existe officiellement que depuis la circulaire IOMA2322276J (sénatoriales 2023). Pour les scrutins antérieurs, reconstruction selon logique officielle datée (voir ADR-0005).
+11. **Blocs officiels depuis 2020** : la première grille officielle de blocs de clivages est l'annexe 3 de INTA1931378J (municipales 2020), puis IOMA2322276J (2023) et INTP2602966C (2026) ; IOMA2415630C (législatives 2024) n'en contient pas. Scrutins sans grille : doctrine de l'ADR-0010 (grille la plus proche dans le temps, même famille politique). Le gotcha « blocs depuis 2023 » de l'ADR-0005 est révisé.
 
 ### Infra Docker
 12. **Dev vs prod** : le compose dev (`docker-compose.yml`) monte `./data:/app/data:ro` (bind mount — DB locale visible immédiatement). Le compose prod (`docker-compose.prod.yml`) utilise un named volume (`duckdb-data`). Ne pas confondre les deux.
