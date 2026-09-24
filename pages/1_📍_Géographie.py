@@ -5,11 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import duckdb
-import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info._theme import render_page_header
+from ministere_de_l_info._theme import render_donnees_indisponibles, render_page_header
+from ministere_de_l_info.viz._queries import get_tableau_territoires
 from ministere_de_l_info.viz.maps import make_choropleth
 
 render_page_header(
@@ -46,18 +46,6 @@ _VUE_POP: dict[str, tuple[str, str]] = {
     "commune": ("v_population_commune", "code_commune"),
 }
 
-_TABLE_CODE: dict[str, tuple[str, str]] = {
-    "region": ("geographies_regions", "code_insee"),
-    "departement": ("geographies_departements", "code_insee"),
-    "epci": ("geographies_epci", "code_siren"),
-    "arrondissement_municipal": (
-        "geographies_arrondissements_municipaux",
-        "code_insee",
-    ),
-    "circonscription": ("geographies_circonscriptions", "code"),
-    "commune": ("geographies_communes", "code_insee"),
-}
-
 _FILTRE_DEPT_COL: dict[str, str] = {
     "epci": "code_departement_principal",
     "circonscription": "code_departement",
@@ -70,16 +58,6 @@ _FILTRE_REGION_COL: dict[str, str] = {
 }
 
 
-def _format_evolution(delta_abs: float | None, delta_pct: float | None) -> str:
-    """Formate l'évolution démographique : '↗ +4.2% (+503 260 hab)'."""
-    if delta_abs is None or delta_pct is None:
-        return "—"
-    icon = "↗" if delta_pct > 1.0 else ("↘" if delta_pct < -1.0 else "→")
-    abs_val = int(delta_abs)
-    abs_str = (f"+{abs_val:,}" if abs_val >= 0 else f"{abs_val:,}").replace(",", " ")
-    return f"{icon} {delta_pct:+.1f}% ({abs_str} hab)"
-
-
 @st.cache_resource
 def _get_con() -> duckdb.DuckDBPyConnection:
     """Connexion DuckDB partagée en lecture seule."""
@@ -89,9 +67,14 @@ def _get_con() -> duckdb.DuckDBPyConnection:
 
 
 if not _DB_PATH.exists():
-    st.error(
-        "Base de données absente. Lancez d'abord :\n\n"
-        "```bash\nuv run python scripts/etl_regions.py\n```"
+    render_donnees_indisponibles(
+        "géographiques",
+        base_absente=True,
+        commande_dev=(
+            "./scripts/download_db.sh\n"
+            "# ou, pour reconstruire les référentiels territoriaux :\n"
+            "uv run python scripts/etl_territoires.py"
+        ),
     )
     st.stop()
 
@@ -243,84 +226,50 @@ else:
 
 st.divider()
 
+tableau = get_tableau_territoires(
+    con,
+    niveau,
+    annee,
+    annee_ref=annee_ref if niveau in _VUE_POP else None,
+    filtre_departement=filtre_departement,
+    filtre_region=filtre_region,
+)
+
+col_pop = f"Population municipale {annee}"
+col_evol_abs = f"Évolution {annee_ref}→{annee} (hab.)"
+col_evol_pct = f"Évolution {annee_ref}→{annee} (%)"
+column_config: dict[str, object] = {}
+
 if niveau in _VUE_POP:
-    vue, vue_code = _VUE_POP[niveau]
-    table, code_col = _TABLE_CODE[niveau]
-
-    # Filtres géographiques communs
-    where: list[str] = []
-    geo_params: list = []
-    dept_col = _FILTRE_DEPT_COL.get(niveau)
-    if filtre_departement and dept_col:
-        where.append(f"g.{dept_col} = ?")
-        geo_params.append(filtre_departement)
-    region_col = _FILTRE_REGION_COL.get(niveau)
-    if filtre_region and region_col:
-        where.append(f"g.{region_col} = ?")
-        geo_params.append(filtre_region)
-    where_sql = f"AND {' AND '.join(where)}" if where else ""
-
+    renommage = {"code": "Code", "nom": "Nom", "population": col_pop}
+    column_config[col_pop] = st.column_config.NumberColumn(col_pop, format="localized")
     if annee_ref is not None:
-        # Double JOIN millesime — ajoute une colonne evolution
-        rows = con.execute(  # noqa: S608
-            f"SELECT g.{code_col} AS code, g.nom,"
-            f" COALESCE(p_main.population_municipale, 0) AS pop_main,"
-            f" (p_main.population_municipale - p_ref.population_municipale) AS delta_abs,"
-            f" 100.0 * (p_main.population_municipale - p_ref.population_municipale)"
-            f" / NULLIF(p_ref.population_municipale, 0) AS delta_pct"
-            f" FROM {table} g"
-            f" LEFT JOIN {vue} p_main"
-            f"   ON g.{code_col} = p_main.{vue_code} AND p_main.annee = ?"
-            f" LEFT JOIN {vue} p_ref"
-            f"   ON g.{code_col} = p_ref.{vue_code} AND p_ref.annee = ?"
-            f" {where_sql}"
-            f" ORDER BY pop_main DESC NULLS LAST LIMIT 200",
-            [annee, annee_ref, *geo_params],
-        ).fetchall()
-        df = pl.DataFrame(
-            {
-                "Code": [r[0] for r in rows],
-                "Nom": [r[1] for r in rows],
-                f"Population municipale {annee}": [
-                    f"{r[2]:,}".replace(",", " ") if r[2] else "—" for r in rows
-                ],
-                f"Évolution {annee_ref}→{annee}": [_format_evolution(r[3], r[4]) for r in rows],
-            }
+        renommage |= {"delta_abs": col_evol_abs, "delta_pct": col_evol_pct}
+        column_config[col_evol_abs] = st.column_config.NumberColumn(
+            col_evol_abs, format="localized"
         )
-    else:
-        rows = con.execute(  # noqa: S608
-            f"SELECT g.{code_col} AS code, g.nom,"
-            f" COALESCE(p.population_municipale, 0) AS pop"
-            f" FROM {table} g"
-            f" LEFT JOIN {vue} p ON g.{code_col} = p.{vue_code} AND p.annee = ?"
-            f" {where_sql}"
-            f" ORDER BY pop DESC NULLS LAST LIMIT 200",
-            [annee, *geo_params],
-        ).fetchall()
-        df = pl.DataFrame(
-            {
-                "Code": [r[0] for r in rows],
-                "Nom": [r[1] for r in rows],
-                f"Population municipale {annee}": [
-                    f"{r[2]:,}".replace(",", " ") if r[2] else "—" for r in rows
-                ],
-            }
-        )
+        column_config[col_evol_pct] = st.column_config.NumberColumn(col_evol_pct, format="%+.1f %%")
+    df = tableau.rename(renommage)
 else:
-    # ARM ou circonscriptions : pas de population
-    table, code_col = _TABLE_CODE[niveau]
-    extra_col = "code_commune_mere" if niveau == "arrondissement_municipal" else "code_departement"
-    rows = con.execute(  # noqa: S608
-        f"SELECT {code_col}, nom, {extra_col} FROM {table} ORDER BY {code_col} LIMIT 200"
-    ).fetchall()
-
     extra_label = "Commune mère" if niveau == "arrondissement_municipal" else "Département"
-    df = pl.DataFrame(
-        {
-            "Code": [r[0] for r in rows],
-            "Nom": [r[1] for r in rows],
-            extra_label: [r[2] for r in rows],
-        }
-    )
+    df = tableau.rename({"code": "Code", "nom": "Nom", "extra": extra_label})
 
-st.dataframe(df, width="stretch", hide_index=True)
+st.caption(
+    f"{df.height:,} entité(s) affichée(s)".replace(",", " ")
+    + (" — triées par population décroissante" if niveau in _VUE_POP else "")
+    + ". Cliquez sur un en-tête de colonne pour trier ; « n.d. » = donnée non disponible."
+)
+st.dataframe(
+    df,
+    width="stretch",
+    hide_index=True,
+    column_config=column_config,
+    placeholder="n.d.",
+)
+st.download_button(
+    "Télécharger le tableau en CSV",
+    data=df.write_csv().encode("utf-8"),
+    file_name=f"geographie_{niveau}_{annee}.csv",
+    mime="text/csv",
+    key="geo_download_csv",
+)
