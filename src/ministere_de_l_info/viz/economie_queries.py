@@ -8,7 +8,9 @@ Fonctions exportées
 - get_indicateurs()             : dict code → libellé des 8 indicateurs
 - get_scores_commune()          : indicateur × commune HdF pour une année
 - get_economie_commune()        : tous indicateurs pour une commune, toutes années
-- get_croisement_eco_elections(): croisement économie × présidentielles T2
+- get_croisement_eco_elections(): croisement économie × présidentielles (T1 ou T2)
+- annees_croisement_exploitables(): années de présidentielle avec données éco en n-1
+- get_annees_presidentielles()  : années de présidentielle en base
 - get_evolution_hdf()           : évolution agrégée HdF (3 indicateurs Filosofi/RP)
 - get_evolution_rsa_hdf()       : évolution total foyers RSA HdF (CNAF 2020-2024)
 - get_contexte_hdf_vs_france()  : HdF vs France par indicateur macro (Eurostat)
@@ -43,6 +45,12 @@ _INDICATEURS_VALIDES = frozenset(
 )
 # Indicateurs provenant de economie_social (Phase E+) — routage alternatif
 _INDICATEURS_SOCIAL = frozenset({"nb_foyers_rsa", "apl_medecins"})
+# Indicateurs du Recensement (economie_rp) — lus directement dans la table RP :
+# v_economie_commune part de Filosofi (2017-2021) et perd les millésimes RP 2015-2016
+# (audit I5).
+_INDICATEURS_RP = frozenset(
+    {"tx_chomage_dec", "part_ouvriers_employes", "part_emploi_industriel", "part_logements_sociaux"}
+)
 # Indicateurs macro contexte (Phase E++) — economie_contexte / Eurostat
 _INDICATEURS_CONTEXTE = frozenset({"tx_chomage_bit", "pib_eur_hab"})
 
@@ -53,14 +61,30 @@ def _open_ro() -> duckdb.DuckDBPyConnection:
     return con
 
 
+def is_base_disponible() -> bool:
+    """True si le fichier DuckDB existe (non mis en cache : test de fichier immédiat)."""
+    return DB_PATH.exists()
+
+
 @st.cache_data(ttl=60)
 def is_data_loaded() -> bool:
-    """Vérifie que economie_filosofi et economie_rp contiennent des données."""
-    con = _open_ro()
+    """Vérifie que economie_filosofi et economie_rp contiennent des données.
+
+    Renvoie False (au lieu de lever une exception) si la base est absente
+    ou si les tables économiques n'existent pas.
+    """
+    if not DB_PATH.exists():
+        return False
+    try:
+        con = _open_ro()
+    except duckdb.Error:
+        return False
     try:
         n_f = con.execute("SELECT COUNT(*) FROM economie_filosofi").fetchone()[0]
         n_r = con.execute("SELECT COUNT(*) FROM economie_rp").fetchone()[0]
         return int(n_f) > 0 and int(n_r) > 0
+    except duckdb.Error:
+        return False
     finally:
         con.close()
 
@@ -72,6 +96,8 @@ def is_contexte_loaded() -> bool:
     try:
         n = con.execute("SELECT COUNT(*) FROM economie_contexte").fetchone()[0]
         return int(n) > 0
+    except duckdb.CatalogException:
+        return False
     finally:
         con.close()
 
@@ -122,7 +148,7 @@ def get_indicateurs() -> dict[str, str]:
         "part_ouvriers_employes": "Part ouvriers + employés (%)",
         "part_emploi_industriel": "Part emploi industriel (%)",
         "part_logements_sociaux": "Part logements sociaux (%)",
-        "nb_foyers_rsa": "Allocataires RSA (foyers)",
+        "nb_foyers_rsa": "Allocataires RSA (nombre de foyers)",
         "apl_medecins": "Accessibilité médecins (APL)",
     }
 
@@ -131,7 +157,9 @@ def get_indicateurs() -> dict[str, str]:
 def get_scores_commune(annee: int, indicateur: str) -> pl.DataFrame:
     """Valeur d'un indicateur par commune HdF pour une année.
 
-    Filosofi/RP : jointure sur v_economie_commune (secret INSEE géré).
+    Filosofi : jointure sur economie_filosofi ; RP : jointure sur economie_rp
+    (tous les millésimes RP, y compris ceux sans Filosofi — audit I5) ; secret
+    statistique INSEE de la source concernée.
     nb_foyers_rsa, apl_medecins : jointure sur economie_social (secret=FALSE).
     Retourne code_commune, nom_commune, valeur, secret, geojson.
     """
@@ -157,18 +185,35 @@ def get_scores_commune(annee: int, indicateur: str) -> pl.DataFrame:
                 """,
                 [annee],
             ).fetchall()
+        elif indicateur in _INDICATEURS_RP:
+            rows = con.execute(  # noqa: S608
+                f"""
+                SELECT
+                    gc.code_insee                                   AS code_commune,
+                    gc.nom                                          AS nom_commune,
+                    r.{indicateur}                                  AS valeur,
+                    COALESCE(r.secret, FALSE)                       AS secret,
+                    ST_AsGeoJSON(gc.geometry_simplified_communal)   AS geojson
+                FROM geographies_communes gc
+                LEFT JOIN economie_rp r
+                    ON gc.code_insee = r.code_commune AND r.annee_millesime = ?
+                WHERE gc.code_region = '32'
+                ORDER BY gc.nom
+                """,
+                [annee],
+            ).fetchall()
         else:
             rows = con.execute(  # noqa: S608
                 f"""
                 SELECT
                     gc.code_insee                                   AS code_commune,
                     gc.nom                                          AS nom_commune,
-                    v.{indicateur}                                  AS valeur,
-                    COALESCE(v.secret_partiel, FALSE)               AS secret,
+                    f.{indicateur}                                  AS valeur,
+                    COALESCE(f.secret, FALSE)                       AS secret,
                     ST_AsGeoJSON(gc.geometry_simplified_communal)   AS geojson
                 FROM geographies_communes gc
-                LEFT JOIN v_economie_commune v
-                    ON gc.code_insee = v.code_commune AND v.annee = ?
+                LEFT JOIN economie_filosofi f
+                    ON gc.code_insee = f.code_commune AND f.annee = ?
                 WHERE gc.code_region = '32'
                 ORDER BY gc.nom
                 """,
@@ -200,25 +245,31 @@ def get_scores_commune(annee: int, indicateur: str) -> pl.DataFrame:
 
 @st.cache_data(ttl=3600)
 def get_economie_commune(code_commune: str) -> pl.DataFrame:
-    """Tous les indicateurs pour une commune donnée, toutes années disponibles."""
+    """Tous les indicateurs pour une commune donnée, toutes années disponibles.
+
+    Union des années Filosofi et RP (FULL OUTER JOIN) : les millésimes RP sans
+    Filosofi (2015-2016) sont conservés (audit I5).
+    """
     con = _open_ro()
     try:
         rows = con.execute(
             """
+            WITH f AS (SELECT * FROM economie_filosofi WHERE code_commune = ?),
+                 r AS (SELECT * FROM economie_rp WHERE code_commune = ?)
             SELECT
-                annee,
-                taux_pauvrete,
-                niveau_vie_median,
-                tx_chomage_dec,
-                part_ouvriers_employes,
-                part_emploi_industriel,
-                part_logements_sociaux,
-                secret_partiel AS secret
-            FROM v_economie_commune
-            WHERE code_commune = ?
+                COALESCE(f.annee, r.annee_millesime)            AS annee,
+                f.taux_pauvrete,
+                f.niveau_vie_median,
+                r.tx_chomage_dec,
+                r.part_ouvriers_employes,
+                r.part_emploi_industriel,
+                r.part_logements_sociaux,
+                (COALESCE(f.secret, FALSE) OR COALESCE(r.secret, FALSE)) AS secret
+            FROM f
+            FULL OUTER JOIN r ON f.annee = r.annee_millesime
             ORDER BY annee
             """,
-            [code_commune],
+            [code_commune, code_commune],
         ).fetchall()
     finally:
         con.close()
@@ -254,12 +305,17 @@ def get_economie_commune(code_commune: str) -> pl.DataFrame:
 def get_croisement_eco_elections(
     annee_election: int,
     bloc: str | None = None,
+    tour: int = 2,
 ) -> pl.DataFrame:
-    """Croisement indicateurs économiques × résultats présidentiels T2 par commune.
+    """Croisement indicateurs économiques × résultats présidentiels par commune.
 
-    Utilise v_scores_commune_pres (T2) + v_participation_commune_pres pour calculer
-    pct_voix, et v_economie_commune pour les indicateurs éco de l'année n-1.
+    Utilise v_scores_commune_pres + v_participation_commune_pres (tour choisi) pour
+    calculer pct_voix, et les indicateurs économiques de l'année n-1 lus directement
+    dans economie_filosofi et economie_rp (chaque source avec ses propres millésimes :
+    RP 2016 disponible pour la présidentielle 2017 même sans Filosofi 2016).
     """
+    if tour not in (1, 2):
+        raise ValueError(f"Tour invalide : {tour}")
     con = _open_ro()
     try:
         sql = """
@@ -268,23 +324,25 @@ def get_croisement_eco_elections(
                 gc.nom                                            AS nom_commune,
                 e.bloc,
                 ROUND(100.0 * e.voix / NULLIF(p.exprimes, 0), 2) AS pct_voix,
-                eco.taux_pauvrete,
-                eco.niveau_vie_median,
-                eco.tx_chomage_dec,
-                eco.part_ouvriers_employes,
-                eco.part_emploi_industriel,
-                eco.part_logements_sociaux,
-                eco.pop_active
+                f.taux_pauvrete,
+                f.niveau_vie_median,
+                r.tx_chomage_dec,
+                r.part_ouvriers_employes,
+                r.part_emploi_industriel,
+                r.part_logements_sociaux,
+                r.pop_active
             FROM v_scores_commune_pres e
             LEFT JOIN v_participation_commune_pres p
                 ON p.code_commune = e.code_commune
                 AND p.annee = e.annee AND p.tour = e.tour
-            LEFT JOIN v_economie_commune eco
-                ON eco.code_commune = e.code_commune AND eco.annee = e.annee - 1
+            LEFT JOIN economie_filosofi f
+                ON f.code_commune = e.code_commune AND f.annee = e.annee - 1
+            LEFT JOIN economie_rp r
+                ON r.code_commune = e.code_commune AND r.annee_millesime = e.annee - 1
             LEFT JOIN geographies_communes gc ON gc.code_insee = e.code_commune
-            WHERE e.annee = ? AND e.tour = 2
+            WHERE e.annee = ? AND e.tour = ?
         """
-        params: list = [annee_election]
+        params: list = [annee_election, tour]
         if bloc is not None:
             sql += " AND e.bloc = ?"
             params.append(bloc)
@@ -326,35 +384,89 @@ def get_croisement_eco_elections(
     )
 
 
+_SQL_EVOLUTION_HDF = """
+    WITH fil AS (
+        SELECT
+            annee,
+            AVG(taux_pauvrete)          AS taux_pauvrete_moyen,
+            MEDIAN(niveau_vie_median)   AS niveau_vie_median_communes
+        FROM economie_filosofi
+        GROUP BY annee
+    ),
+    rp AS (
+        SELECT
+            annee_millesime AS annee,
+            SUM(tx_chomage_dec * pop_active)
+                FILTER (WHERE tx_chomage_dec IS NOT NULL AND pop_active > 0)
+            / NULLIF(
+                SUM(pop_active) FILTER (WHERE tx_chomage_dec IS NOT NULL AND pop_active > 0),
+                0
+            )                           AS tx_chomage_pondere
+        FROM economie_rp
+        GROUP BY annee_millesime
+    )
+    SELECT
+        COALESCE(fil.annee, rp.annee)   AS annee,
+        fil.taux_pauvrete_moyen,
+        fil.niveau_vie_median_communes,
+        rp.tx_chomage_pondere
+    FROM fil
+    FULL OUTER JOIN rp ON fil.annee = rp.annee
+    ORDER BY annee
+"""
+
+
+def _evolution_hdf(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
+    """Agrégats HdF par année (requête non mise en cache, testable sur base en mémoire).
+
+    - taux_pauvrete_moyen : moyenne NON pondérée des taux communaux (Filosofi ne
+      fournit pas en base le nombre de personnes pour pondérer) ;
+    - niveau_vie_median_communes : médiane des médianes communales (et non le
+      niveau de vie médian régional, qui n'est pas calculable depuis les communes) ;
+    - tx_chomage_pondere : taux communaux pondérés par les actifs de 15-64 ans
+      (pop_active, RP), soit ≈ Σ chômeurs / Σ actifs ; tous les millésimes RP.
+    """
+    return (
+        con.execute(_SQL_EVOLUTION_HDF)
+        .pl()
+        .with_columns(
+            pl.col("annee").cast(pl.Int64),
+            pl.col("taux_pauvrete_moyen").cast(pl.Float64),
+            pl.col("niveau_vie_median_communes").cast(pl.Float64),
+            pl.col("tx_chomage_pondere").cast(pl.Float64),
+        )
+    )
+
+
 @st.cache_data(ttl=3600)
 def get_evolution_hdf() -> pl.DataFrame:
-    """Évolution des indicateurs agrégés HdF par année (v_evolution_economie_hdf)."""
+    """Évolution des indicateurs agrégés HdF par année (voir `_evolution_hdf`)."""
     con = _open_ro()
     try:
-        rows = con.execute(
-            "SELECT annee, taux_pauvrete_moyen, niveau_vie_median_hdf, tx_chomage_moyen "
-            "FROM v_evolution_economie_hdf ORDER BY annee"
-        ).fetchall()
+        return _evolution_hdf(con)
     finally:
         con.close()
 
-    if not rows:
-        return pl.DataFrame(
-            schema={
-                "annee": pl.Int64,
-                "taux_pauvrete_moyen": pl.Float64,
-                "niveau_vie_median_hdf": pl.Float64,
-                "tx_chomage_moyen": pl.Float64,
-            }
-        )
-    return pl.DataFrame(
-        {
-            "annee": [int(r[0]) for r in rows],
-            "taux_pauvrete_moyen": [float(r[1]) if r[1] is not None else None for r in rows],
-            "niveau_vie_median_hdf": [float(r[2]) if r[2] is not None else None for r in rows],
-            "tx_chomage_moyen": [float(r[3]) if r[3] is not None else None for r in rows],
-        }
-    )
+
+def annees_croisement_exploitables(
+    annees_election: list[int], annees_indicateur: list[int]
+) -> list[int]:
+    """Années de présidentielle pour lesquelles l'indicateur existe en n-1 (croisement)."""
+    disponibles = set(annees_indicateur)
+    return sorted(a for a in annees_election if a - 1 in disponibles)
+
+
+@st.cache_data(ttl=3600)
+def get_annees_presidentielles() -> list[int]:
+    """Années de présidentielle présentes en base (ordre croissant)."""
+    con = _open_ro()
+    try:
+        rows = con.execute(
+            "SELECT DISTINCT annee FROM elections WHERE type_scrutin = 'pres' ORDER BY annee"
+        ).fetchall()
+    finally:
+        con.close()
+    return [int(r[0]) for r in rows]
 
 
 @st.cache_data(ttl=3600)
