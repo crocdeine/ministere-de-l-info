@@ -6,6 +6,12 @@ Mathias (GitHub : crocdeine) développe ministere-de-l-info comme projet personn
 
 **Workflow** : Mathias supervise via un chat Claude (web/app) où sont prises les décisions structurantes (architecture, scope, choix éditoriaux). Claude Code intervient sur le Mac mini M4 (OrbStack) pour l'exécution technique : code, tests, commits, déploiement. Claude Code ne prend pas de décisions structurantes sans validation explicite — il propose, attend, exécute. En fin de tâche significative, il rapporte avec un rapport structuré que Mathias relit en chat.
 
+**Gouvernance (depuis le 2026-09-24)** : Claude Code est **directeur de projet**. Mathias fixe les grandes orientations et tranche les décisions structurantes ; le directeur pilote tout le reste et délègue à des agents spécialisés lancés en parallèle (définitions dans `.claude/agents/` : `verificateur-code`, `chercheur-donnees`, `documentaliste`, `architecte-restructuration`, `ingenieur-etl`, `developpeur-ui`, `ingenieur-infra`, `outilleur-claude` — liste extensible). Règles :
+- Les agents qui modifient des fichiers travaillent en worktree isolé et ne poussent jamais ; le directeur relit, vérifie, fusionne et pousse.
+- Aucun agent ne tranche une décision structurante ou méthodologique (classement politique, architecture, périmètre, stack) : il instruit et formule des questions fermées ; le directeur les regroupe pour Mathias.
+- Le directeur peut engager sans attendre les correctifs de bugs avérés et la maintenance (documentation, tests, outillage) qui n'engagent aucun choix de fond.
+- Chaque vague d'agents se termine par un rapport de synthèse dans `reports/`.
+
 Toujours communiquer en français, ton neutre, sans blabla.
 
 ---
