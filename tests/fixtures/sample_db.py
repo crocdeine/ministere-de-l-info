@@ -12,6 +12,9 @@ recrée tables et vues avec les fonctions de schéma du projet, puis insère les
   ``pytest.skip`` explicite.
 - Écart de schéma (colonne ou table présente dans l'échantillon mais pas créée par le
   code) : la colonne ou la table est ajoutée et un ``EcartSchemaEchantillon`` est émis.
+- Échantillon antérieur à l'ADR-0011 (sans ``leg_mandats`` ni ``leg_groupes_blocs``) :
+  ces tables sont dérivées de ``leg_elus`` et du référentiel du code par la migration 0008,
+  comme sur une base réelle migrée.
 """
 
 from __future__ import annotations
@@ -124,6 +127,21 @@ def creer_vues(con: duckdb.DuckDBPyConnection) -> None:
         etape(con)
 
 
+_TABLES_ADR_0011 = frozenset({"leg_mandats", "leg_groupes_blocs"})
+
+
+def completer_legislatif(con: duckdb.DuckDBPyConnection, tables: set[str]) -> bool:
+    """Dérive leg_mandats / leg_groupes_blocs (migration 0008) si l'échantillon ne les a pas.
+
+    Retourne True si la migration a été appliquée.
+    """
+    if "leg_elus" not in tables or tables >= _TABLES_ADR_0011:
+        return False
+    m0008 = _charger_migration("0008_legislatif_groupes_par_legislature.py")
+    m0008.appliquer_migration(con)
+    return True
+
+
 def _quote(ident: str) -> str:
     return '"' + ident.replace('"', '""') + '"'
 
@@ -203,6 +221,7 @@ def construire_base(
         creer_schema(con)
         for table, meta in manifest["tables"].items():
             _inserer_table(con, table, meta, sample_dir)
+        completer_legislatif(con, set(manifest["tables"]))
         creer_vues(con)
         vues = {
             str(r[0])

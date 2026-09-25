@@ -15,7 +15,10 @@ Aucune donnée n'est inventée. Les transformations sont les suivantes :
   la colonne `geometry` de l'échantillon n'est donc **pas** en pleine résolution ;
 - les résultats électoraux sont limités à 12 scrutins (liste dans `manifest.json`) ;
 - l'emploi URSSAF est limité aux secteurs industriels, les seuls utilisés par le code ;
-- les tables techniques `_etl_metadata` et `_schema_version` ne sont pas exportées.
+- les tables techniques `_etl_metadata` et `_schema_version` ne sont pas exportées ;
+- législatif (ADR-0011) : `leg_mandats` limité aux élus du département, `leg_groupes_blocs`
+  complet. Un échantillon exporté avant l'ajout de ces tables est complété à la
+  reconstruction par la migration 0008 (dérivation depuis `leg_elus` et le référentiel du code).
 
 Sources et licences : voir `docs/data-sources.md`.
 
