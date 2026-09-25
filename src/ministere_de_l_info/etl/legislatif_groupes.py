@@ -423,12 +423,158 @@ _SENAT: tuple[CorrespondanceGroupe, ...] = (
 CORRESPONDANCES_GROUPES: tuple[CorrespondanceGroupe, ...] = _AN + _SENAT
 
 
+# ---------------------------------------------------------------------------
+# Groupes sénatoriaux disparus avant le renouvellement de 2002 (addendum ADR-0011)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class GroupeHorsPerimetre:
+    """Groupe du Sénat dissous avant le renouvellement du 29 septembre 2002.
+
+    Un ancien sénateur dont c'est le dernier groupe (ODSEN_GENERAL) a quitté le Sénat
+    au plus tard à ce renouvellement : il est hors du périmètre 2002-présent. Aucun bloc
+    n'est attribué (ce serait un classement hors périmètre).
+    """
+
+    sigle: str
+    libelle: str
+    periode: str
+    justification: str
+
+
+_CONNAISSANCE = (
+    "connaissance générale de l'historique des groupes du Sénat, non vérifiée sur "
+    "senat.fr (accès réseau indisponible le 2026-09-25) — à confirmer"
+)
+
+# Clé : sigle normalisé (majuscules, sans points, espaces ni tirets), cf. normaliser_sigle.
+GROUPES_SENAT_ANTERIEURS_2002: tuple[GroupeHorsPerimetre, ...] = (
+    GroupeHorsPerimetre(
+        "UNR",
+        "Union pour la nouvelle République",
+        "1959-1968",
+        f"Devenu UDR en 1968 ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "UNRUDT",
+        "Union pour la nouvelle République - Union démocratique du travail",
+        "années 1960",
+        f"Variante de l'UNR ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "UDR",
+        "Union des démocrates pour la République",
+        "1968-1977",
+        f"Devenu RPR en 1977 ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "RPR",
+        "Rassemblement pour la République",
+        "1977-2002",
+        "Fondu dans le groupe UMP constitué après le renouvellement du 29 septembre 2002 "
+        "(octobre 2002) : les sénateurs réélus en 2002 ont UMP (ou un groupe ultérieur) "
+        f"pour dernier groupe ; RPR = mandat achevé au plus tard en septembre 2002 ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "RI",
+        "Républicains et indépendants / Républicains indépendants",
+        "1962-1977, puis 1995-2002",
+        f"Fondu dans le groupe UMP en octobre 2002 (même raisonnement que RPR) ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "UREI",
+        "Union des républicains et des indépendants",
+        "1977-1995",
+        f"Redevenu RI ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "IPAS",
+        "Indépendants et paysans d'action sociale",
+        "1959-1962",
+        f"Groupe du début de la Ve République ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "CNIP",
+        "Centre national des indépendants et paysans",
+        "années 1960",
+        f"Groupe des débuts de la Ve République ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "CRARS",
+        "Centre républicain d'action rurale et sociale",
+        "1959-1971",
+        f"Disparu au début des années 1970 ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "GD",
+        "Gauche démocratique",
+        "jusqu'en 1989",
+        f"Devenu RDE en 1989, puis RDSE en 1995 ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "RDE",
+        "Rassemblement démocratique et européen",
+        "1989-1995",
+        f"Devenu RDSE en 1995 (RDSE, toujours existant, est classé) ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "RPCD",
+        "Républicains populaires et Centre démocratique",
+        "années 1960",
+        f"Groupe démocrate-chrétien, remplacé par l'UCDP ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "UCDP",
+        "Union centriste des démocrates de progrès",
+        "1968-années 1970",
+        f"Remplacé par l'Union centriste (UC, classée) ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "CD",
+        "Centre démocratique",
+        "années 1960",
+        f"Groupe centriste des années 1960 ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "PDM",
+        "Progrès et démocratie moderne",
+        "1967-années 1970",
+        f"Formation centriste des années 1970 ; {_CONNAISSANCE}",
+    ),
+    GroupeHorsPerimetre(
+        "COM",
+        "Groupe communiste",
+        "jusqu'aux années 1990",
+        f"Devenu Communiste républicain et citoyen (CRC, classé) ; {_CONNAISSANCE}",
+    ),
+)
+
+
+def normaliser_sigle(sigle: str | None) -> str:
+    """Sigle comparable : majuscules, sans points, espaces ni tirets (``G.D.`` → ``GD``)."""
+    if not sigle:
+        return ""
+    return "".join(ch for ch in sigle.upper() if ch.isalnum())
+
+
+_SIGLES_SENAT_ANTERIEURS_2002: frozenset[str] = frozenset(
+    g.sigle for g in GROUPES_SENAT_ANTERIEURS_2002
+)
+
+
+def est_groupe_senat_anterieur_2002(groupe: str | None) -> bool:
+    """Vrai si le groupe du Sénat a disparu avant le renouvellement de 2002."""
+    return normaliser_sigle(groupe) in _SIGLES_SENAT_ANTERIEURS_2002
+
+
 def valider_correspondances(
     correspondances: Iterable[CorrespondanceGroupe] = CORRESPONDANCES_GROUPES,
 ) -> None:
     """Lève ValueError si le référentiel est incohérent (bloc, chambre, bornes, recouvrement)."""
+    correspondances_liste = list(correspondances)
     par_cle: dict[tuple[str, str], list[CorrespondanceGroupe]] = {}
-    for c in correspondances:
+    for c in correspondances_liste:
         if c.chambre not in CHAMBRES:
             raise ValueError(f"Chambre inconnue : {c}")
         if c.bloc not in BLOCS_VALIDES:
@@ -451,6 +597,13 @@ def valider_correspondances(
         for a, b in zip(lignes_triees, lignes_triees[1:], strict=False):
             if (b.legislature_debut or 0) <= (a.legislature_fin or 0):
                 raise ValueError(f"{chambre}/{groupe} : intervalles qui se recouvrent")
+
+    sigles_senat_classes = {
+        normaliser_sigle(c.groupe) for c in correspondances_liste if c.chambre == "SENAT"
+    }
+    conflits = sigles_senat_classes & _SIGLES_SENAT_ANTERIEURS_2002
+    if conflits:
+        raise ValueError(f"Groupes Sénat à la fois classés et antérieurs à 2002 : {conflits}")
 
 
 def resoudre_bloc(chambre: str, groupe: str | None, legislature: int | None) -> str | None:
@@ -477,6 +630,23 @@ def journaliser_non_classes(chambre: str, non_classes: Counter[tuple[str, int | 
         "etl/legislatif_groupes.py après décision) : %s",
         chambre,
         sum(non_classes.values()),
+        detail,
+    )
+
+
+def journaliser_sans_groupe(chambre: str, sans_groupe: Counter[int | None]) -> None:
+    """INFO : élus sans groupe dans la source (statut explicite, aucun bloc attribué)."""
+    if not sans_groupe:
+        return
+    detail = ", ".join(
+        f"lég. {leg if leg is not None else '-'} × {n}"
+        for leg, n in sorted(sans_groupe.items(), key=lambda kv: str(kv[0]))
+    )
+    logger.info(
+        "%s : %d élu(s) sans groupe dans la source (groupe NULL, bloc NULL, hors contrôle "
+        "de complétude du référentiel) : %s",
+        chambre,
+        sum(sans_groupe.values()),
         detail,
     )
 

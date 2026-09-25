@@ -17,10 +17,11 @@ Périmètre par défaut : Somme (80).
   (--scrutins). Défaut : 2 années par type, choisies pour couvrir les cas de résolution
   des blocs (nuance vs nom de candidat, ancien découpage, panneaux synthétiques 2008).
 - Référentiels complets : elections, blocs_politiques, nuances_harmonisees,
-  candidats_presidentielle, leg_blocs_override, economie_contexte.
+  candidats_presidentielle, leg_blocs_override, leg_groupes_blocs, economie_contexte.
 - Économie : communes du 80 ; URSSAF limitée aux secteurs industriels (seuls utilisés
   par les vues et requêtes du projet).
-- Législatif : élus rattachés au 80 (toutes chambres, toutes législatures) et leur activité.
+- Législatif : élus rattachés au 80 (toutes chambres, toutes législatures), leurs mandats
+  (leg_mandats) et leur activité.
 
 La taille totale est vérifiée (--max-mo, 5 Mo par défaut) : le script échoue sans rien
 écrire si le budget est dépassé. Il est idempotent : l'échantillon précédent est remplacé.
@@ -133,8 +134,14 @@ def construire_specs(dept: str, scrutins: tuple[str, ...] | None) -> list[TableS
         TableSpec("economie_contexte"),
         # Législatif
         TableSpec("leg_elus", f"code_departement = {d}"),
+        TableSpec(
+            "leg_mandats",
+            "EXISTS (SELECT 1 FROM leg_elus e WHERE e.id = leg_mandats.elu_id "
+            f"AND e.chambre = leg_mandats.chambre AND e.code_departement = {d})",
+        ),
         TableSpec("leg_activite", f"elu_id IN ({elus})"),
         TableSpec("leg_blocs_override"),
+        TableSpec("leg_groupes_blocs"),
     ]
 
 

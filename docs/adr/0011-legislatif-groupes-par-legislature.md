@@ -257,3 +257,73 @@ WHERE groupe_sigle IN ('FI', 'LFI-NUPES', 'LFI-NFP') ORDER BY 1;
 -- Dates de fin : 0 attendu
 SELECT COUNT(*) FROM leg_elus WHERE date_fin_mandat IS NOT NULL;
 ```
+
+## Addendum 2026-09-25 — complément d'exécution (périmètre Sénat, « sans groupe »)
+
+Constat sur la base réelle (Mac, 2026-09-25) : `test_aucun_mandat_non_classe` échouait
+(19 anciens groupes du Sénat sans bloc, 569 mandats ; 3 députés de la XVe législature sans
+groupe dans Datan). Aucun élu actif n'était concerné. Pas de nouveau classement : le
+référentiel groupe → bloc (D1, D6) est inchangé.
+
+1. **Groupes sénatoriaux disparus avant le renouvellement de 2002** : liste
+   `GROUPES_SENAT_ANTERIEURS_2002` de `etl/legislatif_groupes.py` (sigle normalisé : sans
+   points, espaces ni tirets, `G.D.` = `GD`). Un **ancien** sénateur dont c'est le dernier
+   groupe a quitté le Sénat au plus tard en septembre 2002 : il est hors périmètre et
+   écarté au chargement (`leg_elus` et `leg_mandats`), comme les critères de D5 ; effectif
+   par groupe journalisé en INFO. Aucun bloc ne leur est attribué. L'option
+   `--inclure-senateurs-anterieurs-2002` les conserve (ils apparaissent alors « non
+   classés »). Un sénateur **actif** n'est jamais écarté (sigle historique = anomalie
+   signalée en WARNING).
+
+   | Sigle | Groupe | Période (indicative) |
+   |---|---|---|
+   | UNR, UNR-UDT | Union pour la nouvelle République | 1959-1968 |
+   | UDR | Union des démocrates pour la République | 1968-1977 |
+   | RPR | Rassemblement pour la République | 1977-2002 |
+   | RI | Républicains indépendants / Républicains et indépendants | 1962-1977, 1995-2002 |
+   | UREI | Union des républicains et des indépendants | 1977-1995 |
+   | IPAS, CNIP | Indépendants et paysans | débuts de la Ve République |
+   | CRARS | Centre républicain d'action rurale et sociale | 1959-1971 |
+   | GD (G.D.) | Gauche démocratique | jusqu'en 1989 (→ RDE) |
+   | RDE (R.D.E.) | Rassemblement démocratique et européen | 1989-1995 (→ RDSE) |
+   | RPCD | Républicains populaires et Centre démocratique | années 1960 |
+   | UCDP (U.C.D.P.) | Union centriste des démocrates de progrès | 1968-années 1970 (→ UC) |
+   | CD | Centre démocratique | années 1960 |
+   | PDM | Progrès et démocratie moderne | années 1970 |
+   | COM | Groupe communiste | jusqu'aux années 1990 (→ CRC) |
+
+   **Cas limites traités explicitement** : RPR et RI ont siégé jusqu'au renouvellement du
+   29 septembre 2002, puis se sont fondus dans le groupe UMP constitué en octobre 2002 ;
+   les sénateurs réélus ou restés en fonction ont donc UMP (ou un groupe ultérieur) pour
+   dernier groupe, et RPR/RI comme dernier groupe signifie un mandat achevé au plus tard
+   en septembre 2002. Les groupes ayant existé après 2002 (UC, UC-UDF, RDSE, CRC, SOC,
+   UMP) restent dans le périmètre et classés.
+
+   **Source** : connaissance générale de l'historique des groupes du Sénat ; senat.fr et
+   data.senat.fr étaient inaccessibles depuis la session (2026-09-25). Liste et périodes à
+   confirmer sur senat.fr (pages « Les groupes politiques depuis 1959 »). Tout sigle absent
+   de la liste reste signalé « non classé » (WARNING) et fait échouer le test : un groupe
+   historique non listé se complète dans `GROUPES_SENAT_ANTERIEURS_2002`, un groupe
+   postérieur à 2002 dans le référentiel de classement (décision Mathias).
+
+2. **Élus « sans groupe »** : `groupeAbrev` (Datan) ou « Groupe politique » (Sénat) vide →
+   `groupe_sigle` NULL, bloc NULL, INFO au chargement (effectif par législature). Statut
+   distinct de « non classé » : pas de bloc inventé, exclu du contrôle de complétude mais
+   compté (`test_mandats_sans_groupe_comptes` vérifie en outre qu'aucun élu actif n'est
+   sans groupe).
+
+3. **Tests** : `test_aucun_mandat_non_classe` porte sur les mandats du périmètre (groupe
+   non NULL, hors groupes Sénat antérieurs à 2002) ; `test_senat_groupes_anterieurs_2002_exclus`
+   vérifie qu'ils ne sont plus chargés ; tests hermétiques dans
+   `tests/test_legislatif_memoire.py`.
+
+Requêtes de contrôle (après `uv run python scripts/load_legislatif.py --source senat`) :
+
+```sql
+-- 0 ligne attendue (mandats du périmètre non classés)
+SELECT chambre, groupe_sigle, legislature, COUNT(*) FROM v_mandats_legislatif
+WHERE bloc_groupe IS NULL AND groupe_sigle IS NOT NULL GROUP BY ALL ORDER BY 4 DESC;
+-- Mandats sans groupe (3 attendus, XVe législature, aucun actif)
+SELECT chambre, legislature, est_actif, COUNT(*) FROM v_mandats_legislatif
+WHERE groupe_sigle IS NULL GROUP BY ALL;
+```

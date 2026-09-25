@@ -471,35 +471,40 @@ def get_annees_presidentielles() -> list[int]:
     return [int(r[0]) for r in rows]
 
 
+# Indicateur → (table, colonne année). Liste blanche : noms injectés dans le SQL.
+_SOURCES_ANNEES: dict[str, tuple[str, str]] = {
+    "taux_pauvrete": ("economie_filosofi", "annee"),
+    "niveau_vie_median": ("economie_filosofi", "annee"),
+    "tx_chomage_dec": ("economie_rp", "annee_millesime"),
+    "part_ouvriers_employes": ("economie_rp", "annee_millesime"),
+    "part_emploi_industriel": ("economie_rp", "annee_millesime"),
+    "part_logements_sociaux": ("economie_rp", "annee_millesime"),
+    "nb_foyers_rsa": ("economie_social", "annee"),
+    "apl_medecins": ("economie_social", "annee"),
+}
+
+
 @st.cache_data(ttl=3600)
 def get_annees_par_indicateur() -> dict[str, list[int]]:
-    """Années disponibles par indicateur (selon la table source)."""
+    """Années où l'indicateur a au moins une valeur non NULL.
+
+    Un millésime chargé mais où l'indicateur n'est pas diffusé (ex. chômage RP 2015 et
+    2016 si la clef source manque) n'est pas proposé : carte vide évitée.
+    """
     con = _open_ro()
     try:
-
-        def _a(sql: str) -> list[int]:
-            return [int(r[0]) for r in con.execute(sql).fetchall()]
-
-        f = _a("SELECT DISTINCT annee FROM economie_filosofi ORDER BY annee")
-        r = _a("SELECT DISTINCT annee_millesime FROM economie_rp ORDER BY annee_millesime")
-        rsa = _a(
-            "SELECT DISTINCT annee FROM economie_social WHERE nb_foyers_rsa IS NOT NULL ORDER BY annee"
-        )
-        apl = _a(
-            "SELECT DISTINCT annee FROM economie_social WHERE apl_medecins IS NOT NULL ORDER BY annee"
-        )
+        return {
+            indicateur: [
+                int(r[0])
+                for r in con.execute(
+                    f"SELECT DISTINCT {col_annee} FROM {table} "
+                    f"WHERE {indicateur} IS NOT NULL ORDER BY 1"
+                ).fetchall()
+            ]
+            for indicateur, (table, col_annee) in _SOURCES_ANNEES.items()
+        }
     finally:
         con.close()
-    return {
-        "taux_pauvrete": f,
-        "niveau_vie_median": f,
-        "tx_chomage_dec": r,
-        "part_ouvriers_employes": r,
-        "part_emploi_industriel": r,
-        "part_logements_sociaux": r,
-        "nb_foyers_rsa": rsa,
-        "apl_medecins": apl,
-    }
 
 
 @st.cache_data(ttl=3600)

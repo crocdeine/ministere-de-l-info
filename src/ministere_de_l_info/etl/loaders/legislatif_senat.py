@@ -20,8 +20,12 @@ Périmètre temporel (ADR-0011) : le projet couvre 2002-présent. Faute de dates
 seuls les anciens sénateurs **certainement** antérieurs au renouvellement du
 29 septembre 2002 sont écartés : circonscriptions disparues (code ``XX`` : Seine,
 Seine-et-Oise, Algérie, anciens territoires, toutes antérieures à 1968) et sénateurs
-décédés avant cette date (colonne « Date de décès », si présente). Les autres anciens
+décédés avant cette date (colonne « Date de décès », si présente). Addendum ADR-0011
+(2026-09-25) : sont aussi écartés les anciens sénateurs dont le dernier groupe a disparu
+avant ce renouvellement (RPR, RI, UNR, G.D., …, liste ``GROUPES_SENAT_ANTERIEURS_2002``
+de ``etl/legislatif_groupes.py``) ; aucun bloc ne leur est attribué. Les autres anciens
 sénateurs sont conservés ; un filtre exact exige une source datée des mandats.
+Groupe vide : statut « sans groupe » (bloc NULL, INFO), distinct de « non classé ».
 """
 
 from __future__ import annotations
@@ -36,7 +40,12 @@ import httpx
 import polars as pl
 
 from ministere_de_l_info.etl._common import upsert_metadata
-from ministere_de_l_info.etl.legislatif_groupes import journaliser_non_classes, resoudre_bloc
+from ministere_de_l_info.etl.legislatif_groupes import (
+    est_groupe_senat_anterieur_2002,
+    journaliser_non_classes,
+    journaliser_sans_groupe,
+    resoudre_bloc,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +238,15 @@ def _hors_perimetre(est_actif: bool, code_dep: str, date_deces: date | None) -> 
     return date_deces is not None and date_deces < DEBUT_PERIMETRE_SENAT
 
 
+def _groupe_anterieur_2002(est_actif: bool, groupe: str | None) -> bool:
+    """Vrai si un ancien sénateur a pour dernier groupe un groupe disparu avant 2002.
+
+    Un sénateur actif n'est jamais écarté : s'il portait un tel sigle, il resterait
+    chargé et signalé « non classé » (anomalie de source à examiner).
+    """
+    return not est_actif and est_groupe_senat_anterieur_2002(groupe)
+
+
 def load_legislatif_senat(
     con: duckdb.DuckDBPyConnection,
     raw_dir: Path,
@@ -266,6 +284,8 @@ def load_legislatif_senat(
     rows: list[tuple] = []
     mandat_rows: list[tuple] = []
     non_classes: Counter[tuple[str, int | None]] = Counter()
+    sans_groupe: Counter[int | None] = Counter()
+    groupes_anterieurs: Counter[str] = Counter()
     n_hors_perimetre = 0
     for row in df.iter_rows(named=True):
         matricule = str(row["Matricule"]).strip() if row["Matricule"] else None
@@ -284,9 +304,16 @@ def load_legislatif_senat(
             continue
 
         groupe = str(row["Groupe politique"]).strip() if row["Groupe politique"] else None
+        groupe = groupe or None
+        if not inclure_anterieurs_2002 and _groupe_anterieur_2002(est_actif, groupe):
+            groupes_anterieurs[groupe or ""] += 1
+            continue
+
         bloc = resoudre_bloc("SENAT", groupe, None)
-        if bloc is None:
-            non_classes[(groupe or "(vide)", None)] += 1
+        if groupe is None:
+            sans_groupe[None] += 1
+        elif bloc is None:
+            non_classes[(groupe, None)] += 1
 
         date_naissance = _parse_date(row.get("Date naissance"))
         # Aucune date de mandat dans ODSEN_GENERAL : NULL plutôt que la date du jour.
@@ -342,6 +369,16 @@ def load_legislatif_senat(
             n_hors_perimetre,
             DEBUT_PERIMETRE_SENAT.isoformat(),
         )
+    if groupes_anterieurs:
+        logger.info(
+            "Sénat : %d ancien(s) sénateur(s) écarté(s), dernier groupe disparu avant le "
+            "renouvellement de 2002 (hors périmètre, aucun bloc attribué) : %s",
+            sum(groupes_anterieurs.values()),
+            ", ".join(
+                f"{g} × {n}"
+                for g, n in sorted(groupes_anterieurs.items(), key=lambda kv: (-kv[1], kv[0]))
+            ),
+        )
 
     con.execute("DELETE FROM leg_elus WHERE source = 'senat_csv'")
 
@@ -384,6 +421,7 @@ def load_legislatif_senat(
         mandat_rows,
     )
     journaliser_non_classes("SENAT", non_classes)
+    journaliser_sans_groupe("SENAT", sans_groupe)
 
     total = con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'").fetchone()[0]
     actifs = con.execute(

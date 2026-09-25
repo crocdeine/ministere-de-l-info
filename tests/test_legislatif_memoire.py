@@ -141,6 +141,9 @@ _SENATEURS: list[tuple[str, str, str, str, str]] = [
     # Hors périmètre 2002-présent : circonscription disparue, décès avant 2002
     ("H001", "ANCIEN", "RPR", "Seine-et-Oise", ""),
     ("H002", "ANCIEN", "RI", "Nord", "1998-05-12 00:00:00.0"),
+    # Hors périmètre : dernier groupe disparu avant 2002 (addendum ADR-0011, sigles réels)
+    ("H003", "ANCIEN", "G.D.", "Aisne", ""),
+    ("H004", "ANCIEN", "U.C.D.P.", "Somme", ""),
 ]
 
 
@@ -299,6 +302,47 @@ class TestReferentiel:
     def test_non_classe(self, chambre: str, groupe: str | None, legislature: int | None) -> None:
         assert resoudre_bloc(chambre, groupe, legislature) is None
 
+    @pytest.mark.parametrize(
+        ("groupe", "attendu"),
+        [
+            ("RPR", True),
+            ("R.P.R.", True),
+            ("RI", True),
+            ("UNR", True),
+            ("G.D.", True),
+            ("U.C.D.P.", True),
+            ("R.D.E.", True),
+            ("C.R.A.R.S.", True),
+            ("UREI", True),
+            # Groupes existant après 2002 : dans le périmètre
+            ("RDSE", False),
+            ("UC", False),
+            ("UMP", False),
+            ("CRC", False),
+            ("UC-UDF", False),
+            # Inconnu : jamais écarté, reste signalé « non classé »
+            ("Groupe inventé", False),
+            (None, False),
+            ("", False),
+        ],
+    )
+    def test_groupes_senat_anterieurs_2002(self, groupe: str | None, attendu: bool) -> None:
+        assert lg.est_groupe_senat_anterieur_2002(groupe) is attendu
+
+    def test_groupes_anterieurs_2002_sans_bloc_ni_recouvrement(self) -> None:
+        """Aucun groupe hors périmètre n'est classé ; chaque entrée est justifiée."""
+        for g in lg.GROUPES_SENAT_ANTERIEURS_2002:
+            assert g.sigle == lg.normaliser_sigle(g.sigle)
+            assert g.justification.strip() and g.periode.strip()
+            assert resoudre_bloc("SENAT", g.sigle, None) is None
+        sigles = [g.sigle for g in lg.GROUPES_SENAT_ANTERIEURS_2002]
+        assert len(sigles) == len(set(sigles))
+
+    def test_validation_detecte_groupe_historique_classe(self) -> None:
+        conflit = CorrespondanceGroupe("SENAT", "R.P.R.", None, None, "DTE", "RPR", "test")
+        with pytest.raises(ValueError, match="antérieurs à 2002"):
+            valider_correspondances((*CORRESPONDANCES_GROUPES, conflit))
+
     def test_aucun_groupe_lfi_en_exg_avant_2026(self) -> None:
         """ADR-0005 n° 3 : aucune législature 15-17 ne place LFI en EXG."""
         for c in CORRESPONDANCES_GROUPES:
@@ -415,9 +459,68 @@ class TestChargement:
         ids = {
             r[0] for r in con.execute("SELECT id FROM leg_elus WHERE chambre = 'SENAT'").fetchall()
         }
-        assert "H001" not in ids and "H002" not in ids
+        assert not {"H001", "H002", "H003", "H004"} & ids
         assert {"A001", "A002", "A003", "A004", "A005"} <= ids
-        assert len(ids) == len(_SENATEURS) - 2
+        assert len(ids) == len(_SENATEURS) - 4
+        n_mandats = con.execute(
+            "SELECT COUNT(*) FROM leg_mandats WHERE chambre = 'SENAT'"
+        ).fetchone()[0]
+        assert n_mandats == len(ids)
+
+    def test_senat_groupes_anterieurs_2002_logges_en_info(
+        self, raw_dir: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        c = duckdb.connect()
+        with caplog.at_level(logging.INFO):
+            _charger(c, raw_dir)
+        c.close()
+        infos = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+        message = next(m for m in infos if "disparu avant le renouvellement de 2002" in m)
+        assert "2 ancien(s)" in message
+        assert "G.D. × 1" in message and "U.C.D.P. × 1" in message
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+    def test_senateur_actif_groupe_historique_reste_signale(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Un sénateur ACTIF n'est jamais écarté : sigle historique = anomalie signalée."""
+        raw = tmp_path / "raw_actif"
+        _ecrire_senat(raw, [("S1", "ACTIF", "RPR", "Nord", "")])
+        c = duckdb.connect()
+        _creer_meta(c)
+        create_legislatif_schema(c)
+        with caplog.at_level(logging.WARNING):
+            load_legislatif_senat(c, raw)
+        rows = c.execute("SELECT id, bloc_politique FROM leg_elus").fetchall()
+        c.close()
+        assert rows == [("S1", None)]
+        assert any("RPR" in r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING)
+
+    def test_depute_sans_groupe(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+        """groupeAbrev vide : statut « sans groupe » (NULL, INFO), pas « non classé »."""
+        raw = tmp_path / "raw_sans_groupe"
+        _ecrire_datan(raw, [("", 15, "59", False), ("SOC", 15, "62", False)])
+        _ecrire_senat(raw, [("S1", "ACTIF", "SER", "Nord", "")])
+        c = duckdb.connect()
+        with caplog.at_level(logging.INFO):
+            _charger(c, raw)
+        rows = c.execute(
+            "SELECT groupe_sigle, groupe_nom, bloc_groupe FROM v_mandats_legislatif "
+            "WHERE chambre = 'AN' ORDER BY groupe_sigle NULLS FIRST"
+        ).fetchall()
+        elus = c.execute(
+            "SELECT groupe_sigle, bloc_politique FROM leg_elus WHERE chambre = 'AN' "
+            "ORDER BY groupe_sigle NULLS FIRST"
+        ).fetchall()
+        c.close()
+        assert rows[0][0] is None and rows[0][2] is None
+        assert rows[1] == ("SOC", "Groupe SOC", "GAU")
+        assert elus == [(None, None), ("SOC", "GAU")]
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert any(
+            "sans groupe" in r.getMessage() and "lég. 15 × 1" in r.getMessage()
+            for r in caplog.records
+        )
 
     def test_senat_filtre_desactivable(self, raw_dir: Path) -> None:
         c = duckdb.connect()

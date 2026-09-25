@@ -114,6 +114,16 @@ def source_synthetique() -> Iterator[duckdb.DuckDBPyConnection]:
         "INSERT INTO leg_activite (elu_id, chambre, date_extraction) VALUES "
         "('E80', 'AN', DATE '2026-01-01'), ('E59', 'AN', DATE '2026-01-01')"
     )
+    con.execute(
+        "INSERT INTO leg_mandats (elu_id, chambre, legislature, groupe_sigle, "
+        "code_departement, granularite, source) VALUES "
+        "('E80', 'AN', 17, 'SOC', '80', 'derniere_legislature', 'datan'), "
+        "('E59', 'AN', 17, 'RN', '59', 'derniere_legislature', 'datan')"
+    )
+    con.execute(
+        "INSERT INTO leg_groupes_blocs (chambre, groupe, legislature_debut, "
+        "legislature_fin, bloc, source_bloc) VALUES ('AN', 'SOC', 12, 17, 'GAU', 'test')"
+    )
     creer_vues(con)
     yield con
     con.close()
@@ -138,6 +148,8 @@ class TestExportAllerRetour:
         assert t["economie_emploi_urssaf"]["lignes"] == 1  # 80, industrie seulement
         assert t["leg_elus"]["lignes"] == 1
         assert t["leg_activite"]["lignes"] == 1
+        assert t["leg_mandats"]["lignes"] == 1  # mandats des élus du 80
+        assert t["leg_groupes_blocs"]["lignes"] == 1  # référentiel complet
         assert "_etl_metadata" not in t
         assert manifest["departement"] == "80"
         assert (tmp_path / "manifest.json").is_file()
@@ -216,6 +228,11 @@ class TestExportAllerRetour:
         assert len(export_sample_db.SCRUTINS_DEFAUT) == 12
         assert "2008_muni_t1" in export_sample_db.SCRUTINS_DEFAUT
 
+    def test_tables_legislatives_adr_0011_exportees(self) -> None:
+        specs = {s.nom: s.filtre for s in export_sample_db.construire_specs("80", None)}
+        assert specs["leg_groupes_blocs"] == ""  # référentiel complet
+        assert "leg_elus e" in specs["leg_mandats"] and "'80'" in specs["leg_mandats"]
+
 
 def manifest_vues(sample_dir: Path) -> list[str]:
     return json.loads((sample_dir / "manifest.json").read_text(encoding="utf-8"))["vues_source"]
@@ -283,6 +300,22 @@ class TestEchantillonReel:
         df = legislatif_queries.get_departements_disponibles()
         assert df.height > 0
         legislatif_queries.get_departements_disponibles.clear()
+
+    def test_legislatif_mandats_et_groupes(
+        self, manifest_reel: dict, echantillon_con: duckdb.DuckDBPyConnection
+    ) -> None:
+        """leg_mandats et leg_groupes_blocs présents (exportés ou dérivés, ADR-0011) ;
+        aucun mandat du périmètre sans bloc (hors « sans groupe » et groupes Sénat < 2002)."""
+        from ministere_de_l_info.etl.legislatif_groupes import est_groupe_senat_anterieur_2002
+
+        for table in ("leg_mandats", "leg_groupes_blocs"):
+            assert _ligne(echantillon_con, f"SELECT COUNT(*) FROM {table}")[0] > 0, table
+        rows = echantillon_con.execute(
+            "SELECT chambre, groupe_sigle FROM v_mandats_legislatif "
+            "WHERE bloc_groupe IS NULL AND NULLIF(groupe_sigle, '') IS NOT NULL"
+        ).fetchall()
+        hors = [r for r in rows if not (r[0] == "SENAT" and est_groupe_senat_anterieur_2002(r[1]))]
+        assert hors == []
 
     @pytest.mark.spatial
     def test_communes_dans_leur_departement(self, manifest_reel: dict) -> None:
