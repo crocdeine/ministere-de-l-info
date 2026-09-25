@@ -165,7 +165,8 @@ nouvel_env() {
   PROJ="${2:-$S/projet}"
   mkdir -p "$HOME" "$STATE" "$PROJ/data"
   : >"$STATE/journal"
-  touch "$PROJ/app.py" "$PROJ/pyproject.toml" "$PROJ/uv.lock"
+  mkdir -p "$PROJ/scripts"
+  touch "$PROJ/app.py" "$PROJ/pyproject.toml" "$PROJ/uv.lock" "$PROJ/scripts/backup_db.sh"
   echo "base factice" >"$PROJ/data/ministere.duckdb"
   PLIST_APP="$HOME/Library/LaunchAgents/$LABEL_APP.plist"
   PLIST_SAUV="$HOME/Library/LaunchAgents/$LABEL_SAUV.plist"
@@ -202,14 +203,18 @@ check "code 0" rc_egal 0
 check "plist application créé" test -f "$PLIST_APP"
 check "plist application valide" plist_valide "$PLIST_APP"
 check "aucun marqueur @...@ restant (app)" not grep -q '@[A-Z_]*@' "$PLIST_APP"
-check "port par défaut 8502" egal "$(plist_valeur "$PLIST_APP" "d['EnvironmentVariables']['STREAMLIT_SERVER_PORT']")" "8502"
-check "écoute 127.0.0.1 (argument)" egal "$(plist_valeur "$PLIST_APP" "d['ProgramArguments'][d['ProgramArguments'].index('--server.address')+1]")" "127.0.0.1"
+check "port par défaut 8501" egal "$(plist_valeur "$PLIST_APP" "d['EnvironmentVariables']['STREAMLIT_SERVER_PORT']")" "8501"
 check "écoute 127.0.0.1 (variable)" egal "$(plist_valeur "$PLIST_APP" "d['EnvironmentVariables']['STREAMLIT_SERVER_ADDRESS']")" "127.0.0.1"
 check "MINISTERE_DB_PATH = base du projet" egal "$(plist_valeur "$PLIST_APP" "d['EnvironmentVariables']['MINISTERE_DB_PATH']")" "$PROJ/data/ministere.duckdb"
 check "KeepAlive et RunAtLoad" egal "$(plist_valeur "$PLIST_APP" "(d['KeepAlive'], d['RunAtLoad'])")" "(True, True)"
 check "runOnSave désactivé" egal "$(plist_valeur "$PLIST_APP" "d['EnvironmentVariables']['STREAMLIT_SERVER_RUN_ON_SAVE']")" "false"
 check "WorkingDirectory = projet" egal "$(plist_valeur "$PLIST_APP" "d['WorkingDirectory']")" "$PROJ"
-check "Python du .venv" egal "$(plist_valeur "$PLIST_APP" "d['ProgramArguments'][0]")" "$PROJ/.venv/bin/python"
+check "lancement via bash + lancer-app.sh (disque interne)" egal "$(plist_valeur "$PLIST_APP" "tuple(d['ProgramArguments'])")" "('/bin/bash', '$HOME/.config/ministere-info/lancer-app.sh')"
+LANCEUR="$HOME/.config/ministere-info/lancer-app.sh"
+check "lancer-app.sh généré et exécutable" test -x "$LANCEUR"
+check "lancer-app.sh sans marqueur @...@ restant" not grep -q '@[A-Z_]*@' "$LANCEUR"
+check "lancer-app.sh référence le Python du .venv" contient "$LANCEUR" "$PROJ/.venv/bin/python"
+check "lancer-app.sh référence le port" contient "$LANCEUR" "PORT=\"8501\""
 check "journaux dans ~/Library/Logs/ministere-info" egal "$(plist_valeur "$PLIST_APP" "d['StandardErrorPath']")" "$HOME/Library/Logs/ministere-info/app.err.log"
 check "dossier de journaux créé" test -d "$HOME/Library/Logs/ministere-info"
 check "uv sync --frozen appelé dans le projet" contient "$STATE/journal" "uv sync --frozen --group etl --inexact (dans $PROJ)"
@@ -221,7 +226,7 @@ check "sauvegarde : MINISTERE_DB_PATH" egal "$(plist_valeur "$PLIST_SAUV" "d['En
 check "sauvegarde : destination par défaut" egal "$(plist_valeur "$PLIST_SAUV" "d['EnvironmentVariables']['BACKUP_DEST']")" "$PROJ/data/backups"
 check "sauvegarde : 3 h, pas au chargement" egal "$(plist_valeur "$PLIST_SAUV" "(d['StartCalendarInterval']['Hour'], d['RunAtLoad'])")" "(3, False)"
 check "agent sauvegarde chargé" agent_charge "$LABEL_SAUV"
-check "configuration écrite" contient "$CONF" "PORT=8502"
+check "configuration écrite" contient "$CONF" "PORT=8501"
 check "navigateur non ouvert (--sans-navigateur)" not contient "$STATE/journal" "open http"
 check "Docker non touché" not grep -q "com.ministere-info\$\|docker" "$STATE/journal"
 cp "$PLIST_APP" "$S/plist1"
@@ -352,7 +357,7 @@ check "--aide : décrit --port" contient "$OUT" "--port N"
 echo "== N14 navigateur ouvert par défaut"
 nouvel_env n14
 lancer install-native.sh --projet "$PROJ"
-check "open http://localhost:8502" contient "$STATE/journal" "open http://localhost:8502"
+check "open http://localhost:8501" contient "$STATE/journal" "open http://localhost:8501"
 
 echo "== N15 status / stop / start"
 lancer status.sh
@@ -416,6 +421,58 @@ lancer install-native.sh --projet "$PROJ" --sans-navigateur
 check "code 0" rc_egal 0
 check "base issue de l'environnement" egal "$(plist_valeur "$PLIST_APP" "d['EnvironmentVariables']['MINISTERE_DB_PATH']")" "$ENV_BASE"
 unset MINISTERE_DB_PATH
+
+echo "== N20 disque externe avec chemin à espaces (cas réel du 25/09)"
+nouvel_env n20 "$WORK/n20/Volumes/le gros stockage/ministere-de-l-info"
+lancer install-native.sh --projet "$PROJ" --sauvegarde-vers "$PROJ/data/backups" --sans-navigateur
+check "code 0" rc_egal 0
+check "WorkingDirectory avec espaces (disque externe)" egal "$(plist_valeur "$PLIST_APP" "d['WorkingDirectory']")" "$PROJ"
+check "base avec espaces dans le chemin" egal "$(plist_valeur "$PLIST_APP" "d['EnvironmentVariables']['MINISTERE_DB_PATH']")" "$PROJ/data/ministere.duckdb"
+check "lancer-app.sh (disque interne, sans espace de test) référence le projet à espaces" contient "$HOME/.config/ministere-info/lancer-app.sh" "$PROJ"
+check "sauvegarde : chemin à espaces référencé" egal "$(plist_valeur "$PLIST_SAUV" "d['EnvironmentVariables']['MINISTERE_DB_PATH']")" "$PROJ/data/ministere.duckdb"
+
+echo "== N21 lancer-app.sh : attente bornée du montage du disque externe"
+nouvel_env n21
+lancer install-native.sh --projet "$PROJ" --sans-navigateur
+check "code 0" rc_egal 0
+LANCEUR="$HOME/.config/ministere-info/lancer-app.sh"
+rm -rf "$PROJ"
+MINISTERE_LANCER_ATTENTE_MAX=1 MINISTERE_LANCER_INTERVALLE=1 bash "$LANCEUR" >"$OUT" 2>&1
+RC=$?
+check "code non nul si le disque n'est pas monté" rc_non_nul
+check "message d'attente affiché" contient "$OUT" "pas encore monté"
+check "message d'abandon après le délai borné" contient "$OUT" "indisponible après 1s"
+
+echo "== N22 ancien agent de sauvegarde en échec : détecté, désactivé, remplacé"
+nouvel_env n22
+mkdir -p "$(dirname "$PLIST_SAUV")"
+ANCIEN_PROJ="$S/ancien-projet-disparu"
+cat >"$PLIST_SAUV" <<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$LABEL_SAUV</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>$ANCIEN_PROJ/scripts/backup_db.sh</string>
+    </array>
+</dict>
+</plist>
+XML
+lancer install-native.sh --projet "$PROJ" --sans-navigateur
+check "code 0" rc_egal 0
+check "message de détection affiché" contient "$OUT" "Ancien agent de sauvegarde détecté"
+check "ancien plist déplacé dans desactives/" egal "$(find "$HOME/Library/LaunchAgents/desactives" -maxdepth 1 -name "${LABEL_SAUV}.plist.*" 2>/dev/null | wc -l | tr -d ' ')" "1"
+check "nouveau plist de sauvegarde valide" plist_valide "$PLIST_SAUV"
+check "nouveau plist référence le projet courant" egal "$(plist_valeur "$PLIST_SAUV" "d['ProgramArguments'][1]")" "$PROJ/scripts/backup_db.sh"
+: >"$STATE/journal"
+lancer install-native.sh --projet "$PROJ" --sans-navigateur
+check "idempotent : code 0" rc_egal 0
+check "idempotent : pas de nouvelle détection" not contient "$OUT" "Ancien agent de sauvegarde détecté"
+check "idempotent : un seul plist désactivé" egal "$(find "$HOME/Library/LaunchAgents/desactives" -maxdepth 1 -name "${LABEL_SAUV}.plist.*" 2>/dev/null | wc -l | tr -d ' ')" "1"
 
 echo ""
 echo "Résultat : $PASS réussis, $FAIL échoués"

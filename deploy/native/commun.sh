@@ -12,12 +12,18 @@ LABEL_SAUVEGARDE="com.crocdeine.ministere-info.backup"
 LABEL_DOCKER="com.ministere-info" # LaunchAgent créé par deploy/install.sh (Docker)
 
 DOSSIER_AGENTS="${HOME}/Library/LaunchAgents"
+DOSSIER_AGENTS_DESACTIVES="${DOSSIER_AGENTS}/desactives"
 PLIST_APP="${DOSSIER_AGENTS}/${LABEL_APP}.plist"
 PLIST_SAUVEGARDE="${DOSSIER_AGENTS}/${LABEL_SAUVEGARDE}.plist"
 DOSSIER_LOGS="${HOME}/Library/Logs/ministere-info"
 FICHIER_CONF="${MINISTERE_NATIVE_CONF:-${HOME}/.config/ministere-info/native.conf}"
+# Script réellement lancé par le LaunchAgent de l'application (voir
+# deploy/native/lancer-app.sh) : toujours sur le disque interne (~), jamais
+# dans le dossier du projet, pour rester exécutable même si celui-ci est sur
+# un disque externe débranché à l'ouverture de session.
+LANCEUR_APP="${HOME}/.config/ministere-info/lancer-app.sh"
 
-PORT_PAR_DEFAUT="8502" # 8502 pendant le double fonctionnement ; 8501 après la bascule
+PORT_PAR_DEFAUT="8501" # Constat du 25/09 : aucun conteneur Docker sur le Mac, installation directe sur 8501
 RETENTION_PAR_DEFAUT="7"
 
 # Dossier du dépôt qui contient ces scripts (deploy/native/../..)
@@ -136,6 +142,32 @@ charger_agent() {
   launchctl bootstrap "$(domaine_gui)" "$2"
 }
 
+retirer_ancienne_sauvegarde() {
+  # retirer_ancienne_sauvegarde <plist> : si un LaunchAgent de sauvegarde
+  # existe déjà (même label, historiquement `com.crocdeine.ministere-info.backup`)
+  # et référence un script `backup_db.sh` qui n'existe plus (projet déplacé,
+  # par exemple vers un disque externe), le décharge et range le plist dans
+  # desactives/ au lieu de l'écraser silencieusement — trace conservée pour
+  # diagnostic. Idempotent : ne fait rien si le script référencé existe
+  # toujours (y compris après un premier passage, qui aura remplacé le plist).
+  local plist="$1" script_ancien
+  [ -f "$plist" ] || return 0
+  script_ancien="$(awk '
+    /<key>ProgramArguments<\/key>/ { dans = 1; next }
+    dans && /backup_db\.sh<\/string>/ {
+      gsub(/.*<string>|<\/string>.*/, "")
+      print
+      exit
+    }
+  ' "$plist" 2>/dev/null || true)"
+  [ -n "$script_ancien" ] || return 0
+  [ -f "$script_ancien" ] && return 0
+  attention "Ancien agent de sauvegarde détecté (script disparu : $script_ancien) — désactivé"
+  decharger_agent "$LABEL_SAUVEGARDE"
+  mkdir -p "$DOSSIER_AGENTS_DESACTIVES"
+  mv "$plist" "${DOSSIER_AGENTS_DESACTIVES}/$(basename "$plist").$(date +%Y%m%d%H%M%S)"
+}
+
 # ── Santé de l'application ───────────────────────────────────────────────
 app_repond() {
   # app_repond <port> : vrai si /_stcore/health répond « ok »
@@ -211,6 +243,7 @@ rendre_modele() {
     -e "s|@PATH@|${R_PATH}|g" \
     -e "s|@BACKUP_DEST@|${R_BACKUP_DEST}|g" \
     -e "s|@RETENTION@|${R_RETENTION}|g" \
+    -e "s|@LANCEUR@|${R_LANCEUR:-}|g" \
     "$modele" >"$tmp"
   if grep -q '@[A-Z_]*@' "$tmp"; then
     rm -f "$tmp"
@@ -222,5 +255,25 @@ rendre_modele() {
       fatal "plist invalide généré depuis $modele"
     }
   fi
+  mv "$tmp" "$dest"
+}
+
+# Les variables R_* sont définies par l'appelant (install-native.sh).
+# shellcheck disable=SC2153
+rendre_script() {
+  # rendre_script <modèle> <destination> : comme rendre_modele, pour un script
+  # shell (pas de vérification plutil ; rend le résultat exécutable).
+  local modele="$1" dest="$2" tmp
+  tmp="${dest}.tmp"
+  sed \
+    -e "s|@PROJECT_DIR@|${R_PROJECT_DIR}|g" \
+    -e "s|@PYTHON@|${R_PYTHON}|g" \
+    -e "s|@PORT@|${R_PORT}|g" \
+    "$modele" >"$tmp"
+  if grep -q '@[A-Z_]*@' "$tmp"; then
+    rm -f "$tmp"
+    fatal "Marqueur non remplacé dans $modele (bug du script)"
+  fi
+  chmod +x "$tmp"
   mv "$tmp" "$dest"
 }

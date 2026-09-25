@@ -4,8 +4,8 @@ Deux modes d'exécution coexistent :
 
 | Mode | Rôle | Référence |
 |---|---|---|
-| **Natif** (uv + LaunchAgent macOS) | **Mode principal** sur le Mac mini de Mathias | [ADR-0012](adr/0012-execution-native-mac.md), §1 à §3 |
-| **Docker / OrbStack** | **Repli** pendant la transition (2 semaines), puis distribution éventuelle à des tiers (`deploy/install.sh`) | §4 |
+| **Natif** (uv + LaunchAgent macOS) | **Mode principal**, seul mode réellement installé sur le Mac mini de Mathias | [ADR-0012](adr/0012-execution-native-mac.md), §1 à §3 |
+| **Docker / OrbStack** | Non déployé actuellement (constat du 25/09/2026) ; conservé comme repli possible et pour la distribution à d'éventuels tiers (`deploy/install.sh`) | §4 |
 
 La publication des releases (image + base) est décrite dans
 [`deploy/README-deploy.md`](../deploy/README-deploy.md).
@@ -13,8 +13,16 @@ La publication des releases (image + base) est décrite dans
 Convention de ce document : les blocs de commandes se copient-collent tels quels dans
 le Terminal. Ils ne contiennent volontairement aucun commentaire `#` : le Terminal de
 macOS utilise zsh, qui par défaut transmet un `# commentaire` comme argument de la
-commande au lieu de l'ignorer. Le dossier du projet est supposé être `~/Documents/Docker/ministere-de-l-info` ;
-s'il est ailleurs, remplacer ce chemin dans la première commande `cd` de chaque bloc.
+commande au lieu de l'ignorer. Les exemples utilisent une variable `PROJET` définie une
+fois en tête de session — **toujours entre guillemets**, y compris pour `cd`, car le
+chemin réel (25/09/2026 : `/Volumes/le gros stockage/ministere-de-l-info`, sur un
+disque externe) contient des espaces :
+
+```bash
+PROJET="/Volumes/le gros stockage/ministere-de-l-info"
+```
+
+Adapter cette ligne si le projet est ailleurs, puis copier les blocs suivants tels quels.
 
 ---
 
@@ -44,6 +52,15 @@ s'il est ailleurs, remplacer ce chemin dans la première commande `cd` de chaque
 - L'app n'écoute que sur `127.0.0.1` : elle n'est pas visible depuis le réseau local.
 - Aucune connexion Internet n'est nécessaire au démarrage (pas de `uv run`, extension
   spatial préinstallée).
+- **Projet sur disque externe (constat du 25/09/2026)** : le script réellement lancé
+  par le LaunchAgent (`~/.config/ministere-info/lancer-app.sh`, généré par
+  `install-native.sh`) est toujours installé sur le disque interne, pour rester
+  exécutable même si le disque du projet n'est pas encore monté à l'ouverture de
+  session. Il attend le montage jusqu'à 60 secondes (message clair dans
+  `app.err.log`), puis démarre Streamlit une fois le projet disponible. **Limite** :
+  si le disque reste débranché plus de 60 secondes, l'application reste indisponible
+  jusqu'au prochain cycle de relance (`KeepAlive`, au rythme de `ThrottleInterval`) ou
+  jusqu'à `./deploy/native/start.sh` une fois le disque rebranché.
 
 ### Fichiers et emplacements
 
@@ -52,7 +69,9 @@ s'il est ailleurs, remplacer ce chemin dans la première commande `cd` de chaque
 | Scripts | `<projet>/deploy/native/` : `install-native.sh`, `start.sh`, `stop.sh`, `status.sh`, `uninstall-native.sh` |
 | Configuration enregistrée | `~/.config/ministere-info/native.conf` (projet, base, port, sauvegarde) |
 | LaunchAgent application | `~/Library/LaunchAgents/com.crocdeine.ministere-info.native.plist` (généré depuis `deploy/native/ministere-info.plist`) |
+| Script lancé par ce LaunchAgent | `~/.config/ministere-info/lancer-app.sh` (disque interne ; généré depuis `deploy/native/lancer-app.sh`, attend le montage du disque du projet) |
 | LaunchAgent sauvegarde | `~/Library/LaunchAgents/com.crocdeine.ministere-info.backup.plist` (généré depuis `scripts/com.crocdeine.ministere-info.backup.plist`) |
+| Anciens LaunchAgents désactivés | `~/Library/LaunchAgents/desactives/` (archivés par `install-native.sh`, jamais supprimés) |
 | Journaux | `~/Library/Logs/ministere-info/` : `app.err.log`, `app.out.log`, `backup.log` (visibles dans l'app Console) |
 | Base | `MINISTERE_DB_PATH`, défaut `<projet>/data/ministere.duckdb` |
 | Sauvegardes | `BACKUP_DEST`, défaut `<projet>/data/backups/` (à remplacer par un disque externe, voir §2.5) |
@@ -62,7 +81,7 @@ s'il est ailleurs, remplacer ce chemin dans la première commande `cd` de chaque
 | Variable | Défaut | Utilisée par |
 |---|---|---|
 | `MINISTERE_DB_PATH` | `<projet>/data/ministere.duckdb` | application (`src/ministere_de_l_info/config.py`), sauvegarde |
-| `MINISTERE_PORT` | `8502`, puis `8501` après la bascule | `install-native.sh` |
+| `MINISTERE_PORT` | `8501` | `install-native.sh` |
 | `BACKUP_DEST` | `<projet>/data/backups` | sauvegarde |
 | `BACKUP_RETENTION_DAYS` | `7` | sauvegarde |
 | `MINISTERE_NATIVE_CONF` | `~/.config/ministere-info/native.conf` | tous les scripts |
@@ -82,33 +101,33 @@ Les valeurs retenues sont enregistrées dans `native.conf` et réutilisées aux 
 ### 2.1 Savoir si tout va bien
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/status.sh
 ```
 
 Vérification : la ligne `Santé` indique `OK (répond)` ; la section « Sauvegardes » donne la date de la dernière
-sauvegarde. L'app est à l'adresse indiquée (`http://localhost:8501` après la bascule).
+sauvegarde. L'app est à l'adresse indiquée (`http://localhost:8501`).
 
 ### 2.2 Arrêter, démarrer, redémarrer
 
 Arrêter (jusqu'au prochain `start.sh` ou à la prochaine ouverture de session) :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/stop.sh
 ```
 
 Démarrer, ou redémarrer si l'app tourne déjà :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/start.sh
 ```
 
 ### 2.3 Mettre à jour le code
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 git pull
 ./deploy/native/install-native.sh
 ```
@@ -120,19 +139,19 @@ les paramètres enregistrés.
 ### 2.4 Lancer un ETL (écriture dans la base)
 
 DuckDB n'accepte aucun écrivain tant qu'un programme lit la base. Il faut donc arrêter
-l'app (et, pendant la période de double fonctionnement, le conteneur Docker s'il lit le
-même fichier). Exemple avec `load_economie.py`, à remplacer par le script ETL voulu :
+l'app (et un éventuel conteneur Docker s'il lit le même fichier, en repli). Exemple avec
+`load_economie.py`, à remplacer par le script ETL voulu :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/stop.sh
 uv run python scripts/load_economie.py
 ./deploy/native/start.sh
 ```
 
 Si l'ETL affiche `Could not set lock on file`, un programme lit encore la base : vérifier
-`./deploy/native/status.sh` (et `docker ps` pendant la transition). Une sauvegarde lancée
-pendant un ETL s'abandonne d'elle-même (code 4) sans rien abîmer.
+`./deploy/native/status.sh` (et `docker ps`, si Docker est un jour redéployé en repli).
+Une sauvegarde lancée pendant un ETL s'abandonne d'elle-même (code 4) sans rien abîmer.
 
 ### 2.5 Sauvegardes
 
@@ -142,7 +161,7 @@ pendant un ETL s'abandonne d'elle-même (code 4) sans rien abîmer.
 **Manuelle** :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./scripts/backup_db.sh
 ```
 
@@ -155,14 +174,14 @@ interne emporterait sinon base et sauvegardes). Choisir **une** des deux command
 Disque externe (remplacer `MonDisque` par le nom du disque affiché dans le Finder) :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/install-native.sh --sauvegarde-vers "/Volumes/MonDisque/ministere-info-sauvegardes"
 ```
 
 iCloud Drive :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/install-native.sh --sauvegarde-vers "$HOME/Library/Mobile Documents/com~apple~CloudDocs/ministere-info-sauvegardes"
 ```
 
@@ -191,7 +210,7 @@ secours local utilisé · `6` espace disque insuffisant.
 sauvegarde voulue ; remplacer ci-dessous le chemin par la destination affichée :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/status.sh
 ls -lh "/Volumes/MonDisque/ministere-info-sauvegardes"
 ```
@@ -199,7 +218,7 @@ ls -lh "/Volumes/MonDisque/ministere-info-sauvegardes"
 2) Remplacer la base (ici par la sauvegarde du 1er octobre 2026 à 3 h, à adapter) :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/stop.sh
 mv data/ministere.duckdb data/ministere.duckdb.avant-restauration
 cp "/Volumes/MonDisque/ministere-info-sauvegardes/ministere-2026-10-01_0300.duckdb" data/ministere.duckdb
@@ -218,96 +237,82 @@ Vérification : l'app répond et les pages affichent des données. Supprimer ens
 |---|---|---|
 | `status.sh` : `NE RÉPOND PAS` | `tail -n 50 ~/Library/Logs/ministere-info/app.err.log` | Corriger l'erreur affichée, puis `./deploy/native/start.sh` |
 | `Extension "spatial" not found` dans le journal | La version de DuckDB a changé | `./deploy/native/install-native.sh` (réinstalle l'extension ; Internet requis) |
-| `Le port 8501 est déjà utilisé par : …` | Autre programme sur le port (souvent Docker pendant la transition) | Voir bascule, étape 8, ou choisir `--port 8502` |
-| `Base introuvable ou vide` | Chemin de base erroné | `./deploy/native/status.sh`, puis `install-native.sh --base <chemin>` |
+| `Le port 8501 est déjà utilisé par : …` | Autre programme sur le port | Arrêter ce programme, ou choisir `--port 8502` |
+| `Base introuvable ou vide` | Chemin de base erroné, ou disque externe débranché | `./deploy/native/status.sh`, puis `install-native.sh --base <chemin>` |
 | L'ETL échoue avec `Could not set lock on file` | L'app lit la base | §2.4 |
 | Le Terminal indique `Rosetta` | Terminal ouvert en mode Intel | Finder → Applications → Utilitaires → Terminal → Lire les informations → décocher « Ouvrir avec Rosetta » |
 | Page sans données | Base vide ou ancienne | Contrôle des tables : §4.6 (même requête, lancée avec `uv run python`) |
+| L'app ne démarre pas après l'ouverture de session, `app.err.log` indique « indisponible après … » | Le disque externe n'était pas encore monté quand le LaunchAgent a démarré (voir §1, limite connue) | Rebrancher/monter le disque, puis `./deploy/native/start.sh` |
 
 ---
 
-## 3. Bascule Docker → natif (8 étapes)
+## 3. Installation directe (pas de Docker sur le Mac)
 
-Chaque étape se termine par une **vérification**. Ne passer à l'étape suivante que si la
-vérification est bonne. En cas de doute, s'arrêter : rien n'est modifié côté Docker avant
-l'étape 8, et Docker continue de fonctionner sur son port pendant toute la période d'essai.
+Constat du 25/09/2026 : aucun conteneur ni image Docker de l'application n'existe sur
+le Mac mini. La période de double fonctionnement natif/Docker prévue par l'ADR-0012
+(§8 de la version précédente de cette section) n'a plus d'objet : il n'y a rien à
+comparer ni à basculer. L'installation se fait **directement sur le port 8501**.
 
-### Étape 1 — Faire l'état des lieux
+Chaque étape se termine par une **vérification**. Ne passer à l'étape suivante que si
+la vérification est bonne.
+
+> ## POINT D'ARRÊT — avant l'étape 5 (suppression de l'ancien agent de sauvegarde)
+>
+> `install-native.sh` détecte automatiquement un ancien LaunchAgent de sauvegarde en
+> échec et le range dans `~/Library/LaunchAgents/desactives/` (rien n'est supprimé).
+> Vérifier le contenu de ce dossier après l'étape 5 avant de continuer, et ne rien
+> supprimer manuellement (ni cet ancien plist, ni une base, ni une sauvegarde) sans
+> validation explicite de Mathias en chat.
+
+### Étape 1 — Constater l'absence de Docker
 
 ```bash
-docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}'
-docker inspect ministere-info --format '{{range .Mounts}}{{.Type}}  {{.Source}}  ->  {{.Destination}}{{println}}{{end}}'
+docker ps 2>&1
 launchctl list | grep -i ministere
 ```
 
-Noter :
+Attendu : soit `docker` répond « Cannot connect to the Docker daemon » (ou n'est pas
+installé), soit `docker ps` ne montre aucun conteneur `ministere-info`. `launchctl list`
+peut montrer `com.crocdeine.ministere-info.backup` (l'ancienne sauvegarde en échec,
+traitée à l'étape 5).
 
-- le **port** de Docker (colonne `PORTS`, normalement `8501`) ;
-- la **base** utilisée par Docker (ligne qui finit par `-> /app/data`) :
-  - `bind  /Users/…/.ministere-info/data` → installation par `deploy/install.sh` ;
-  - `volume  ministere-info_duckdb-data` → `docker-compose.prod.yml` du projet ;
-  - `bind  /Users/…/ministere-de-l-info/data` → compose de développement ;
-- les agents `launchctl` présents (`com.ministere-info` = démarrage auto Docker ;
-  `com.crocdeine.ministere-info.backup` = ancienne sauvegarde).
+Si un conteneur `ministere-info` tourne réellement, s'arrêter ici et prévenir le
+directeur : ce document suppose qu'il n'y en a pas (cas contraire : reprendre l'ancienne
+procédure de bascule en récupérant la version de cette section dans l'historique Git).
 
-Vérification : ces trois informations sont notées. Si `docker` répond `Cannot connect
-to the Docker daemon`, ouvrir OrbStack et recommencer. Si `docker inspect` répond
-`No such object`, remplacer `ministere-info` par le nom affiché dans la colonne `NAMES`.
+Vérification : pas de conteneur `ministere-info` actif.
 
-### Étape 2 — Choisir la base et en faire une copie de sécurité
-
-L'app native lit par défaut la base du projet, celle que l'ETL met à jour :
+### Étape 2 — Localiser le projet et la base, copie de sécurité
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
-ls -lh data/ministere.duckdb
-ls -lh ~/.ministere-info/data/ministere.duckdb 2>/dev/null
+PROJET="/Volumes/le gros stockage/ministere-de-l-info"
+ls -lh "$PROJET/data/ministere.duckdb"
 ```
 
-- Si la base du projet existe et est la plus récente (cas normal : l'ETL tourne dans le
-  projet), ne rien changer.
-- Si elle est absente ou plus ancienne que celle de `~/.ministere-info` (installation
-  `install.sh` mise à jour par `update.sh`) :
+Si ce fichier n'existe pas ou semble trop ancien (comparer avec la date attendue de la
+dernière mise à jour), s'arrêter et vérifier avec le directeur avant de continuer —
+`install-native.sh` refuse de démarrer sans base valide, mais autant le savoir avant.
 
-  ```bash
-  cd ~/Documents/Docker/ministere-de-l-info
-  mv data/ministere.duckdb data/ministere.duckdb.ancienne 2>/dev/null
-  cp -p ~/.ministere-info/data/ministere.duckdb data/ministere.duckdb
-  ```
-
-- Si Docker utilise le volume `ministere-info_duckdb-data` et que sa base est la plus
-  récente, la récupérer :
-
-  ```bash
-  cd ~/Documents/Docker/ministere-de-l-info
-  mv data/ministere.duckdb data/ministere.duckdb.ancienne 2>/dev/null
-  docker run --rm -v ministere-info_duckdb-data:/data:ro -v "$PWD/data:/dest" alpine cp /data/ministere.duckdb /dest/ministere.duckdb
-  ```
-
-L'ancienne base du projet éventuelle est conservée sous `data/ministere.duckdb.ancienne`
-(à supprimer après la bascule).
-
-Copie de sécurité avant toute la suite (à supprimer après la bascule réussie) :
+Copie de sécurité (à conserver jusqu'à la fin de l'étape 6, sur un support qui n'est
+**pas** le disque du projet si possible, par exemple le disque interne) :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
-cp -p data/ministere.duckdb ~/ministere-avant-bascule.duckdb
-ls -lh data/ministere.duckdb ~/ministere-avant-bascule.duckdb
+cp -p "$PROJET/data/ministere.duckdb" ~/ministere-avant-installation-native.duckdb
+ls -lh "$PROJET/data/ministere.duckdb" ~/ministere-avant-installation-native.duckdb
 ```
 
-Vérification : les deux fichiers ont la même taille (environ 900 Mo à 1 Go).
+Vérification : les deux fichiers ont la même taille.
 
-### Étape 3 — Mettre à jour le code et vérifier uv
+### Étape 3 — Code à jour et `uv` installé
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 git status
 git pull
 uv --version
 ```
 
-- `git status` ne doit lister aucun fichier modifié (message `nothing to commit` ou
-  `rien à valider`) ; sinon, demander à Claude Code avant de continuer.
+- `git status` ne doit lister aucun fichier modifié.
 - Si `uv --version` répond `command not found` :
 
   ```bash
@@ -319,160 +324,101 @@ uv --version
 Vérification : `ls deploy/native/` liste `install-native.sh` et `uv --version` affiche
 un numéro de version.
 
-### Étape 4 — Installer l'app native (port 8502, à côté de Docker)
+### Étape 4 — Vérifier que le port 8501 est libre
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+lsof -nP -iTCP:8501 -sTCP:LISTEN 2>/dev/null || echo "port 8501 libre"
+```
+
+Si un programme occupe déjà le port 8501, l'identifier et l'arrêter (ou installer avec
+`--port 8502` à titre temporaire, puis reprendre plus tard sur 8501).
+
+Vérification : `port 8501 libre` s'affiche, ou l'occupant est identifié et traité.
+
+### Étape 5 — Installer l'application native
+
+```bash
+cd "$PROJET"
 ./deploy/native/install-native.sh
 ```
 
-Le script affiche 9 étapes numérotées, puis ouvre le navigateur sur `http://localhost:8502`.
-Durée : 1 à 3 minutes la première fois. Si Docker occupe déjà le port 8502 (cas où
-`install.sh` avait trouvé 8501 pris), ajouter `--port 8503`.
+Le script affiche 9 étapes numérotées. S'il détecte un ancien LaunchAgent de sauvegarde
+en échec (script disparu, ex. ancien chemin `~/Documents/...`), il affiche
+`Ancien agent de sauvegarde détecté (...) — désactivé` et le range dans
+`~/Library/LaunchAgents/desactives/` avant d'installer la nouvelle version. **Voir le
+POINT D'ARRÊT ci-dessus avant de continuer.**
 
-Le script installe aussi la sauvegarde quotidienne ; il remplace l'ancien agent
-`com.crocdeine.ministere-info.backup` (qui copiait le volume Docker) par la nouvelle
-version, qui sauvegarde la base du projet. Docker n'est pas touché.
+Le script se termine par l'ouverture du navigateur sur `http://localhost:8501`.
+Durée : 1 à 3 minutes la première fois.
 
-Vérification : le script se termine par `=== Installation native terminée ===` et
-`./deploy/native/status.sh` indique `OK (répond)` sur la ligne `Santé`.
+Vérification : le script se termine par `=== Installation native terminée ===`,
+`./deploy/native/status.sh` indique `OK (répond)` sur la ligne `Santé`, et le dossier
+`~/Library/LaunchAgents/desactives/` contient l'ancien plist de sauvegarde s'il y en
+avait un (vérifié au POINT D'ARRÊT).
 
-### Étape 5 — Comparer les deux versions
+### Étape 6 — Régler et tester la sauvegarde
 
-Ouvrir côte à côte `http://localhost:8501` (Docker) et `http://localhost:8502` (natif).
-Parcourir les 5 pages (Accueil, Géographie, Élections, Économie, Législatif), en
-particulier une carte par page.
-
-Mémoire utilisée par l'app native :
-
-```bash
-ps -o rss=,command= -p "$(launchctl print gui/$(id -u)/com.crocdeine.ministere-info.native | awk '/^[[:space:]]*pid = /{print $3; exit}')"
-```
-
-(Premier nombre en kilo-octets ; à comparer avec `docker stats ministere-info --no-stream`.)
-
-Vérification : les 5 pages s'affichent en natif, sans message d'erreur rouge. Différences
-attendues : la version native contient les derniers développements (design system),
-absents de l'image Docker de juin.
-
-### Étape 6 — Tester la sauvegarde et la restauration
-
-Brancher le disque de sauvegarde (ou choisir iCloud, §2.5), puis :
+Sauvegarde vers un disque différent de celui du projet (recommandé — voir §2.5 pour le
+détail) :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
-./deploy/native/install-native.sh --sauvegarde-vers "/Volumes/MonDisque/ministere-info-sauvegardes"
+cd "$PROJET"
+./deploy/native/install-native.sh --sauvegarde-vers "/Volumes/MonAutreDisque/ministere-info-sauvegardes"
 ./scripts/backup_db.sh
 ```
 
 Test de restauration **sans toucher à la base en service** :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
-DERNIERE="$(ls -t "/Volumes/MonDisque/ministere-info-sauvegardes"/ministere-*.duckdb | head -n 1)"
+cd "$PROJET"
+DERNIERE="$(ls -t "/Volumes/MonAutreDisque/ministere-info-sauvegardes"/ministere-*.duckdb | head -n 1)"
 echo "$DERNIERE"
 .venv/bin/python -c "import duckdb, sys; c = duckdb.connect(sys.argv[1], read_only=True); print(c.execute(\"SELECT count(*) FROM duckdb_tables()\").fetchone()[0], 'tables')" "$DERNIERE"
 ```
 
-Vérification : `backup_db.sh` affiche une ligne `OK : ministere-…duckdb`, sans
-`ATTENTION : sauvegarde sur le même disque` ; le test de restauration affiche un nombre
-de tables supérieur à 0.
+Vérification : `backup_db.sh` affiche une ligne `OK : ministere-…duckdb` ; le test de
+restauration affiche un nombre de tables supérieur à 0. Si la sauvegarde est sur le
+même disque que le projet (cas du 25/09 si aucun autre disque n'est disponible), le
+journal l'indique (`ATTENTION : sauvegarde sur le même disque`) — accepté en attendant
+un second disque, mais à corriger dès que possible (voir recommandation §2.5).
 
-### Étape 7 — Redémarrer le Mac
+### Étape 7 — Redémarrage de contrôle
 
-Menu Pomme → Redémarrer. Après l'ouverture de session, attendre une minute, puis :
+Menu Pomme → Redémarrer. Après l'ouverture de session (et le montage du disque externe
+si le projet y est installé — laisser une minute de plus que d'habitude), lancer :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/status.sh
 ```
 
-Vérification : la ligne `Santé` indique `OK` sans avoir rien lancé à la main, et `http://localhost:8502`
-s'ouvre.
+Vérification : la ligne `Santé` indique `OK` sans avoir rien relancé à la main, et
+`http://localhost:8501` s'ouvre. Si `status.sh` indique `NE RÉPOND PAS` juste après le
+redémarrage, regarder `~/Library/Logs/ministere-info/app.err.log` : un message
+« indisponible après 60s » signale que le disque externe n'était pas monté à temps
+(voir §1, limite connue) — remonter le disque puis `./deploy/native/start.sh`.
 
----
+### Retour arrière
 
-> ## POINT D'ARRÊT — période de double fonctionnement (2 semaines)
->
-> Utiliser la version native (`http://localhost:8502`) au quotidien pendant deux semaines,
-> Docker restant disponible sur `http://localhost:8501`. Pendant cette période, avant un
-> ETL : arrêter l'app native **et** Docker s'il lit la même base.
->
-> Critères pour passer à l'étape 8 (validation explicite de Mathias) :
-> - aucune indisponibilité inexpliquée de l'app native ;
-> - `backup.log` montre une sauvegarde `OK` chaque jour où le Mac était allumé ;
-> - au moins un redémarrage du Mac et un ETL réalisés sans incident.
->
-> Ne pas exécuter l'étape 8 sans cette validation.
-
----
-
-### Étape 8 — Bascule définitive : arrêter Docker, passer le natif sur 8501
-
-1. Arrêter le conteneur, avec **une** des deux commandes selon l'étape 1.
-   Installation `install.sh` (`~/.ministere-info`) :
-
-   ```bash
-   cd ~/.ministere-info && docker compose stop
-   ```
-
-   Compose du projet (`docker-compose.prod.yml`) :
-
-   ```bash
-   cd ~/Documents/Docker/ministere-de-l-info && docker compose -f docker-compose.prod.yml stop
-   ```
-
-   Utiliser `stop`, jamais `down -v` (qui supprimerait le volume de données).
-
-2. Désactiver le démarrage automatique de Docker (sans le supprimer) :
-
-   ```bash
-   launchctl bootout gui/$(id -u)/com.ministere-info 2>/dev/null; echo "déchargé"
-   mkdir -p ~/Library/LaunchAgents/desactives
-   mv ~/Library/LaunchAgents/com.ministere-info.plist ~/Library/LaunchAgents/desactives/ 2>/dev/null; echo "déplacé"
-   ```
-
-3. Passer l'app native sur le port habituel :
-
-   ```bash
-   cd ~/Documents/Docker/ministere-de-l-info
-   ./deploy/native/install-native.sh --port 8501
-   ```
-
-4. OrbStack : menu OrbStack → Settings → General → décocher « Start at login », puis
-   quitter OrbStack. **Ne pas le désinstaller** : il reste le repli pendant encore un mois.
-
-Vérification : `./deploy/native/status.sh` affiche `http://localhost:8501`, la ligne `Santé` indique `OK`
-et `Démarrage auto Docker : inactif` ; après un redémarrage du Mac, l'app répond sur 8501
-alors qu'OrbStack n'est pas lancé. La copie `~/ministere-avant-bascule.duckdb` peut alors
-être supprimée.
-
-### Retour arrière (à tout moment)
-
-Retirer l'app native (base et sauvegardes conservées), puis réactiver Docker :
+Retirer l'app native (base et sauvegardes conservées) :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 ./deploy/native/uninstall-native.sh
-mv ~/Library/LaunchAgents/desactives/com.ministere-info.plist ~/Library/LaunchAgents/ 2>/dev/null
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ministere-info.plist
-open -a OrbStack
 ```
 
-Puis, après une minute, `cd ~/.ministere-info && docker compose up -d` (installation
-`install.sh`) ou `docker compose -f docker-compose.prod.yml up -d` depuis le projet.
-
-La base n'est modifiée ni par la bascule ni par le retour arrière. Attention : si Docker
-utilise une autre base que le projet (`~/.ministere-info/data` ou volume), les mises à jour
-faites en natif entre-temps n'y figurent pas.
+La base n'est modifiée ni par l'installation ni par le retrait. La copie de sécurité de
+l'étape 2 (`~/ministere-avant-installation-native.duckdb`) peut être supprimée une fois
+l'étape 7 validée.
 
 ---
 
 ## 4. Mode Docker / OrbStack (repli, distribution)
 
-Ce mode reste fonctionnel. Il sert de repli pendant la transition et de canal de
-distribution pour un éventuel tiers (`deploy/install.sh`, voir `deploy/README-deploy.md`).
-Deux configurations existent :
+Ce mode reste fonctionnel mais **n'est pas déployé actuellement** (constat du
+25/09/2026 : aucun conteneur ni image sur le Mac mini). Il sert de repli possible et de
+canal de distribution pour un éventuel tiers (`deploy/install.sh`, voir
+`deploy/README-deploy.md`). Deux configurations existent :
 
 > **Dev vs prod — deux comportements différents pour `/app/data`** :
 > - **Dev** (`docker-compose.yml`) : bind mount `./data:/app/data:ro` — la base locale est
@@ -523,12 +469,12 @@ contenu d'un volume Docker. Pour l'installation `install.sh`, dont la base est u
 de l'hôte :
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "$PROJET"
 MINISTERE_DB_PATH="$HOME/.ministere-info/data/ministere.duckdb" ./scripts/backup_db.sh
 ```
 
 Pour le volume `ministere-info_duckdb-data`, copier d'abord la base hors du volume
-(commande `docker run … alpine cp` de l'étape 2 de la bascule), puis sauvegarder ce fichier.
+(commande `docker run … alpine cp` du §4.1, sens inverse), puis sauvegarder ce fichier.
 
 Restauration dans le volume :
 
@@ -541,10 +487,13 @@ docker run --rm \
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-### 4.4 Arrêter Docker après la période de transition
+### 4.4 Si Docker est un jour redéployé puis retiré
 
-Procédure : étape 8 de la bascule (§3). Plus tard, sur décision (pas avant un mois de
-fonctionnement natif sans incident), l'espace disque peut être récupéré :
+Sans objet le 25/09/2026 (aucun conteneur Docker installé). Si Docker est un jour
+redéployé en repli puis retiré : arrêter le conteneur (`docker compose ... stop`,
+jamais `down -v`), décharger son LaunchAgent
+(`launchctl bootout gui/$(id -u)/com.ministere-info`, plist à archiver dans
+`~/Library/LaunchAgents/desactives/`), puis, sur décision, récupérer l'espace disque :
 
 ```bash
 docker images | grep ministere

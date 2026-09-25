@@ -11,20 +11,18 @@
     <key>Label</key>
     <string>@LABEL@</string>
 
-    <!-- Python de l'environnement uv du projet (dossier .venv créé par uv sync) :
-         pas de « uv run » au démarrage, donc aucune synchronisation ni accès réseau.
-         Attention : deux tirets consécutifs sont interdits dans un commentaire XML. -->
+    <!-- Passe par lancer-app.sh (généré sur le disque interne, jamais dans le
+         dossier du projet) : si le projet est sur un disque externe pas
+         encore monté à l'ouverture de session, ce script attend le montage
+         (borné, message clair dans le journal) avant de démarrer Streamlit
+         avec le Python de l'environnement uv du projet (pas de « uv run » au
+         démarrage, donc aucune synchronisation ni accès réseau une fois le
+         disque disponible). Attention : deux tirets consécutifs sont
+         interdits dans un commentaire XML. -->
     <key>ProgramArguments</key>
     <array>
-        <string>@PYTHON@</string>
-        <string>-m</string>
-        <string>streamlit</string>
-        <string>run</string>
-        <string>app.py</string>
-        <string>--server.address</string>
-        <string>127.0.0.1</string>
-        <string>--server.port</string>
-        <string>@PORT@</string>
+        <string>/bin/bash</string>
+        <string>@LANCEUR@</string>
     </array>
 
     <key>WorkingDirectory</key>
@@ -63,9 +61,12 @@
     <true/>
     <key>KeepAlive</key>
     <true/>
-    <!-- Au moins 10 s entre deux relances (évite une boucle rapide en cas d'erreur) -->
+    <!-- Au moins 15 s entre deux relances : lancer-app.sh peut déjà passer
+         jusqu'à 60 s à attendre le montage du disque avant d'échouer, ce
+         délai supplémentaire évite une boucle rapide dans les autres cas
+         d'échec (ex. script absent, erreur immédiate). -->
     <key>ThrottleInterval</key>
-    <integer>10</integer>
+    <integer>15</integer>
 
     <key>StandardOutPath</key>
     <string>@LOG_DIR@/app.out.log</string>

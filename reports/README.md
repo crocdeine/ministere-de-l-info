@@ -23,6 +23,7 @@ sommaire (`grep -n '^## ' <fichier>`) avant d'ouvrir une section.
 
 | Fichier | Objet | Taille |
 |---|---|---|
+| [infra-native-mac-situation-reelle-2026-09-25.md](infra-native-mac-situation-reelle-2026-09-25.md) | Adaptation de l'installation native au constat réel du 25/09 (pas de Docker, disque externe, ancien agent de sauvegarde) | 17 Ko |
 | [a-faire-sur-le-mac.md](a-faire-sur-le-mac.md) | Liste tenue à jour des tâches à exécuter sur le Mac (base, réseau ministère) | 3 Ko |
 | [synthese-vague-2-2026-09-24.md](synthese-vague-2-2026-09-24.md) | Synthèse de la vague 2 : lots appliqués, décisions secondaires A-G | 5 Ko |
 | [synthese-vague-1-2026-09-24.md](synthese-vague-1-2026-09-24.md) | Synthèse de la vague 1 d'agents, décisions regroupées en lots | 8 Ko |
