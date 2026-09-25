@@ -14,7 +14,9 @@ séparée : un `@import` CSS placé dans un bloc injecté dynamiquement par
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import streamlit as st
 
@@ -89,6 +91,29 @@ def conserver_selections(cle_onglets: str, prefixes_par_onglet: dict[str, tuple[
         if "download" in cle or "_dl_" in cle:
             continue
         st.session_state[cle] = st.session_state[cle]
+
+
+def index_persiste(cle: str, options: Sequence[Any], defaut: int = 0) -> int:
+    """Index à passer explicitement à un widget `radio`/`selectbox` conservé
+    par `conserver_selections()`, en plus de son `key`.
+
+    Contexte (onglets paresseux `st.tabs(on_change="rerun")`) : quand un onglet
+    fermé rouvre, Streamlit recrée le widget. `conserver_selections()` garantit
+    que la valeur reste correcte côté `st.session_state` (et donc pour la
+    donnée affichée), mais un widget recréé sans `index`/`value` explicite peut
+    afficher transitoirement son option par défaut côté navigateur avant de se
+    resynchroniser — d'où un bouton visuellement désynchronisé de la donnée
+    réellement utilisée. Passer un `index` calculé depuis la valeur conservée
+    supprime cette fenêtre de désynchronisation.
+
+    Retourne l'index de la valeur actuellement en session_state dans
+    `options`, ou `defaut` si absente/inconnue (premier rendu).
+    """
+    valeur = st.session_state.get(cle)
+    options_list = list(options)
+    if valeur in options_list:
+        return options_list.index(valeur)
+    return defaut
 
 
 def render_donnees_indisponibles(

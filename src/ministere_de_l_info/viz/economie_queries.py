@@ -136,7 +136,15 @@ def get_contexte_hdf_vs_france(indicateur: str) -> pl.DataFrame:
             "valeur_hdf": [float(r[1]) if r[1] is not None else None for r in rows],
             "valeur_france": [float(r[2]) if r[2] is not None else None for r in rows],
             "ecart_hdf_france": [float(r[3]) if r[3] is not None else None for r in rows],
-        }
+        },
+        # dtype explicite : une colonne entièrement None (ex. millésime sans donnée
+        # France) serait sinon inférée `pl.Null`, incompatible avec `np.isnan` côté
+        # pandas/Plotly (cf. carte économie, même défaut).
+        schema_overrides={
+            "valeur_hdf": pl.Float64,
+            "valeur_france": pl.Float64,
+            "ecart_hdf_france": pl.Float64,
+        },
     )
 
 
@@ -241,7 +249,13 @@ def get_scores_commune(annee: int, indicateur: str) -> pl.DataFrame:
             "valeur": [float(r[2]) if r[2] is not None else None for r in rows],
             "secret": [bool(r[3]) for r in rows],
             "geojson": [r[4] for r in rows],
-        }
+        },
+        # dtype explicite : si tout un millésime est sous secret statistique (ex.
+        # chômage RP 2015/2016), la colonne "valeur" est entièrement None. Sans ce
+        # schema_overrides, Polars l'infère en `pl.Null`, convertie en dtype `object`
+        # côté pandas : `folium.Choropleth` plante alors sur `np.isnan` (colonne non
+        # numérique). Cf. `pages/economie.py::_make_choropleth`.
+        schema_overrides={"valeur": pl.Float64},
     )
 
 
@@ -299,7 +313,17 @@ def get_economie_commune(code_commune: str) -> pl.DataFrame:
             "part_emploi_industriel": [float(r[5]) if r[5] is not None else None for r in rows],
             "part_logements_sociaux": [float(r[6]) if r[6] is not None else None for r in rows],
             "secret": [bool(r[7]) for r in rows],
-        }
+        },
+        # dtype explicite : millésime RP sans Filosofi (ex. 2015-2016) → colonnes
+        # Filosofi entièrement None, sinon inférées `pl.Null` (crash isnan en aval).
+        schema_overrides={
+            "taux_pauvrete": pl.Float64,
+            "niveau_vie_median": pl.Float64,
+            "tx_chomage_dec": pl.Float64,
+            "part_ouvriers_employes": pl.Float64,
+            "part_emploi_industriel": pl.Float64,
+            "part_logements_sociaux": pl.Float64,
+        },
     )
 
 
@@ -382,7 +406,19 @@ def get_croisement_eco_elections(
             "part_emploi_industriel": [float(r[8]) if r[8] is not None else None for r in rows],
             "part_logements_sociaux": [float(r[9]) if r[9] is not None else None for r in rows],
             "pop_active": [int(r[10]) if r[10] is not None else None for r in rows],
-        }
+        },
+        # dtype explicite : cf. get_scores_commune (indicateur entièrement None sur
+        # une année de croisement).
+        schema_overrides={
+            "pct_voix": pl.Float64,
+            "taux_pauvrete": pl.Float64,
+            "niveau_vie_median": pl.Float64,
+            "tx_chomage_dec": pl.Float64,
+            "part_ouvriers_employes": pl.Float64,
+            "part_emploi_industriel": pl.Float64,
+            "part_logements_sociaux": pl.Float64,
+            "pop_active": pl.Int64,
+        },
     )
 
 
@@ -525,7 +561,8 @@ def get_evolution_rsa_hdf() -> pl.DataFrame:
         {
             "annee": [int(r[0]) for r in rows],
             "total_foyers_rsa_hdf": [int(r[1]) if r[1] is not None else None for r in rows],
-        }
+        },
+        schema_overrides={"total_foyers_rsa_hdf": pl.Int64},
     )
 
 
@@ -558,7 +595,8 @@ def get_deserts_medicaux() -> pl.DataFrame:
             "nom_commune": [r[1] for r in rows],
             "apl_medecins": [float(r[2]) if r[2] is not None else None for r in rows],
             "geojson": [r[3] for r in rows],
-        }
+        },
+        schema_overrides={"apl_medecins": pl.Float64},
     )
 
 
@@ -599,7 +637,8 @@ def get_desindustrialisation_commune(code_commune: str | None = None) -> pl.Data
             "annee": [int(r[0]) for r in rows],
             "nb_salaries": [int(r[1]) if r[1] is not None else None for r in rows],
             "nb_etablissements": [int(r[2]) if r[2] is not None else None for r in rows],
-        }
+        },
+        schema_overrides={"nb_salaries": pl.Int64, "nb_etablissements": pl.Int64},
     )
 
 
@@ -628,7 +667,8 @@ def get_top_communes_rsa(annee: int, n: int = 20) -> pl.DataFrame:
             "code_commune": [r[0] for r in rows],
             "nom_commune": [r[1] for r in rows],
             "nb_foyers_rsa": [int(r[2]) if r[2] is not None else None for r in rows],
-        }
+        },
+        schema_overrides={"nb_foyers_rsa": pl.Int64},
     )
 
 

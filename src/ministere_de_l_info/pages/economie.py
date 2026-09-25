@@ -23,6 +23,7 @@ from ministere_de_l_info._blocs_politiques import COULEURS_BLOCS as _COULEURS_BL
 from ministere_de_l_info._blocs_politiques import LIBELLES_BLOCS as _LIBELLES_BLOCS
 from ministere_de_l_info._theme import (
     conserver_selections,
+    index_persiste,
     render_donnees_indisponibles,
     render_page_header,
 )
@@ -143,19 +144,36 @@ def _make_choropleth(df: pl.DataFrame, libelle: str) -> folium.Map:
         .to_pandas()
     )
 
-    choropleth = folium.Choropleth(
-        geo_data=geo_json,
-        data=data_pd,
-        columns=["code_commune", "valeur_plot"],
-        key_on="feature.properties.code_commune",
-        fill_color="YlOrRd",
-        nan_fill_color="#CCCCCC",
-        fill_opacity=0.75,
-        line_opacity=0.2,
-        legend_name=libelle,
-    )
-    choropleth.add_to(m)
-    choropleth.geojson.add_child(
+    # Si aucune commune n'a de valeur exploitable (ex. RP 2015/2016 entièrement sous
+    # secret statistique), `folium.Choropleth` plante (`np.isnan` sur une colonne
+    # entièrement None, castée en dtype `object`). On affiche alors les contours en
+    # gris uni, sans légende de dégradé, plutôt que de lever une exception.
+    if data_pd["valeur_plot"].notna().any():
+        choropleth = folium.Choropleth(
+            geo_data=geo_json,
+            data=data_pd,
+            columns=["code_commune", "valeur_plot"],
+            key_on="feature.properties.code_commune",
+            fill_color="YlOrRd",
+            nan_fill_color="#CCCCCC",
+            fill_opacity=0.75,
+            line_opacity=0.2,
+            legend_name=libelle,
+        )
+        choropleth.add_to(m)
+        tooltip_target: folium.Choropleth | folium.GeoJson = choropleth.geojson
+    else:
+        tooltip_target = folium.GeoJson(
+            geo_json,
+            style_function=lambda _: {
+                "fillColor": "#CCCCCC",
+                "color": "#999999",
+                "weight": 0.5,
+                "fillOpacity": 0.5,
+            },
+        )
+        tooltip_target.add_to(m)
+    tooltip_target.add_child(
         folium.features.GeoJsonTooltip(
             fields=["nom", "valeur_str"],
             aliases=["Commune", libelle],
@@ -170,11 +188,15 @@ def _render_carte_tab() -> None:
     indicateurs = get_indicateurs()
     annees_par_indic = get_annees_par_indicateur()
 
+    # `index=` explicite (en plus de `key=`) : cf. `_theme.index_persiste`, évite
+    # la désynchronisation widget/donnée après réouverture d'un onglet paresseux.
+    indicateurs_cles = list(indicateurs.keys())
     c1, c2 = st.columns([2, 1])
     with c1:
         indicateur: str = st.selectbox(  # type: ignore[assignment]
             "Indicateur",
-            list(indicateurs.keys()),
+            indicateurs_cles,
+            index=index_persiste("eco_indicateur", indicateurs_cles, 0),
             format_func=lambda k: indicateurs[k],
             key="eco_indicateur",
         )
@@ -183,7 +205,9 @@ def _render_carte_tab() -> None:
         if not annees:
             st.warning("Pas de données disponibles pour cet indicateur.")
             return
-        annee: int = st.selectbox("Année", annees, key="eco_annee")  # type: ignore[assignment]
+        annee: int = st.selectbox(  # type: ignore[assignment]
+            "Année", annees, index=index_persiste("eco_annee", annees, 0), key="eco_annee"
+        )
 
     libelle = indicateurs[indicateur]
     df = get_scores_commune(annee, indicateur)
@@ -219,6 +243,13 @@ def _render_carte_tab() -> None:
             "disponible en base pour calculer un taux.",
             icon=":material/info:",
         )
+    if n_valides == 0:
+        st.info(
+            f"Aucune donnée exploitable pour {libelle} en {annee} (secret statistique "
+            "intégral ou données non publiées pour ce millésime). La carte ci-dessous "
+            "n'affiche que les contours des communes.",
+            icon=":material/info:",
+        )
 
     try:
         carte = _make_choropleth(df, libelle)
@@ -238,7 +269,12 @@ def _render_carte_tab() -> None:
             for row in df.filter(pl.col("valeur").is_not_null()).iter_rows(named=True)
         ]
         options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes]
-        sel: str = st.selectbox("Commune", options, key="eco_drilldown")  # type: ignore[assignment]
+        sel: str = st.selectbox(  # type: ignore[assignment]
+            "Commune",
+            options,
+            index=index_persiste("eco_drilldown", options, 0),
+            key="eco_drilldown",
+        )
 
         if sel != "(aucune sélection)":
             code_sel = sel.rsplit("(", 1)[1].rstrip(")")
@@ -307,9 +343,11 @@ def _render_contexte_section() -> None:
         )
         return
 
+    options_ctx = ["tx_chomage_bit", "pib_eur_hab"]
     indic_ctx: str = st.selectbox(  # type: ignore[assignment]
         "Indicateur",
-        ["tx_chomage_bit", "pib_eur_hab"],
+        options_ctx,
+        index=index_persiste("eco_ctx_indic", options_ctx, 0),
         format_func=lambda k: {
             "tx_chomage_bit": "Taux de chômage BIT (%)",
             "pib_eur_hab": "PIB par habitant (€)",
@@ -371,13 +409,15 @@ def _render_contexte_section() -> None:
 
 def _render_evolution_tab() -> None:
     """Onglet Évolution HdF — Filosofi/RP 2017-2021, RSA CNAF 2020-2024 ou Eurostat."""
+    options_mode = [
+        "Revenus & emploi (INSEE 2017-2021)",
+        "Allocataires RSA (CNAF 2020-2024)",
+        "Contexte HdF vs France (Eurostat)",
+    ]
     mode: str = st.radio(  # type: ignore[assignment]
         "Données à afficher",
-        [
-            "Revenus & emploi (INSEE 2017-2021)",
-            "Allocataires RSA (CNAF 2020-2024)",
-            "Contexte HdF vs France (Eurostat)",
-        ],
+        options_mode,
+        index=index_persiste("eco_evol_mode", options_mode, 0),
         horizontal=True,
         key="eco_evol_mode",
     )
@@ -409,9 +449,11 @@ def _render_evolution_tab() -> None:
         st.warning("Aucune donnée d'évolution disponible.")
         return
 
+    options_indic_evol = list(_INDIC_EVOL.keys())
     indic_evol: str = st.selectbox(  # type: ignore[assignment]
         "Indicateur",
-        list(_INDIC_EVOL.keys()),
+        options_indic_evol,
+        index=index_persiste("eco_evol_indic", options_indic_evol, 0),
         format_func=lambda k: _INDIC_EVOL[k],
         key="eco_evol_indic",
     )
@@ -471,11 +513,13 @@ def _render_croisement_tab() -> None:
     annees_par_indic = get_annees_par_indicateur()
     annees_pres = get_annees_presidentielles()
 
+    options_indic_x = list(indicateurs.keys())
     c1, c2, c3, c4 = st.columns([2, 1, 1, 2])
     with c1:
         indic_x: str = st.selectbox(  # type: ignore[assignment]
             "Indicateur éco (axe X)",
-            list(indicateurs.keys()),
+            options_indic_x,
+            index=index_persiste("eco_crois_indic", options_indic_x, 0),
             format_func=lambda k: indicateurs[k],
             key="eco_crois_indic",
         )
@@ -492,7 +536,7 @@ def _render_croisement_tab() -> None:
         annee_election: int = st.selectbox(  # type: ignore[assignment]
             "Présidentielle",
             annees_ok,
-            index=len(annees_ok) - 1,
+            index=index_persiste("eco_crois_annee", annees_ok, len(annees_ok) - 1),
             key="eco_crois_annee",
             help=(
                 "Seules les élections dont l'année précédente est couverte par l'indicateur "
@@ -503,6 +547,7 @@ def _render_croisement_tab() -> None:
         tour: int = st.radio(  # type: ignore[assignment]
             "Tour",
             [1, 2],
+            index=index_persiste("eco_crois_tour", [1, 2]),
             format_func=lambda t: "1er" if t == 1 else "2e",
             horizontal=True,
             key="eco_crois_tour",
@@ -512,7 +557,7 @@ def _render_croisement_tab() -> None:
         bloc_viz: str = st.selectbox(  # type: ignore[assignment]
             "Bloc (axe Y — % des exprimés)",
             _BLOCS_ORDERED,
-            index=5,
+            index=index_persiste("eco_crois_bloc", _BLOCS_ORDERED, 5),
             format_func=lambda b: f"{b} — {_LIBELLES_BLOCS[b]}",
             key="eco_crois_bloc",
         )
@@ -626,7 +671,12 @@ def _render_industrie_tab() -> None:
         st.info("Données URSSAF non chargées.")
     else:
         opts = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes_ind]
-        sel: str = st.selectbox("Commune", opts, key="industrie_commune")  # type: ignore[assignment]
+        sel: str = st.selectbox(  # type: ignore[assignment]
+            "Commune",
+            opts,
+            index=index_persiste("industrie_commune", opts, 0),
+            key="industrie_commune",
+        )
         if sel != "(aucune sélection)":
             code_ind = sel.rsplit("(", 1)[1].rstrip(")")
             nom_ind = sel.rsplit(" (", 1)[0]
@@ -658,6 +708,12 @@ def _render_industrie_tab() -> None:
                 pl.col("valeur").is_not_null() & (pl.col("valeur") < 2.5)
             ).height
             st.metric("Communes désert médical / avec données APL", f"{n_desert} / {n_total}")
+            if n_total == 0:
+                st.info(
+                    "Aucune donnée APL exploitable pour ce millésime. La carte "
+                    "ci-dessous n'affiche que les contours des communes.",
+                    icon=":material/info:",
+                )
             try:
                 st_folium(
                     _make_desert_map(apl_df),

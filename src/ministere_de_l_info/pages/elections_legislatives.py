@@ -7,7 +7,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info._theme import render_donnees_indisponibles
+from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
 from ministere_de_l_info.viz.elections_legi_queries import (
     get_bv_details_legi,
     get_circo_bounds,
@@ -65,20 +65,32 @@ def render() -> None:
     bloc_codes: list[str] = [b[0] for b in blocs_meta]
 
     # ── Sélecteurs ──────────────────────────────────────────────────────────────
+    # `index=` explicite (en plus de `key=`) : cf. `_theme.index_persiste`, évite
+    # la désynchronisation widget/donnée après réouverture d'un onglet paresseux.
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
         annee: int = st.selectbox(  # type: ignore[assignment]
-            "Année", _ANNEES_LEGI, index=4, key="legi_annee"
+            "Année",
+            _ANNEES_LEGI,
+            index=index_persiste("legi_annee", _ANNEES_LEGI, 4),
+            key="legi_annee",
         )
     with col2:
         tour: int = st.selectbox(  # type: ignore[assignment]
-            "Tour", [1, 2], format_func=lambda x: "1er" if x == 1 else "2e", key="legi_tour"
+            "Tour",
+            [1, 2],
+            index=index_persiste("legi_tour", [1, 2]),
+            format_func=lambda x: "1er" if x == 1 else "2e",
+            key="legi_tour",
         )
     with col3:
         circos = get_circos_hdf_legi()
         options = ["(toutes — vue HdF)"] + [c[1] for c in circos]
         circo_selected: str = st.selectbox(  # type: ignore[assignment]
-            "Circonscription", options, index=0, key="legi_circo"
+            "Circonscription",
+            options,
+            index=index_persiste("legi_circo", options, 0),
+            key="legi_circo",
         )
 
     # ── Avertissement ancien découpage ──────────────────────────────────────────
@@ -297,11 +309,12 @@ def _render_vue_circo(
     communes_list = get_communes_circo_legi_list(annee, tour, code_circo)
     commune_options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes_list]
 
+    cle_drilldown = f"legi_drilldown_commune_{code_circo}"
     commune_selected: str = st.selectbox(  # type: ignore[assignment]
         "Commune",
         commune_options,
-        index=0,
-        key=f"legi_drilldown_commune_{code_circo}",
+        index=index_persiste(cle_drilldown, commune_options, 0),
+        key=cle_drilldown,
         help="Choisir une commune pour afficher le détail par bureau de vote.",
     )
 
@@ -372,18 +385,22 @@ def _render_evolution_chart(
 ) -> None:
     """Graphe d'évolution temporelle (HdF ou circo), avec zone grisée 2002/2007."""
     ev_left, ev_right = st.columns([1, 3])
+    cle_tour_evol = f"legi_tour_evol_{'hdf' if hdf_mode else code_circo}"
+    cle_mode_evol = f"legi_mode_evol_{'hdf' if hdf_mode else code_circo}"
     with ev_left:
         tour_evol: int = st.radio(  # type: ignore[assignment]
             "Tour (évolution)",
             [1, 2],
+            index=index_persiste(cle_tour_evol, [1, 2]),
             format_func=lambda x: "1er" if x == 1 else "2e",
             horizontal=True,
-            key=f"legi_tour_evol_{'hdf' if hdf_mode else code_circo}",
+            key=cle_tour_evol,
         )
         mode_evol: str = st.radio(  # type: ignore[assignment]
             "Unité",
             ["Voix totales", "Part des exprimés (%)"],
-            key=f"legi_mode_evol_{'hdf' if hdf_mode else code_circo}",
+            index=index_persiste(cle_mode_evol, ["Voix totales", "Part des exprimés (%)"]),
+            key=cle_mode_evol,
         )
 
     ev_df = get_evolution_hdf_legi() if hdf_mode else get_evolution_circo_legi(code_circo)  # type: ignore[arg-type]
