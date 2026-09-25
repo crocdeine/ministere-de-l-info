@@ -16,7 +16,8 @@ dernière législature (``legislatureLast``) et à son groupe dans cette législ
 ``dateMaj`` est la date de mise à jour Datan, pas une date de fin de mandat.
 
 Blocs : référentiel (groupe, législature) → bloc (``etl/legislatif_groupes.py``) ;
-groupe non classé → bloc NULL + WARNING.
+groupe non classé → bloc NULL + WARNING. ``groupeAbrev`` vide : statut « sans groupe »
+(groupe et bloc NULL, INFO), exclu du contrôle de complétude (addendum ADR-0011).
 
 Idempotent : DELETE leg_elus/leg_mandats/leg_activite WHERE source='datan' puis INSERT.
 """
@@ -33,7 +34,11 @@ import duckdb
 import httpx
 
 from ministere_de_l_info.etl._common import upsert_metadata
-from ministere_de_l_info.etl.legislatif_groupes import journaliser_non_classes, resoudre_bloc
+from ministere_de_l_info.etl.legislatif_groupes import (
+    journaliser_non_classes,
+    journaliser_sans_groupe,
+    resoudre_bloc,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +146,7 @@ def load_legislatif_datan(
     mandat_rows: list[tuple] = []
     activite_rows: list[tuple] = []
     non_classes: Counter[tuple[str, int | None]] = Counter()
+    sans_groupe: Counter[int | None] = Counter()
 
     for row in rows_csv:
         elu_id = (row.get("id") or "").strip()
@@ -158,8 +164,10 @@ def load_legislatif_datan(
         groupe_abrev = (row.get("groupeAbrev") or "").strip()
         groupe_nom = (row.get("groupe") or "").strip()
         bloc = resoudre_bloc("AN", groupe_abrev, legislature)
-        if bloc is None:
-            non_classes[(groupe_abrev or "(vide)", legislature)] += 1
+        if not groupe_abrev:
+            sans_groupe[legislature] += 1
+        elif bloc is None:
+            non_classes[(groupe_abrev, legislature)] += 1
 
         code_dep = (row.get("departementCode") or "XX").strip()
         nom_dep = (row.get("departementNom") or "").strip()
@@ -184,8 +192,8 @@ def load_legislatif_datan(
                 nom_dep,
                 None,  # region_nom non disponible dans Datan
                 num_circo,
-                groupe_abrev,
-                groupe_nom,
+                groupe_abrev or None,
+                groupe_nom or None,
                 bloc,
                 False,
                 date_debut,
@@ -268,6 +276,7 @@ def load_legislatif_datan(
         mandat_rows,
     )
     journaliser_non_classes("AN", non_classes)
+    journaliser_sans_groupe("AN", sans_groupe)
 
     if activite_rows:
         con.execute("DELETE FROM leg_activite WHERE source = 'datan'")

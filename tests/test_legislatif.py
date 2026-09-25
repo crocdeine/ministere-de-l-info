@@ -233,13 +233,54 @@ def _exige_leg_mandats(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_aucun_mandat_non_classe(con: duckdb.DuckDBPyConnection) -> None:
-    """ADR-0011 : tout groupe présent dans la base doit figurer dans leg_groupes_blocs."""
+    """ADR-0011 : tout mandat du périmètre doit avoir un groupe classé.
+
+    Hors contrôle (addendum 2026-09-25) : mandats « sans groupe » (groupe NULL dans la
+    source) et groupes du Sénat disparus avant 2002 (normalement écartés au chargement).
+    Tout autre groupe sans bloc — y compris un groupe inconnu futur — fait échouer le test.
+    """
+    from ministere_de_l_info.etl.legislatif_groupes import est_groupe_senat_anterieur_2002
+
     _exige_leg_mandats(con)
     rows = con.execute(
         "SELECT chambre, groupe_sigle, legislature, COUNT(*) FROM v_mandats_legislatif "
-        "WHERE bloc_groupe IS NULL GROUP BY ALL ORDER BY 4 DESC"
+        "WHERE bloc_groupe IS NULL AND NULLIF(groupe_sigle, '') IS NOT NULL "
+        "GROUP BY ALL ORDER BY 4 DESC"
     ).fetchall()
-    assert rows == [], f"Groupes non classés (compléter etl/legislatif_groupes.py) : {rows}"
+    dans_perimetre = [
+        r for r in rows if not (r[0] == "SENAT" and est_groupe_senat_anterieur_2002(r[1]))
+    ]
+    assert dans_perimetre == [], (
+        f"Groupes non classés (compléter etl/legislatif_groupes.py) : {dans_perimetre}"
+    )
+
+
+def test_senat_groupes_anterieurs_2002_exclus(con: duckdb.DuckDBPyConnection) -> None:
+    """Addendum ADR-0011 : aucun mandat Sénat dans un groupe disparu avant 2002."""
+    from ministere_de_l_info.etl.legislatif_groupes import est_groupe_senat_anterieur_2002
+
+    _exige_leg_mandats(con)
+    rows = con.execute(
+        "SELECT groupe_sigle, COUNT(*) FROM leg_mandats "
+        "WHERE chambre = 'SENAT' AND groupe_sigle IS NOT NULL GROUP BY 1"
+    ).fetchall()
+    anterieurs = [(g, n) for g, n in rows if est_groupe_senat_anterieur_2002(g)]
+    assert anterieurs == [], (
+        "Sénateurs hors périmètre encore chargés, recharger : "
+        f"uv run python scripts/load_legislatif.py --source senat ({anterieurs})"
+    )
+
+
+def test_mandats_sans_groupe_comptes(con: duckdb.DuckDBPyConnection) -> None:
+    """Mandats « sans groupe » : comptés, jamais dotés d'un bloc de groupe, aucun actif."""
+    _exige_leg_mandats(con)
+    rows = con.execute(
+        "SELECT chambre, legislature, bool_or(est_actif), bool_or(bloc_groupe IS NOT NULL), "
+        "COUNT(*) FROM v_mandats_legislatif WHERE NULLIF(groupe_sigle, '') IS NULL GROUP BY ALL"
+    ).fetchall()
+    for chambre, legislature, actif, avec_bloc, n in rows:
+        assert not avec_bloc, f"{chambre} lég. {legislature} : bloc sur un mandat sans groupe"
+        assert not actif, f"{chambre} lég. {legislature} : {n} élu(s) actif(s) sans groupe"
 
 
 def test_lfi_gauche_par_legislature(con: duckdb.DuckDBPyConnection) -> None:
