@@ -7,7 +7,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info._theme import render_donnees_indisponibles
+from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
 from ministere_de_l_info.viz.elections_muni_queries import (
     get_communes_hdf_muni_list,
     get_communes_muni_geo,
@@ -99,7 +99,7 @@ def render() -> None:
     selected_label: str = st.selectbox(  # type: ignore[assignment]
         "Scrutin",
         labels,
-        index=0,
+        index=index_persiste("muni_scrutin", labels, 0),
         key="muni_scrutin",
     )
     annee, tour = next((s[0], s[1]) for s in scrutins if s[2] == selected_label)
@@ -216,11 +216,12 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
         return
 
     options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes]
+    cle_drilldown = f"muni_drilldown_{annee}_{tour}"
     selected: str = st.selectbox(  # type: ignore[assignment]
         "Commune",
         options,
-        index=0,
-        key=f"muni_drilldown_{annee}_{tour}",
+        index=index_persiste(cle_drilldown, options, 0),
+        key=cle_drilldown,
         help="Choisir une commune pour afficher le détail des listes.",
     )
 

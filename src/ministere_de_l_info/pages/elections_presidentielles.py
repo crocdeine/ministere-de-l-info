@@ -7,7 +7,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info._theme import render_donnees_indisponibles
+from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
 from ministere_de_l_info.viz.elections_queries import (
     _BLOCS_ORDERED,
     DB_PATH,
@@ -58,13 +58,23 @@ def render() -> None:
     bloc_codes: list[str] = [b[0] for b in blocs_meta]
 
     # ── Sélecteurs ──────────────────────────────────────────────────────────────
+    # `index=` explicite partout (en plus de `key=`) : évite qu'un widget recréé
+    # après réouverture de l'onglet (onglets paresseux) affiche transitoirement
+    # son option par défaut alors que la donnée utilisée reste correcte (cf.
+    # `_theme.index_persiste`).
     c1, c2, c3, c4 = st.columns([2, 1, 2, 2])
     with c1:
-        annee: int = st.selectbox("Année", _ANNEES, index=len(_ANNEES) - 1, key="pres_annee")  # type: ignore[assignment]
+        annee: int = st.selectbox(  # type: ignore[assignment]
+            "Année",
+            _ANNEES,
+            index=index_persiste("pres_annee", _ANNEES, len(_ANNEES) - 1),
+            key="pres_annee",
+        )
     with c2:
         tour: int = st.radio(  # type: ignore[assignment]
             "Tour",
             [1, 2],
+            index=index_persiste("pres_tour", [1, 2]),
             format_func=lambda x: "1er" if x == 1 else "2e",
             horizontal=True,
             key="pres_tour",
@@ -73,16 +83,23 @@ def render() -> None:
         zone: str = st.radio(  # type: ignore[assignment]
             "Zone",
             list(_ZONES),
+            index=index_persiste("pres_zone", list(_ZONES)),
             format_func=lambda x: _ZONES[x],
             key="pres_zone",
         )
     with c4:
-        mode_carte: str = st.radio("Mode de carte", _MODES_CARTE, key="pres_mode_carte")  # type: ignore[assignment]
+        mode_carte: str = st.radio(  # type: ignore[assignment]
+            "Mode de carte",
+            _MODES_CARTE,
+            index=index_persiste("pres_mode_carte", _MODES_CARTE),
+            key="pres_mode_carte",
+        )
         bloc_sel: str = bloc_codes[3]
         if mode_carte == "Score d'un bloc":
             bloc_sel = st.selectbox(  # type: ignore[assignment]
                 "Bloc",
                 bloc_codes,
+                index=index_persiste("pres_bloc_sel", bloc_codes, 3),
                 format_func=lambda x: f"{x} — {libelles[x]}",
                 key="pres_bloc_sel",
             )
@@ -160,6 +177,7 @@ def render() -> None:
         tour_evol: int = st.radio(  # type: ignore[assignment]
             "Tour (évolution)",
             [1, 2],
+            index=index_persiste("pres_tour_evol", [1, 2]),
             format_func=lambda x: "1er" if x == 1 else "2e",
             horizontal=True,
             key="pres_tour_evol",
@@ -167,6 +185,7 @@ def render() -> None:
         mode_evol: str = st.radio(  # type: ignore[assignment]
             "Unité",
             ["Voix totales", "Part des exprimés (%)"],
+            index=index_persiste("pres_mode_evol", ["Voix totales", "Part des exprimés (%)"]),
             horizontal=False,
             key="pres_mode_evol",
         )
@@ -292,7 +311,7 @@ def render() -> None:
     commune_selected: str = st.selectbox(  # type: ignore[assignment]
         "Commune",
         commune_options,
-        index=0,
+        index=index_persiste("pres_drilldown_commune", commune_options, 0),
         key="pres_drilldown_commune",
         help="Choisir une commune pour afficher le détail par bureau de vote.",
     )
