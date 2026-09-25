@@ -16,6 +16,7 @@ from ministere_de_l_info._blocs_politiques import BLOCS_ORDERED as _BLOCS_ORDERE
 from ministere_de_l_info._blocs_politiques import COULEURS_BLOCS as _COULEURS_BLOCS
 from ministere_de_l_info._blocs_politiques import LIBELLES_BLOCS as _LIBELLES_BLOCS
 from ministere_de_l_info._theme import render_page_header
+from ministere_de_l_info.viz.elections_queries import format_pct_fr
 from ministere_de_l_info.viz.legislatif_queries import (
     BLOC_NON_CLASSE,
     get_activite_elu,
@@ -213,7 +214,8 @@ def _render_fiche_depute(
         cols = st.columns(len(_INDICATEURS_ACTIVITE))
         for col, (cle, libelle) in zip(cols, _INDICATEURS_ACTIVITE.items(), strict=True):
             valeur = dernier.get(cle)
-            col.metric(libelle, "—" if valeur is None else f"{valeur:.0f}")
+            # Scores Datan stockés en ratio [0, 1] : affichage en pourcentage français.
+            col.metric(libelle, format_pct_fr(None if valeur is None else valeur * 100))
         st.caption(f"Scores Datan au {dernier['date_extraction']}.")
 
     rang = classement_complet.filter(pl.col("id") == elu_id)
@@ -277,8 +279,10 @@ def _render_activite_tab(chambre: str | None, codes_dept: tuple[str, ...] | None
     if classement.is_empty():
         st.info("Aucun score disponible.")
     else:
+        # Scores Datan stockés en ratio [0, 1] : ×100 pour l'affichage en pourcentage.
         classement_pd = classement.with_columns(
             (pl.col("nom") + " " + pl.col("prenom")).alias("elu"),
+            (pl.col(indicateur) * 100).alias(indicateur),
         ).to_pandas()
 
         fig = px.bar(
@@ -295,10 +299,12 @@ def _render_activite_tab(chambre: str | None, codes_dept: tuple[str, ...] | None
                 "bloc_final": "Bloc",
             },
         )
+        fig.update_traces(hovertemplate="%{y}<br>%{x:.1f} %<extra></extra>")
         fig.update_layout(
             height=max(500, 25 * classement.height),
             margin={"t": 50, "b": 30, "l": 200},
             yaxis={"categoryorder": "total ascending"},
+            xaxis_ticksuffix=" %",
         )
         st.plotly_chart(fig, width="stretch")
 
@@ -311,7 +317,7 @@ def _render_activite_tab(chambre: str | None, codes_dept: tuple[str, ...] | None
                     pl.col("groupe_sigle").alias("Groupe"),
                     pl.col("bloc_final").alias("Bloc"),
                     pl.col("code_departement").alias("Dépt"),
-                    pl.col(indicateur).alias(_INDICATEURS_ACTIVITE[indicateur]),
+                    (pl.col(indicateur) * 100).round(1).alias(_INDICATEURS_ACTIVITE[indicateur]),
                 ).to_pandas(),
                 width="stretch",
                 hide_index=True,
@@ -324,7 +330,12 @@ def _render_activite_tab(chambre: str | None, codes_dept: tuple[str, ...] | None
         st.info("Aucune donnée d'activité par bloc.")
     else:
         bloc_order = {b: i for i, b in enumerate(_BLOCS_ORDERED)}
-        bloc_pd = bloc_df.to_pandas()
+        # Scores Datan stockés en ratio [0, 1] : ×100 pour l'affichage en pourcentage.
+        bloc_pd = bloc_df.with_columns(
+            (pl.col("moy_participation") * 100).round(1),
+            (pl.col("moy_loyaute") * 100).round(1),
+            (pl.col("moy_majorite") * 100).round(1),
+        ).to_pandas()
         bloc_pd["_order"] = bloc_pd["bloc"].map(
             lambda b: bloc_order.get(b, 99)  # noqa: B023
         )
@@ -341,7 +352,9 @@ def _render_activite_tab(chambre: str | None, codes_dept: tuple[str, ...] | None
             text="nb_elus",
         )
         fig_bloc.update_traces(texttemplate="%{text} élus", textposition="outside")
-        fig_bloc.update_layout(height=420, margin={"t": 50, "b": 30}, showlegend=False)
+        fig_bloc.update_layout(
+            height=420, margin={"t": 50, "b": 30}, showlegend=False, yaxis_ticksuffix=" %"
+        )
         st.plotly_chart(fig_bloc, width="stretch")
 
         st.dataframe(bloc_pd, width="stretch", hide_index=True)
