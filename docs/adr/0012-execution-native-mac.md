@@ -120,5 +120,62 @@ Négatives :
   (conserver pour la distribution, ou mettre en sommeil) : dépend de l'existence d'autres
   utilisateurs d'`install.sh` (question 1 du rapport R&D).
 - Job CI macOS arm64 (optionnel, étape 7 du plan R&D) non créé.
-- Mesures réelles (mémoire, temps de démarrage) à relever pendant le double
-  fonctionnement ; celles du rapport R&D viennent d'un conteneur Linux sans base.
+- Mesures réelles (mémoire, temps de démarrage) à relever une fois l'application en usage
+  quotidien ; celles du rapport R&D viennent d'un conteneur Linux sans base.
+
+---
+
+## Addendum — 2026-09-25 : constat réel du Mac, complément d'exécution
+
+Décideur de l'addendum : le directeur (correctif d'exécution, pas de nouvelle décision
+structurante — la décision du 2026-09-24 reste inchangée). Constat transmis par Mathias.
+
+### Constats
+
+1. **Aucun conteneur ni image Docker n'existe sur le Mac mini.** Il n'y a jamais eu de
+   double fonctionnement natif/Docker à organiser : le point 6 de la décision
+   ci-dessus (transition de deux semaines sur le port 8502) est **sans objet**. L'ADR
+   n'est pas révisé sur le fond (le choix natif reste valide et est même renforcé : rien
+   à désinstaller), seule l'hypothèse d'un Docker déjà en service était fausse.
+2. **Le projet est sur un disque externe**, chemin `/Volumes/le gros stockage/ministere-de-l-info`
+   (restauré depuis une archive zip ; base du 21/06 mise à jour le 25/09), et non
+   `~/Documents/Docker/ministere-de-l-info` supposé par la version initiale de cet ADR et
+   de `docs/deployment.md`. Le chemin contient des espaces.
+3. **Un ancien LaunchAgent de sauvegarde** (`com.crocdeine.ministere-info.backup`, créé
+   avant ce chantier ou pointant vers un chemin de projet disparu) existe et échoue
+   silencieusement (script introuvable).
+
+### Compléments d'exécution
+
+1. **Installation directe sur le port 8501**, sans étape de comparaison à deux ports.
+   `deploy/native/commun.sh` : `PORT_PAR_DEFAUT=8501`. Procédure : `docs/deployment.md`
+   §3 (réécrite), plus courte.
+2. **Robustesse aux chemins à espaces** : déjà largement couverte par la conception
+   initiale (guillemets systématiques, `valider_chemin` refuse les métacaractères XML/sed
+   mais pas les espaces, marqueurs `@...@` dans les modèles de plist plutôt que
+   substitution shell). Cas de test ajoutés dans `deploy/tests/test_native.sh` et
+   `test_backup_db.sh` avec le chemin réel (`/Volumes/le gros stockage/...`) comme dossier
+   du projet et comme destination de sauvegarde, sur le même disque.
+3. **Démarrage avant le montage du disque externe** : un LaunchAgent `RunAtLoad` peut
+   s'exécuter avant que macOS ait fini de monter un disque externe à l'ouverture de
+   session. Le `ProgramArguments` du LaunchAgent applicatif ne lance plus directement
+   `python -m streamlit` mais un script intermédiaire, `deploy/native/lancer-app.sh`,
+   **installé sur le disque interne** (`~/.config/ministere-info/lancer-app.sh`, jamais
+   dans le dossier du projet, pour rester exécutable même si celui-ci est indisponible).
+   Ce script attend le montage du projet jusqu'à 60 secondes (message journalisé,
+   configurable pour les tests), puis démarre Streamlit ; sinon il échoue proprement, et
+   `ThrottleInterval` (porté à 15 s) borne le rythme de relance de launchd. **Limite
+   acceptée** : si le disque reste débranché plus de 60 secondes, l'application reste
+   indisponible jusqu'au cycle de relance suivant ou jusqu'à `./deploy/native/start.sh`
+   une fois le disque rebranché — pas de garantie de disponibilité disque débranché.
+4. **Ancien agent de sauvegarde en échec** : `install-native.sh` détecte désormais, avant
+   d'installer la nouvelle version, si le plist existant référence un script
+   `backup_db.sh` qui n'existe plus ; si oui, il le décharge et le range dans
+   `~/Library/LaunchAgents/desactives/` (jamais de suppression) avant de générer le
+   nouveau plist. Idempotent (voir `deploy/tests/test_native.sh`, scénario N22).
+
+### Question ouverte pour Mathias (pas tranchée par ce complément)
+
+Le projet reste-t-il sur le disque externe, ou est-il déplacé sur le disque interne (le
+disque externe servant alors uniquement aux sauvegardes, cf. `reports/infra-native-mac-situation-reelle-2026-09-25.md`) ? Cette décision n'est pas prise dans cet
+addendum ; elle relève de Mathias.

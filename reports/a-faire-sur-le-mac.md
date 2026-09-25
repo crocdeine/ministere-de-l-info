@@ -1,6 +1,6 @@
 # À faire sur le Mac — liste tenue à jour par le directeur
 
-Dernière mise à jour : 2026-09-24 (fin de la vague 2)
+Dernière mise à jour : 2026-09-25 (constat réel du Mac : pas de Docker installé, projet sur disque externe)
 
 Ce fichier regroupe tout ce qui ne peut être fait que sur le Mac mini : la session cloud n'a ni la base de données, ni accès aux sites officiels. **Suivre les étapes dans l'ordre.**
 
@@ -14,14 +14,18 @@ Exécute l'étape N de reports/a-faire-sur-le-mac.md, puis donne-moi le résumé
 
 (remplacer N par le numéro). Claude Code local fait les commandes, vérifie les résultats et s'arrête s'il y a un problème. Il termine par un **résumé de 5 lignes à copier-coller dans la conversation avec le directeur**. Les commandes sont aussi détaillées ci-dessous pour qu'on puisse les suivre ou les faire à la main.
 
-Dossier du projet : `~/Documents/Docker/ministere-de-l-info`
+Dossier du projet : `/Volumes/le gros stockage/ministere-de-l-info` (disque externe — **toujours entre guillemets** dans les commandes, le chemin contient des espaces). Exemple pour se placer dedans :
+
+```bash
+cd "/Volumes/le gros stockage/ministere-de-l-info"
+```
 
 ---
 
 ## Étape 0 — Récupérer la branche de travail ✅ Prête
 
 ```bash
-cd ~/Documents/Docker/ministere-de-l-info
+cd "/Volumes/le gros stockage/ministere-de-l-info"
 git fetch origin
 git switch claude/exciting-dirac-8mogwe
 git pull
@@ -48,11 +52,9 @@ Claude Code vérifie tout seul sur le site d'archives du ministère, mesure le p
 
 Ce que cela applique : correctifs des bugs critiques (nuances municipales effacées, corrections ignorées, listes fusionnées), 18 reclassements de nuances (ADR-0010), classement des groupes parlementaires par législature (ADR-0011).
 
-1. **Arrêter l'application** (DuckDB n'accepte qu'un seul écrivain) :
-   ```bash
-   docker ps
-   ```
-   puis `docker stop <nom affiché>` (en général `ministere-info` ou `ministere-de-l-info`).
+1. **Arrêter l'application si elle tourne déjà** (DuckDB n'accepte qu'un seul écrivain) :
+   - Si l'étape 5 (installation native) a déjà été faite : `./deploy/native/stop.sh`.
+   - Sinon (cas du 25/09, aucune installation encore en place) : rien à faire, aucun programme ne lit la base.
 2. **Copie de sécurité de la base** :
    ```bash
    cp data/ministere.duckdb data/ministere.duckdb.bak-2026-09-24
@@ -76,7 +78,7 @@ Ce que cela applique : correctifs des bugs critiques (nuances municipales effac�
    - aucun doublon de liste : requête « doublons » de l'annexe A de `reports/synthese-vague-1-2026-09-24.md` → 0 ligne
    - aucun groupe parlementaire sans bloc (requêtes de contrôle de `docs/adr/0011-legislatif-groupes-par-legislature.md`)
    - noter tout message « WARNING groupe non classé » affiché au chargement
-5. **Redémarrer l'application** : `docker start <nom>`.
+5. **Redémarrer l'application si elle avait été arrêtée à l'étape 1** : `./deploy/native/start.sh`.
 
 À signaler au directeur : tout test en échec, tout WARNING, et le test `test_lille_2020_t1_blocs_cohérents` s'il échoue (cas prévu, à analyser).
 
@@ -113,20 +115,31 @@ Le script refuse de dépasser 5 Mo. Signaler au directeur tout avertissement `Ec
 
 ---
 
-## Étape 5 — Passer l'application en direct sur le Mac (sans Docker) ✅ Prête — avec POINT D'ARRÊT
+## Étape 5 — Installer l'application en direct sur le Mac (pas de Docker) ✅ Prête — avec POINT D'ARRÊT
 
-Procédure complète en 8 étapes dans `docs/deployment.md` §3 (ADR-0012). À faire de préférence avec Claude Code : « Exécute l'étape 5 de reports/a-faire-sur-le-mac.md en suivant docs/deployment.md §3, étape par étape, en t'arrêtant au POINT D'ARRÊT ».
+Constat du 25/09 : aucun conteneur ni image Docker sur le Mac. Il n'y a rien à comparer
+ni à basculer entre deux versions : l'installation se fait directement sur le port 8501.
+Procédure complète dans `docs/deployment.md` §3 (ADR-0012 et son addendum du 25/09). À
+faire de préférence avec Claude Code : « Exécute l'étape 5 de reports/a-faire-sur-le-mac.md
+en suivant docs/deployment.md §3, étape par étape, en t'arrêtant au POINT D'ARRÊT ».
 
-En résumé :
-1. État des lieux (quelle base Docker utilise réellement).
+En résumé (`PROJET="/Volumes/le gros stockage/ministere-de-l-info"`) :
+1. Constater l'absence de conteneur Docker (`docker ps`).
 2. Copie de sécurité de la base.
 3. Code à jour et `uv` installé.
-4. `./deploy/native/install-native.sh` → l'app native tourne sur le **port 8502**, Docker reste sur 8501.
-5. Comparer les 5 pages sur les deux ports.
-6. Régler la sauvegarde vers un **disque externe** (recommandé) ou iCloud : `--sauvegarde-vers`, puis tester `./scripts/backup_db.sh`.
-7. Redémarrer le Mac → `./deploy/native/status.sh` doit dire OK sans rien relancer à la main.
+4. Vérifier que le port 8501 est libre.
+5. `./deploy/native/install-native.sh` → l'app native tourne directement sur le **port 8501**.
+   Le script détecte et désactive proprement l'ancien agent de sauvegarde en échec
+   (`com.crocdeine.ministere-info.backup`, plist rangé dans
+   `~/Library/LaunchAgents/desactives/`, rien n'est supprimé).
+6. Régler la sauvegarde vers un disque différent de celui du projet (`--sauvegarde-vers`),
+   puis tester `./scripts/backup_db.sh` et une restauration à blanc.
+7. Redémarrer le Mac → `./deploy/native/status.sh` doit dire OK sans rien relancer à la
+   main (le disque externe doit être monté ; voir la limite documentée en `docs/deployment.md` §1).
 
-**POINT D'ARRÊT : 2 semaines de double fonctionnement**, puis décision de Mathias avant l'étape 8 (arrêt de Docker, app native sur le port 8501).
+**POINT D'ARRÊT avant l'étape 5.5** (désactivation de l'ancien agent de sauvegarde) :
+vérifier le contenu de `~/Library/LaunchAgents/desactives/` et ne rien supprimer
+manuellement sans validation explicite de Mathias en chat.
 
 ---
 
