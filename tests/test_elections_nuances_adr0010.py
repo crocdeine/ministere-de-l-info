@@ -5,7 +5,8 @@ Base DuckDB en mémoire, sans base réelle ni extension spatial : exécutables e
 Vérifie :
 - lot 1 : application stricte des grilles officielles 2020 (INTA1931378J, annexe 3)
   et 2026 (INTP2602966C, annexe 3), y compris les codes officiels ajoutés (Q9) ;
-- lot 2 : LCMD, LGC, LMC 2008 inchangés (bloc et source_bloc), LMAJ 2008 toujours exclu ;
+- lot 2 (addendum 2026-09-25) : référentiels 2008 et 2014 identiques aux libellés
+  officiels des archives du ministère ; LCMD → CENT, LMAJ → DTE, LGC/LMC maintenus ;
 - lot 3 : doctrine « grille la plus proche » pour les législatives et présidentielles.
 
 Les grilles officielles sont recopiées ici indépendamment du code de production
@@ -55,18 +56,24 @@ _GRILLE_LISTES_2026: dict[str, str] = {
     **dict.fromkeys(("LUDR", "LRN", "LREC", "LUXD", "LEXD"), "EXD"),
 }
 
-# Lot 2 : classements D3.2 conservés à l'identique, en attente de vérification manuelle
-_LOT2_INCHANGES: dict[tuple[str, int], tuple[str, str]] = {
-    ("LCMD", 2008): (
-        "GAU",
-        "Communiste et Divers — analyse contextuelle, libellés Parquet NULL, "
-        "bassin minier HdF ; cohérence avec LDVG/LSOC (D3.2, LCMD→GAU validé)",
-    ),
-    ("LGC", 2008): (
-        "DIV",
-        "Gauche-Centre local — 5 occurrences, trop peu pour classifier (D3.2)",
-    ),
-    ("LMC", 2008): ("CENT", "Majorité-Centre — UDF sphère 2008 (D3.2)"),
+# Lot 2 : référentiels officiels des listes (archives-resultats-elections.interieur.gouv.fr,
+# pages « nuances » MN2008 et MN2014, vérifiées le 2026-09-25, texte archivé dans
+# docs/sources-officielles/nuances/) ; blocs selon la doctrine de l'ADR-0010.
+_REFERENTIEL_2008: dict[str, str] = {
+    "LEXG": "EXG",
+    **dict.fromkeys(("LCOM", "LUG", "LSOC", "LVEC", "LDVG"), "GAU"),
+    **dict.fromkeys(("LGC", "LAUT", "LREG"), "DIV"),
+    **dict.fromkeys(("LCMD", "LMC"), "CENT"),
+    **dict.fromkeys(("LMAJ", "LDVD"), "DTE"),
+    **dict.fromkeys(("LFN", "LEXD"), "EXD"),
+}
+_REFERENTIEL_2014: dict[str, str] = {
+    "LEXG": "EXG",
+    **dict.fromkeys(("LFG", "LPG", "LCOM", "LSOC", "LUG", "LDVG", "LVEC"), "GAU"),
+    "LDIV": "DIV",
+    **dict.fromkeys(("LMDM", "LUC", "LUDI"), "CENT"),
+    **dict.fromkeys(("LUMP", "LUD", "LDVD"), "DTE"),
+    **dict.fromkeys(("LFN", "LEXD"), "EXD"),
 }
 
 # Tous les reclassements appliqués : (nuance, annee) → (avant, après)
@@ -83,6 +90,9 @@ _RECLASSEMENTS: dict[tuple[str, int], tuple[str, str]] = {
     ("LUD", 2020): ("CENT", "DTE"),
     ("LECO", 2020): ("GAU", "DIV"),
     ("LECO", 2026): ("GAU", "DIV"),
+    # Lot 2 — municipales 2008 (libellés officiels, addendum 2026-09-25)
+    ("LCMD", 2008): ("GAU", "CENT"),
+    ("LMAJ", 2008): ("exclu", "DTE"),
     # Lot 3 — législatives
     ("ECO", 2002): ("GAU", "DIV"),
     ("ECO", 2007): ("GAU", "DIV"),
@@ -104,6 +114,9 @@ _MAINTENUS: dict[tuple[str, int], str] = {
     ("CPNT", 2007): "DIV",
     ("SAIN", 2002): "DIV",
     ("NIHO", 2007): "DIV",
+    # Lot 2 — ententes 2008 sans équivalent dans les grilles (règle 3)
+    ("LGC", 2008): "DIV",
+    ("LMC", 2008): "CENT",
 }
 
 
@@ -149,8 +162,8 @@ class TestLot1GrillesOfficielles:
             "SELECT annee, COUNT(*) FROM nuances_harmonisees "
             "WHERE annee IN (2008, 2014, 2020, 2026) GROUP BY annee ORDER BY annee"
         ).fetchall()
-        assert rows == [(2008, 12), (2014, 17), (2020, 23), (2026, 25)]
-        assert len(_NUANCES_MUNI) == 77
+        assert rows == [(2008, 15), (2014, 17), (2020, 23), (2026, 25)]
+        assert len(_NUANCES_MUNI) == 80
 
     @pytest.mark.parametrize(
         ("nuance", "annee", "bloc"),
@@ -199,22 +212,32 @@ class TestLot1GrillesOfficielles:
         assert _bloc(con, "LUD", 2026)[0] == "DTE"
 
 
-# ── Lot 2 — codes 2008 en attente de vérification ────────────────────────────
+# ── Lot 2 — libellés officiels 2008 et 2014 (archives du ministère) ──────────
 
 
-class TestLot2Inchanges:
-    @pytest.mark.parametrize(("cle", "attendu"), list(_LOT2_INCHANGES.items()))
-    def test_bloc_et_source_inchanges(
-        self,
-        con: duckdb.DuckDBPyConnection,
-        cle: tuple[str, int],
-        attendu: tuple[str, str],
+class TestLot2LibellesOfficiels:
+    @pytest.mark.parametrize(
+        ("annee", "referentiel"), [(2008, _REFERENTIEL_2008), (2014, _REFERENTIEL_2014)]
+    )
+    def test_referentiel_identique_aux_archives(
+        self, con: duckdb.DuckDBPyConnection, annee: int, referentiel: dict[str, str]
     ) -> None:
-        assert _bloc(con, *cle) == attendu
+        """Codes de l'année = liste officielle des archives, blocs selon l'ADR-0010."""
+        assert _codes_muni(con, annee) == referentiel
 
-    def test_lmaj_2008_toujours_exclu(self, con: duckdb.DuckDBPyConnection) -> None:
-        assert _bloc(con, "LMAJ", 2008) is None
-        assert all(n != "LMAJ" for n, _, _, _ in _NUANCES_MUNI)
+    @pytest.mark.parametrize("annee", [2008, 2014])
+    def test_source_officielle_citee(self, con: duckdb.DuckDBPyConnection, annee: int) -> None:
+        rows = con.execute(
+            "SELECT nuance, source_bloc FROM nuances_harmonisees WHERE annee = ?", [annee]
+        ).fetchall()
+        sans_source = [n for n, src in rows if "libellé officiel archives ministère" not in src]
+        assert sans_source == []
+
+    def test_codes_sans_mapping(self) -> None:
+        """NC et LNC restent exclus ; LMAJ 2008 n'est plus exclu."""
+        codes = {n for n, _, _, _ in _NUANCES_MUNI}
+        assert not codes & {"NC", "LNC"}
+        assert ("LMAJ", 2008) in {(n, a) for n, a, _, _ in _NUANCES_MUNI}
 
 
 # ── Tous lots — reclassements appliqués et justifiés ─────────────────────────
@@ -274,6 +297,8 @@ class TestEffetDansLesVues:
             ("2024_legi_t1", "UDI", 1),
             ("2024_legi_t1", "ECO", 2),
             ("2008_muni_t1", "LMAJ", 1),
+            ("2008_muni_t1", "LCMD", 2),
+            ("2014_muni_t1", "NC", 1),
         ]
         for id_el, nuance, panneau in lignes:
             con.execute(
@@ -287,7 +312,9 @@ class TestEffetDansLesVues:
             "ORDER BY id_election, no_panneau"
         ).fetchall()
         assert rows == [
-            ("2008_muni_t1", "LMAJ", None),
+            ("2008_muni_t1", "LMAJ", "DTE"),
+            ("2008_muni_t1", "LCMD", "CENT"),
+            ("2014_muni_t1", "NC", None),
             ("2020_muni_t1", "LUDI", "CENT"),
             ("2020_muni_t1", "LECO", "DIV"),
             ("2024_legi_t1", "UDI", "DTE"),

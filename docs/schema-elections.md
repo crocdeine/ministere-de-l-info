@@ -171,19 +171,21 @@ Mapping `(nuance, annee) → bloc` pour les scrutins **avec nuances** dans le Pa
 | `bloc` | `VARCHAR` NN | FK → `blocs_politiques.bloc` |
 | `source_bloc` | `VARCHAR` | Justification courte du classement (1 ligne, modèle `candidats_presidentielle`) |
 
-**Couverture** : **226 entrées**, source unique `schema_elections.py` (listes
+**Couverture** : **229 entrées**, source unique `schema_elections.py` (listes
 `_NUANCES_PRES`, `_NUANCES_LEGI`, `_NUANCES_MUNI`) :
 
 | Jeu | Années | Entrées |
 |-----|--------|---------|
 | Présidentielles (codes-candidats) | 2002 (16), 2007 (12), 2012 (10) | 38 |
 | Législatives (codes partisans) | 2002 (22), 2007 (17), 2012 (17), 2017 (17), 2022 (16), 2024 (22) | 111 |
-| Municipales (codes de liste) | 2008 (12), 2014 (17), 2020 (23), 2026 (25) | 77 |
+| Municipales (codes de liste) | 2008 (15), 2014 (17), 2020 (23), 2026 (25) | 80 |
 
 Les listes municipales 2020 et 2026 reprennent intégralement les codes de liste des
-grilles officielles (INTA1931378J et INTP2602966C, annexes 3). Codes municipaux
+grilles officielles (INTA1931378J et INTP2602966C, annexes 3) ; celles de 2008 et 2014,
+les listes officielles de nuances publiées sur les archives du ministère (vérifiées le
+2026-09-25, `docs/sources-officielles/nuances/2008-*` et `2014-*`). Codes municipaux
 volontairement **non insérés** (bloc NULL dans les vues) : `NC` (2014, 2020), `LNC`
-(2020), `LMAJ` (2008, exclusion en attente de vérification, ADR-0010).
+(2020). `LMAJ` (2008) est mappé `DTE` depuis l'addendum de l'ADR-0010 (2026-09-25).
 
 Chargement : `populate_elections_referentiels()` réécrit les trois jeux ;
 `populate_nuances_municipales()` (appelée par `scripts/load_elections_municipales.py`)
@@ -303,7 +305,10 @@ et [l'index des circulaires](sources-officielles/nuances/index.md) pour les sour
 | PRV (legi 2012) | `CENT` | Mouvement radical (successeur du PRV) → CENT en 2020 (ADR-0010 ; avant : DTE) |
 | LCOM (muni 2008-2026) | `GAU` | Grilles 2020 et 2026 ; 2008/2014 par la grille 2020 (ADR-0010 ; avant : EXG) |
 | LUDI / LUD / LECO (muni) | `CENT` / `DTE` / `DIV` | Grilles 2020 et 2026 (ADR-0010) |
-| LCMD, LGC, LMC (muni 2008), LMAJ (exclu) | inchangés | Libellés 2008 à vérifier sur les archives du ministère (ADR-0010, points ouverts) |
+| LCMD (muni 2008) | `CENT` | « Liste centre-MoDem » (archives du ministère) ; grille 2020 : LMDM → CENT (ADR-0010 lot 2 ; avant : GAU) |
+| LMAJ (muni 2008) | `DTE` | « Liste de la majorité » (UMP/NC) ; grille 2020 : LLR/LUD → DTE (ADR-0010 lot 2 ; avant : exclu) |
+| LGC / LMC (muni 2008) | `DIV` / `CENT` | Ententes gauche-centristes et majorité-centristes sans équivalent dans les grilles : règle 3, maintien (ADR-0010 lot 2) |
+| LREG / LEXD (muni 2008) | `DIV` / `EXD` | Codes officiels 2008 ajoutés ; grille 2020 : LREG → AUT, LEXD → EXD (ADR-0010 lot 2) |
 
 Toute modification doit être tracée (commit motivé + mise à jour de `source_bloc`).
 
@@ -334,8 +339,8 @@ municipales par `uv run python scripts/migrations/0007_add_municipales_views.py`
 - présidentielles : `COALESCE(nh.bloc, cp.bloc)` ; bloc NULL si le code est absent ;
 - législatives : `COALESCE(nh.bloc, 'DIV')` — une nuance absente du référentiel tombe
   en `DIV` (le test `test_elections_legislatives.py` vérifie qu'aucune n'est absente) ;
-- municipales : `LEFT JOIN` sans repli — bloc NULL (« Non classé ») pour `NC`, `LNC`,
-  `LMAJ` et les communes sans nuance ; `pct_exprimes` est alors NULL.
+- municipales : `LEFT JOIN` sans repli — bloc NULL (« Non classé ») pour `NC`, `LNC`
+  et les communes sans nuance ; `pct_exprimes` est alors NULL.
 
 ### `v_resultats_candidats_avec_bloc`
 

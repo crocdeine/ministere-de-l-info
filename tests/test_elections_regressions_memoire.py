@@ -30,8 +30,9 @@ from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
 )
 
 _ANNEES_MUNI = (2008, 2014, 2020, 2026)
-# Référentiel municipal après ADR-0010 : 12 (2008) + 17 (2014) + 23 (2020) + 25 (2026)
-_N_MUNI = 77
+# Référentiel municipal après ADR-0010 (addendum 2026-09-25) :
+# 15 (2008) + 17 (2014) + 23 (2020) + 25 (2026)
+_N_MUNI = 80
 
 
 def _charger_script(chemin: Path) -> ModuleType:
@@ -95,7 +96,7 @@ class TestC2ReferentielsConserventMunicipales:
 
     def test_codes_sans_mapping_absents(self, con: duckdb.DuckDBPyConnection) -> None:
         n = con.execute(
-            "SELECT COUNT(*) FROM nuances_harmonisees WHERE nuance IN ('NC', 'LMAJ', 'LNC')"
+            "SELECT COUNT(*) FROM nuances_harmonisees WHERE nuance IN ('NC', 'LNC')"
         ).fetchone()[0]
         assert n == 0
 

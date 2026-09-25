@@ -7,7 +7,7 @@ Vues créées (CREATE OR REPLACE, idempotent) :
   1 ligne par (annee, tour, commune, no_panneau) ; 2008 : descripteurs de liste
 
 Toutes les vues utilisent LEFT JOIN sur nuances_harmonisees : les nuances sans
-mapping (NC, LMAJ, LNC) produisent bloc = NULL, agrégées sous "Non classé" dans
+mapping (NC, LNC) produisent bloc = NULL, agrégées sous "Non classé" dans
 l'UI. pct_exprimes calculé sur le total exprimés de la commune ou du HdF selon
 la vue, via jointure sur resultats_participation.
 
@@ -37,7 +37,7 @@ _DB_PATH = get_settings().db_path
 def _create_v_scores_commune_muni(con) -> None:
     """Voix agrégés par bloc et commune — 1 ligne par (annee, tour, commune, bloc).
 
-    bloc = NULL pour les nuances sans mapping (NC, LMAJ, LNC, nuance=NULL).
+    bloc = NULL pour les nuances sans mapping (NC, LNC, nuance=NULL).
     pct_exprimes = NULL quand bloc IS NULL : les communes plurinominales (< 1000 hab)
     ont une sémantique voix candidat (non additive), ce qui rendrait le % faux.
     Pour les blocs nommés (scrutin de liste ≥ seuil), pct = voix / exprimes_commune.
@@ -140,7 +140,7 @@ def _create_v_listes_commune_muni(con) -> None:
 
     Correctif C1 (audit 2026-09-24) : la vue groupait par nuance, fusionnant les listes
     de même nuance (voix additionnées, tête de liste arbitraire).
-    bloc = NULL pour nuances sans mapping (NC, LMAJ, LNC).
+    bloc = NULL pour nuances sans mapping (NC, LNC).
     pct_exprimes = voix_liste / exprimes_commune * 100 (NULL si bloc NULL).
     """
     annees_synth = ", ".join(str(a) for a in _ANNEES_NO_PANNEAU_SYNTHETIQUE)
