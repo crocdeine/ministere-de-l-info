@@ -287,6 +287,21 @@ check "code 4" rc_egal 4
 check "aucune sauvegarde" egal "$(nb_sauvegardes "$DEST")" "0"
 check "pas de fichier temporaire" pas_de_temporaire "$DEST"
 
+echo "== B13 disque externe à espaces, projet et sauvegarde (cas réel du 25/09)"
+nouvel_env b13
+DISQUE="$S/Volumes/le gros stockage"
+PROJET_EXTERNE="$DISQUE/ministere-de-l-info"
+mkdir -p "$PROJET_EXTERNE/data"
+BASE="$PROJET_EXTERNE/data/ministere.duckdb"
+creer_base "$BASE"
+export MINISTERE_PROJECT_DIR="$PROJET_EXTERNE"
+export MINISTERE_DB_PATH="$BASE"
+export BACKUP_DEST="$DISQUE/ministere-info-sauvegardes"
+lancer
+check "code 0" rc_egal 0
+check "une sauvegarde créée sur le même disque à espaces" egal "$(nb_sauvegardes "$BACKUP_DEST")" "1"
+check "avertissement « même disque » (source et destination sur le même volume)" contient "$LOG" "même disque"
+
 echo ""
 echo "Résultat : $PASS réussis, $FAIL échoués"
 [ "$FAIL" -eq 0 ]

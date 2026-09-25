@@ -14,7 +14,7 @@
 # Options :
 #   --projet DOSSIER          dossier du projet (défaut : le dépôt qui contient ce script)
 #   --base FICHIER            base DuckDB lue par l'app (défaut : <projet>/data/ministere.duckdb)
-#   --port N                  port local (défaut : valeur enregistrée, sinon 8502)
+#   --port N                  port local (défaut : valeur enregistrée, sinon 8501)
 #   --sauvegarde-vers DOSSIER destination des sauvegardes (défaut : <projet>/data/backups)
 #   --retention JOURS         durée de conservation des sauvegardes (défaut : 7)
 #   --sans-sauvegarde         ne pas installer la sauvegarde quotidienne
@@ -233,9 +233,16 @@ R_PATH="${PROJECT_DIR}/.venv/bin:$(dirname "$UV_BIN"):/usr/bin:/bin:/usr/sbin:/s
 R_BACKUP_DEST="$BACKUP_DEST"
 R_RETENTION="$BACKUP_RETENTION_DAYS"
 
+# Script réellement lancé par launchd : sur le disque interne (jamais dans le
+# projet), pour rester exécutable même si le projet est sur un disque externe
+# débranché à l'ouverture de session (voir deploy/native/lancer-app.sh).
+mkdir -p "$(dirname "$LANCEUR_APP")"
+rendre_script "${DOSSIER_DEPOT}/deploy/native/lancer-app.sh" "$LANCEUR_APP"
+R_LANCEUR="$LANCEUR_APP"
+
 rendre_modele "${DOSSIER_DEPOT}/deploy/native/ministere-info.plist" "$PLIST_APP"
 charger_agent "$LABEL_APP" "$PLIST_APP" || fatal "launchctl bootstrap a échoué pour $PLIST_APP"
-ok "Application : $PLIST_APP"
+ok "Application : $PLIST_APP (démarrage via $LANCEUR_APP)"
 
 if [ "$AVEC_SAUVEGARDE" -eq 1 ]; then
   if [ ! -d "$BACKUP_DEST" ]; then
@@ -244,6 +251,7 @@ if [ "$AVEC_SAUVEGARDE" -eq 1 ]; then
       *) mkdir -p "$BACKUP_DEST" ;;
     esac
   fi
+  retirer_ancienne_sauvegarde "$PLIST_SAUVEGARDE"
   decharger_agent "$LABEL_SAUVEGARDE"
   R_LABEL="$LABEL_SAUVEGARDE"
   rendre_modele "${DOSSIER_DEPOT}/scripts/com.crocdeine.ministere-info.backup.plist" "$PLIST_SAUVEGARDE"
