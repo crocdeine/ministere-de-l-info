@@ -497,102 +497,151 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
 
 # ── Nuances municipales (2008 / 2014 / 2020 / 2026) ──────────────────────────
 # Source unique du référentiel municipal (correctif C2, audit 2026-09-24).
-# 67 entrées validées en phase D3.2 (ADR-0005), révisées par l'ADR-0010 (2026-09-24) :
+# 67 entrées validées en phase D3.2 (ADR-0005), révisées par l'ADR-0010 (2026-09-24,
+# addendum 2026-09-25) :
 # - 2020 et 2026 : application stricte des grilles officielles de blocs
 #   (INTA1931378J annexe 3 p. 10 ; INTP2602966C annexe 3 p. 12) ; « AUT » (2020) = DIV ;
 #   ajout des codes de liste officiels jusque-là non mappés (2020 : LREG, LGJ, LMDM,
 #   LDLF ; 2026 : LUD, LREN, LMDM, LDSV, LREC, LREG) ;
 # - 2008 et 2014 (aucune grille) : grille la plus proche (INTA1931378J) pour LCOM,
-#   LUD, LUDI (même famille politique).
-# LCMD, LGC, LMC (2008) et l'exclusion de LMAJ (2008) : inchangés, en attente de
-# vérification manuelle sur les archives du ministère (ADR-0010, points ouverts).
-# Total : 77 entrées (2008 : 12, 2014 : 17, 2020 : 23, 2026 : 25).
-# Codes SANS mapping (non insérés, bloc NULL en vue) : NC (2014/2020), LMAJ (2008), LNC (2020)
+#   LUD, LUDI (même famille politique) ;
+# - lot 2 (addendum ADR-0010 du 2026-09-25) : libellés officiels 2008 et 2014 vérifiés sur
+#   les archives du ministère (docs/sources-officielles/nuances/2008-* et 2014-*) :
+#   LCMD GAU → CENT, LMAJ exclu → DTE, LGC (DIV) et LMC (CENT) maintenus par la règle 3,
+#   ajout de LREG → DIV et LEXD → EXD (2008).
+# Total : 80 entrées (2008 : 15, 2014 : 17, 2020 : 23, 2026 : 25).
+# Codes SANS mapping (non insérés, bloc NULL en vue) : NC (2014/2020), LNC (2020)
 # Format : (nuance, annee, bloc, source_bloc)
 _SRC_2020 = "INTA1931378J annexe 3 p. 10"
 _SRC_2026 = "INTP2602966C annexe 3 p. 12"
+_ARCH_2008 = "libellé officiel archives ministère MN2008 (vérif. 2026-09-25)"
+_ARCH_2014 = "libellé officiel archives ministère MN2014 (vérif. 2026-09-25)"
 
 _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
     # ── 2008 — seuil 3 500 hab — 164 communes HdF nuancées ───────────────────
-    ("LAUT", 2008, "DIV", "Autre — liste inclassable (D3.2)"),
+    # 15 codes = référentiel officiel complet des listes 2008 (archives du ministère).
+    ("LAUT", 2008, "DIV", f"« Liste inclassable » ({_ARCH_2008}) → DIV (D3.2)"),
     (
         "LCMD",
         2008,
-        "GAU",
-        "Communiste et Divers — analyse contextuelle, libellés Parquet NULL, "
-        "bassin minier HdF ; cohérence avec LDVG/LSOC (D3.2, LCMD→GAU validé)",
+        "CENT",
+        f"« Liste centre-MoDem » ({_ARCH_2008}) → CENT : grille la plus proche "
+        f"{_SRC_2020} LMDM → CENT, même formation (ADR-0010 lot 2 ; avant : GAU, "
+        "code lu à tort « Communiste et Divers »)",
     ),
     (
         "LCOM",
         2008,
         "GAU",
-        f"Liste communiste (PCF) → GAU : aucune grille 2008, grille la plus proche "
-        f"{_SRC_2020} LCOM → GAU, même famille (ADR-0010 ; avant : EXG)",
+        f"« Liste du Parti Communiste » ({_ARCH_2008}) → GAU : aucune grille 2008, grille "
+        f"la plus proche {_SRC_2020} LCOM → GAU, même famille (ADR-0010 ; avant : EXG)",
     ),
-    ("LDVD", 2008, "DTE", "Divers Droite (D3.2)"),
-    ("LDVG", 2008, "GAU", "Divers Gauche (D3.2)"),
-    ("LEXG", 2008, "EXG", "Extrême gauche (D3.2)"),
-    ("LFN", 2008, "EXD", "Front National (D3.2)"),
-    ("LGC", 2008, "DIV", "Gauche-Centre local — 5 occurrences, trop peu pour classifier (D3.2)"),
-    ("LMC", 2008, "CENT", "Majorité-Centre — UDF sphère 2008 (D3.2)"),
-    ("LSOC", 2008, "GAU", "Socialiste (D3.2)"),
-    ("LUG", 2008, "GAU", "Union de la Gauche (D3.2)"),
-    ("LVEC", 2008, "GAU", "Verts / Écologistes (D3.2)"),
-    # LCMD, LGC, LMC : classements D3.2 conservés tels quels (bloc et source_bloc) ;
-    # libellés 2008 contestés, vérification manuelle en attente (ADR-0010, points ouverts).
-    # LMAJ (543 occurrences) : non inséré — liste de la majorité sortante,
-    # indique le statut et non l'orientation idéologique (D3.2, Q1 validé).
-    # Libellé contesté (« liste majorité », UMP) : vérification en attente (ADR-0010).
+    ("LDVD", 2008, "DTE", f"« Liste divers droite » ({_ARCH_2008}) → DTE (D3.2)"),
+    ("LDVG", 2008, "GAU", f"« Liste divers gauche » ({_ARCH_2008}) → GAU (D3.2)"),
+    (
+        "LEXD",
+        2008,
+        "EXD",
+        f"« Liste d'extrême droite » ({_ARCH_2008}) → EXD : grille la plus proche "
+        f"{_SRC_2020} LEXD → EXD (ADR-0010 lot 2 ; ajout)",
+    ),
+    ("LEXG", 2008, "EXG", f"« Liste d'extrême gauche » ({_ARCH_2008}) → EXG (D3.2)"),
+    ("LFN", 2008, "EXD", f"« Liste du Front National » ({_ARCH_2008}) → EXD (D3.2)"),
+    (
+        "LGC",
+        2008,
+        "DIV",
+        f"« Liste gauche-centristes » ({_ARCH_2008}) : entente gauche + centristes sans "
+        "équivalent dans les grilles officielles (règle 2 inapplicable) → classement "
+        "D3.2 maintenu, règle 3 (ADR-0010 lot 2)",
+    ),
+    (
+        "LMAJ",
+        2008,
+        "DTE",
+        f"« Liste de la majorité » ({_ARCH_2008}) : majorité présidentielle UMP/NC → DTE, "
+        f"grille la plus proche {_SRC_2020} LLR/LUD → DTE, même famille ; cohérent avec "
+        "MAJ 2007 → DTE (ADR-0010 lot 2 ; avant : exclu, lu « liste sortante »)",
+    ),
+    (
+        "LMC",
+        2008,
+        "CENT",
+        f"« Liste majorité-centristes » ({_ARCH_2008}) : entente majorité + centristes "
+        "sans équivalent dans les grilles officielles → classement D3.2 maintenu, "
+        "règle 3 (ADR-0010 lot 2)",
+    ),
+    (
+        "LREG",
+        2008,
+        "DIV",
+        f"« Liste régionaliste » ({_ARCH_2008}) → DIV : grille la plus proche "
+        f"{_SRC_2020} LREG → AUT = DIV (ADR-0010 lot 2 ; ajout)",
+    ),
+    ("LSOC", 2008, "GAU", f"« Liste du Parti Socialiste » ({_ARCH_2008}) → GAU (D3.2)"),
+    ("LUG", 2008, "GAU", f"« Liste d'union de la gauche » ({_ARCH_2008}) → GAU (D3.2)"),
+    ("LVEC", 2008, "GAU", f"« Liste des Verts » ({_ARCH_2008}) → GAU (D3.2 ; ADR-0010 (c))"),
     # ── 2014 — seuil 1 000 hab — ~3 778 communes HdF nuancées ────────────────
+    # 17 codes = référentiel officiel des listes 2014 (archives du ministère), sans NC.
     (
         "LCOM",
         2014,
         "GAU",
-        f"Liste du Parti communiste français → GAU : aucune grille 2014, grille la plus "
-        f"proche {_SRC_2020} LCOM → GAU, même famille (ADR-0010 ; avant : EXG)",
+        f"« Liste du Parti communiste français » ({_ARCH_2014}) → GAU : aucune grille 2014, "
+        f"grille la plus proche {_SRC_2020} LCOM → GAU, même famille (ADR-0010 ; avant : EXG)",
     ),
-    ("LDIV", 2014, "DIV", "Divers (D3.2)"),
-    ("LDVD", 2014, "DTE", "Divers Droite (D3.2)"),
-    ("LDVG", 2014, "GAU", "Divers Gauche (D3.2)"),
-    ("LEXD", 2014, "EXD", "Extrême droite (D3.2)"),
-    ("LEXG", 2014, "EXG", "Extrême gauche (D3.2)"),
+    ("LDIV", 2014, "DIV", f"« Liste Divers » ({_ARCH_2014}) → DIV (D3.2)"),
+    ("LDVD", 2014, "DTE", f"« Liste Divers droite » ({_ARCH_2014}) → DTE (D3.2)"),
+    ("LDVG", 2014, "GAU", f"« Liste Divers gauche » ({_ARCH_2014}) → GAU (D3.2)"),
+    ("LEXD", 2014, "EXD", f"« Liste Extrême droite » ({_ARCH_2014}) → EXD (D3.2)"),
+    ("LEXG", 2014, "EXG", f"« Liste Extrême gauche » ({_ARCH_2014}) → EXG (D3.2)"),
     (
         "LFG",
         2014,
         "GAU",
-        "Front de Gauche (PCF + Parti de Gauche, 2012-2016) — "
+        f"« Liste Front de Gauche » ({_ARCH_2014}) : PCF + Parti de Gauche, 2012-2016 — "
         "GAU per ADR-0005 ; bascule EXG concerne LFI/Mélenchon en 2026 seulement (D3.2)",
     ),
-    ("LFN", 2014, "EXD", "Front National (D3.2)"),
-    ("LMDM", 2014, "CENT", "Mouvement Démocrate — MoDem (D3.2)"),
+    ("LFN", 2014, "EXD", f"« Liste Front National » ({_ARCH_2014}) → EXD (D3.2)"),
+    ("LMDM", 2014, "CENT", f"« Liste Modem » ({_ARCH_2014}) → CENT (D3.2)"),
     (
         "LPG",
         2014,
         "GAU",
-        "Parti de Gauche (Mélenchon, 2008-2016) — dans le Front de Gauche en 2014 ; "
-        "GAU par cohérence avec LFG (D3.2)",
+        f"« Liste du Parti de Gauche » ({_ARCH_2014}) : Mélenchon, 2008-2016, dans le "
+        "Front de Gauche en 2014 ; GAU par cohérence avec LFG (D3.2)",
     ),
-    ("LSOC", 2014, "GAU", "Socialiste (D3.2)"),
-    ("LUC", 2014, "CENT", "Union Centre (D3.2)"),
+    ("LSOC", 2014, "GAU", f"« Liste Socialiste » ({_ARCH_2014}) → GAU (D3.2)"),
+    ("LUC", 2014, "CENT", f"« Liste Union du Centre » ({_ARCH_2014}) → CENT (D3.2)"),
     (
         "LUD",
         2014,
         "DTE",
-        f"Liste Union de la droite (UMP + autre parti de droite) → DTE : grille la plus "
-        f"proche {_SRC_2020} LUD → DTE, même sens (ADR-0010 ; avant : CENT)",
+        f"« Liste Union de la Droite » ({_ARCH_2014}) → DTE : grille la plus proche "
+        f"{_SRC_2020} LUD → DTE, même sens (ADR-0010 ; avant : CENT)",
     ),
     (
         "LUDI",
         2014,
         "CENT",
-        f"Liste Union des démocrates et indépendants (UDI) → CENT : grille la plus "
+        f"« Liste Union Démocrates et Indépendants » ({_ARCH_2014}) → CENT : grille la plus "
         f"proche {_SRC_2020} LUDI → CENT, même formation (ADR-0010 ; avant : DIV)",
     ),
-    ("LUG", 2014, "GAU", "Union de la Gauche (D3.2)"),
-    ("LUMP", 2014, "DTE", "UMP (devenu LR en 2015) (D3.2)"),
-    ("LVEC", 2014, "GAU", "Verts / EELV (D3.2)"),
-    # NC (~45 281 occurrences HdF t1) : non inséré — Non Classé, indication
-    # administrative pour listes sans investiture, pas un bloc idéologique (D3.2)
+    ("LUG", 2014, "GAU", f"« Liste Union de la Gauche » ({_ARCH_2014}) → GAU (D3.2)"),
+    (
+        "LUMP",
+        2014,
+        "DTE",
+        f"« Liste Union pour un Mouvement Populaire » ({_ARCH_2014}) → DTE (D3.2)",
+    ),
+    (
+        "LVEC",
+        2014,
+        "GAU",
+        f"« Liste Europe-Ecologie-Les Verts » ({_ARCH_2014}) → GAU (D3.2 ; ADR-0010 (c))",
+    ),
+    # NC (~45 281 occurrences HdF t1) : non inséré — absent du référentiel officiel 2014
+    # (communes de moins de 1 000 hab.), pas un bloc idéologique (D3.2 ; vérif. 2026-09-25)
     # ── 2020 — seuil 3 500 hab — ~3 779 communes HdF nuancées ────────────────
     # Grille officielle INTA1931378J annexe 3 : les 23 codes de liste y figurent.
     (
@@ -729,8 +778,9 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
 
 # Années gérées par _NUANCES_MUNI (périmètre du DELETE ciblé de populate_nuances_municipales)
 _ANNEES_MUNI: tuple[int, ...] = tuple(sorted({annee for _, annee, _, _ in _NUANCES_MUNI}))
-# Codes municipaux volontairement SANS mapping (ADR-0005) : ne doivent jamais être insérés
-_CODES_MUNI_SANS_MAPPING: frozenset[str] = frozenset({"NC", "LMAJ", "LNC"})
+# Codes municipaux volontairement SANS mapping (ADR-0005) : ne doivent jamais être insérés.
+# LMAJ (2008) en est sorti : mappé DTE depuis l'addendum ADR-0010 du 2026-09-25 (lot 2).
+_CODES_MUNI_SANS_MAPPING: frozenset[str] = frozenset({"NC", "LNC"})
 
 # ── Candidats présidentiels 2017 / 2022 ──────────────────────────────────────
 # La colonne 'nuance' est NULL pour ces scrutins dans le Parquet.
@@ -1070,7 +1120,7 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
 def _verifier_nuances_municipales() -> None:
     """Garde-fous sur _NUANCES_MUNI avant écriture en base.
 
-    - NC, LMAJ, LNC doivent rester absents (bloc NULL, décision ADR-0005).
+    - NC, LNC doivent rester absents (bloc NULL, décision ADR-0005).
     - Les années municipales doivent être disjointes des années pres/legi, sinon le
       DELETE ciblé de populate_nuances_municipales toucherait d'autres scrutins.
     """

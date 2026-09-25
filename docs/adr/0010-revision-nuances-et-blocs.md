@@ -4,6 +4,9 @@ Date : 2026-09-24
 Statut : Accepté — Révise 0005
 Décideurs : Mathias (lots 1, 2, 3 et 5 du 2026-09-24) ; doctrine du lot 3 fixée par le
 directeur de projet sur délégation de Mathias
+Addendum 2026-09-25 : exécution du lot 2 (municipales 2008) après vérification des libellés
+officiels sur les archives du ministère — complément d'exécution de la même décision, voir
+(d) « Lot 2 » et (e) point 1.
 
 > Sources de l'instruction : `reports/verification-nuances-2026-09-24.md` (questions Q1 à
 > Q25), `reports/synthese-vague-1-2026-09-24.md` (§ 3). Grilles officielles relues sur
@@ -151,22 +154,44 @@ listes simplement soutenues), `DSV 2024` (IOMA2415630C ne classe rien : IOMA2322
 DLF → Droite, INTP2602966C DSV → DTE), `VEC 2002`, Jadot 2022 (`candidats_presidentielle`),
 libellés officiels 2026 de `LUDR`, `LUXD`, `LUG`, `LVEC`.
 
-**Inchangés (lot 2)** : `LCMD 2008` (GAU), `LGC 2008` (DIV), `LMC 2008` (CENT) et
-l'exclusion de `LMAJ 2008` restent tels quels, bloc et `source_bloc` compris.
+**Lot 2 — municipales 2008 (addendum 2026-09-25)** : appliqué après vérification des
+libellés officiels sur archives-resultats-elections.interieur.gouv.fr (pages « nuances »
+MN2008 et MN2014, texte archivé dans
+`docs/sources-officielles/nuances/2008-municipales_nuances_archives-interieur.md` et
+`2014-municipales_nuances_archives-interieur.md` ; instruction :
+`reports/verification-nuances-mac-2008-2014.md`).
 
-Volumes après révision : `nuances_harmonisees` = 226 entrées (38 présidentielles,
-111 législatives, 77 municipales : 12 en 2008, 17 en 2014, 23 en 2020, 25 en 2026) ;
-`candidats_presidentielle` = 23 entrées (inchangé).
+| Code | Année | Libellé officiel | Avant | Après | Règle |
+|------|-------|------------------|-------|-------|-------|
+| LCMD | 2008 | Liste centre-MoDem | GAU | **CENT** | 2 — grille 2020 LMDM → CENT, même formation |
+| LMAJ | 2008 | Liste de la majorité | exclu (NULL) | **DTE** | 2 — grille 2020 LLR/LUD → DTE, même famille (UMP/NC) ; cohérent avec `MAJ 2007 → DTE` |
+| LGC | 2008 | Liste gauche-centristes | DIV | DIV (maintenu) | 3 — entente sans équivalent dans les grilles (voir ci-dessous) |
+| LMC | 2008 | Liste majorité-centristes | CENT | CENT (maintenu) | 3 — idem |
+| LREG | 2008 | Liste régionaliste | absent | **DIV** (ajout) | 2 — grille 2020 LREG → AUT |
+| LEXD | 2008 | Liste d'extrême droite | absent | **EXD** (ajout) | 2 — grille 2020 LEXD → EXD |
+
+`LGC` : la vérification proposait CENT par symétrie avec `LMC`. La doctrine (b) ne le
+permet pas : aucune grille officielle ne contient de code d'entente gauche-centre, donc la
+règle 2 (même famille dans la grille) est inapplicable et la règle 3 maintient le
+classement reconstruit existant (DIV). Le même raisonnement maintient `LMC` en CENT. Poids
+HdF négligeable (une commune chacun). `LREG` et `LEXD` complètent le référentiel officiel
+2008 (15 codes, identique à la liste des archives) ; absents des données HdF, ils sont
+sans effet (cohérence avec Q9). Le `source_bloc` de chaque code 2008 et 2014 cite désormais
+« libellé officiel archives ministère (vérif. 2026-09-25) » ; les libellés 2014 confirment
+les reclassements `LCOM`, `LUD`, `LUDI` du lot 1. `NC` et `LNC` restent exclus.
+
+Volumes après révision (addendum 2026-09-25) : `nuances_harmonisees` = 229 entrées
+(38 présidentielles, 111 législatives, 80 municipales : 15 en 2008, 17 en 2014, 23 en 2020,
+25 en 2026) ; `candidats_presidentielle` = 23 entrées (inchangé). Avant l'addendum :
+226 entrées, dont 77 municipales (12 en 2008).
 
 ### (e) Points ouverts
 
-1. **LCMD, LMAJ, LGC, LMC (municipales 2008)** : d'après deux sources secondaires,
-   LCMD signifierait « liste centre-MoDem » (CENT, et non « Communiste et Divers »)
-   et LMAJ « liste majorité » (UMP, donc DTE, et non « liste sortante »). LGC et LMC
-   seraient des ententes gauche-centristes et majorité-centristes. Classements
-   **suspendus** jusqu'à la vérification manuelle de Mathias sur
-   archives-resultats-elections.interieur.gouv.fr (MN2008). Tant que LMAJ reste exclu,
-   les listes UMP de 2008 sont sans bloc.
+1. ~~**LCMD, LMAJ, LGC, LMC (municipales 2008)**~~ — **résolu le 2026-09-25** : libellés
+   officiels vérifiés sur archives-resultats-elections.interieur.gouv.fr (MN2008).
+   LCMD GAU → CENT ; LMAJ exclu → DTE (43 communes, 114 281 voix HdF au 1er tour) ;
+   LGC (DIV) et LMC (CENT) maintenus par la règle 3 ; ajout de LREG → DIV et
+   LEXD → EXD. Détail en (d), « Lot 2 ».
 2. **Clé `(nuance, annee)` sans `type_scrutin`** (audit M5) : la clé ne distingue pas
    deux scrutins de la même année. Un garde-fou (`_verifier_nuances_municipales`)
    interdit aujourd'hui qu'une année municipale soit partagée avec pres/legi. L'ajout de
@@ -179,8 +204,10 @@ Volumes après révision : `nuances_harmonisees` = 226 entrées (38 présidentie
 4. **UDI** : DTE en 2024 (grille 2023), mais CENT en 2017, 2022 et dans les municipales
    (grilles 2020 et 2026). Cette alternance vient des grilles officielles elle-mêmes. Le
    module Législatif, qui classe les groupes UDI en CENT, relève du lot 4.
-5. **Libellés 2008/2014 établis par des sources secondaires** (LCOM, LUD, LUDI 2014) :
-   à recouper avec les archives MN2014 lors de la vérification du point 1.
+5. ~~**Libellés 2008/2014 établis par des sources secondaires**~~ — **résolu le
+   2026-09-25** : les libellés officiels MN2014 confirment LCOM (PCF), LUD (Union de la
+   Droite) et LUDI (UDI). Seules les définitions longues (« conduite par un candidat
+   UMP… ») restent de source secondaire : les archives ne publient que les libellés courts.
 
 ## Alternatives considérées
 
@@ -203,9 +230,10 @@ Volumes après révision : `nuances_harmonisees` = 226 entrées (38 présidentie
 
 **Tests** : `tests/test_elections_nuances_adr0010.py` (hermétique, en mémoire) vérifie
 les grilles 2020 et 2026, chaque reclassement et sa trace dans `source_bloc`, le maintien
-à l'identique du lot 2 et la résolution dans `v_resultats_candidats_avec_bloc`.
+(addendum : les référentiels 2008 et 2014 identiques aux listes officielles des archives,
+source citée pour chaque code) et la résolution dans `v_resultats_candidats_avec_bloc`.
 `tests/test_elections_municipales.py` et `tests/test_elections_regressions_memoire.py`
-sont alignés sur 77 entrées municipales.
+sont alignés sur 80 entrées municipales.
 
 **Relance nécessaire** (Mac, base réelle) :
 1. `uv run python scripts/init_elections_schema.py` (référentiels complets) ;
@@ -214,6 +242,10 @@ sont alignés sur 77 entrées municipales.
 3. `uv run python scripts/migrations/0007_add_municipales_views.py` ;
 4. contrôle de présence des codes ajoutés :
    `SELECT e.annee, rc.nuance, COUNT(*) FROM resultats_candidats rc JOIN elections e USING (id_election) WHERE e.type_scrutin = 'muni' AND rc.nuance IN ('LREG','LGJ','LMDM','LDLF','LUD','LREN','LDSV','LREC') GROUP BY ALL ORDER BY ALL;`
+5. contrôle du lot 2 (addendum 2026-09-25) :
+   `SELECT id_election, nuance, bloc, COUNT(DISTINCT code_commune) AS communes, SUM(voix) AS voix FROM v_resultats_candidats_avec_bloc WHERE id_election LIKE '2008_muni_%' AND nuance IN ('LCMD','LMAJ','LGC','LMC','LREG','LEXD') GROUP BY ALL ORDER BY ALL;`
+   attendu au 1er tour : LMAJ → DTE (43 communes, 114 281 voix), LCMD → CENT (6 ; 13 610),
+   LGC → DIV (1 ; 660), LMC → CENT (1 ; 2 737).
 
 **Réversibilité** : chaque classement est une ligne de `schema_elections.py` ; l'ancien
 bloc est conservé dans `source_bloc` (`avant : …`).

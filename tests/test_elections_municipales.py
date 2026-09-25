@@ -108,21 +108,21 @@ class TestVolumesParScrutin:
 
 
 class TestNuancesHarmonisees:
-    """77 entrées municipales dans nuances_harmonisees (ADR-0010), ventilation par année."""
+    """80 entrées municipales dans nuances_harmonisees (ADR-0010), ventilation par année."""
 
-    def test_77_entrees_municipales(self, con):
+    def test_80_entrees_municipales(self, con):
         from scripts.load_elections_municipales import _NUANCES_MUNI
 
-        assert len(_NUANCES_MUNI) == 77, (
-            f"_NUANCES_MUNI : {len(_NUANCES_MUNI)} entrées (attendu 77)"
+        assert len(_NUANCES_MUNI) == 80, (
+            f"_NUANCES_MUNI : {len(_NUANCES_MUNI)} entrées (attendu 80)"
         )
         n_db = con.execute(
             "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee IN (2008,2014,2020,2026)"
         ).fetchone()[0]
-        assert n_db == 77, f"nuances_harmonisees muni : {n_db} (attendu 77)"
+        assert n_db == 80, f"nuances_harmonisees muni : {n_db} (attendu 80)"
 
     def test_ventilation_par_annee(self, con):
-        attendus = {2008: 12, 2014: 17, 2020: 23, 2026: 25}
+        attendus = {2008: 15, 2014: 17, 2020: 23, 2026: 25}
         for annee, n_att in attendus.items():
             n = con.execute(
                 "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee = ?", [annee]
@@ -167,13 +167,13 @@ class TestLFIBascule:
 
 
 class TestCodesSansMapping:
-    """NC, LMAJ, LNC doivent être absents de nuances_harmonisees.
+    """NC, LNC doivent être absents de nuances_harmonisees.
 
-    LMAJ 2008 : exclusion D3.2 conservée en attente de vérification manuelle du
-    libellé sur les archives du ministère (ADR-0010, points ouverts).
+    LMAJ 2008 n'en fait plus partie : « Liste de la majorité » (libellé officiel des
+    archives du ministère), mappé DTE (ADR-0010, addendum 2026-09-25).
     """
 
-    @pytest.mark.parametrize("code", ["NC", "LMAJ", "LNC"])
+    @pytest.mark.parametrize("code", ["NC", "LNC"])
     def test_code_absent_de_nuances_harmonisees(self, con, code):
         n = con.execute(
             "SELECT COUNT(*) FROM nuances_harmonisees "
@@ -186,14 +186,27 @@ class TestCodesSansMapping:
 class TestDecisionsStructurantes:
     """Vérifications des décisions validées en D3.1.2."""
 
-    def test_lcmd_2008_inchange_en_attente_de_verification(self, con):
-        """LCMD 2008 : classement D3.2 (GAU) conservé tant que le libellé officiel 2008
-        n'est pas vérifié (ADR-0010, lot 2)."""
+    @pytest.mark.parametrize(
+        ("code", "bloc_attendu"),
+        [
+            ("LCMD", "CENT"),
+            ("LMAJ", "DTE"),
+            ("LGC", "DIV"),
+            ("LMC", "CENT"),
+            ("LREG", "DIV"),
+            ("LEXD", "EXD"),
+        ],
+    )
+    def test_lot2_2008_libelles_officiels(self, con, code, bloc_attendu):
+        """Lot 2 (ADR-0010, addendum 2026-09-25) : classements 2008 fondés sur les libellés
+        officiels des archives du ministère."""
         row = con.execute(
-            "SELECT bloc FROM nuances_harmonisees WHERE nuance='LCMD' AND annee=2008"
+            "SELECT bloc, source_bloc FROM nuances_harmonisees WHERE nuance=? AND annee=2008",
+            [code],
         ).fetchone()
-        assert row is not None, "LCMD 2008 absent"
-        assert row[0] == "GAU", f"LCMD 2008 → {row[0]} (attendu GAU, inchangé)"
+        assert row is not None, f"{code} 2008 absent"
+        assert row[0] == bloc_attendu, f"{code} 2008 → {row[0]} (attendu {bloc_attendu})"
+        assert "archives ministère" in row[1], f"{code} 2008 : source officielle non citée"
 
     def test_ldvc_2020_est_cent_source_grille_2020(self, con):
         """LDVC 2020 → CENT per INTA1931378J annexe 3 (CE 437675 cité pour contexte)."""
