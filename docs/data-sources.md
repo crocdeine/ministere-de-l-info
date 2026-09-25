@@ -179,7 +179,13 @@ réduit le volume d'un facteur ~10.
   sont calculés par le loader (ex. `tx_chomage_dec = chomeurs_15_64_ans_p / actifs_15_64_ans_p`).
 - `part_emploi_industriel` = emplois **au lieu de travail** industriels / emplois au lieu
   de travail (et non la population résidente).
-- Secret statistique : valeur NULL dans le Parquet → colonne `secret = TRUE` dans DuckDB.
+- Secret statistique : valeur NULL dans le Parquet → colonne `secret = TRUE` dans DuckDB,
+  **seulement si le millésime diffuse la clef pour d'autres communes**. Une clef absente
+  (ou NULL partout) pour un millésime entier = indicateur non diffusé : NULL, non secret,
+  WARNING au chargement (correctif du 2026-09-25 : le chômage RP 2015 et 2016 était NULL
+  partout, 100 % des communes marquées secrètes, ce qui masquait aussi les autres
+  indicateurs RP de ces millésimes). L'UI ne propose que les millésimes où l'indicateur a
+  au moins une valeur (`viz/economie_queries.get_annees_par_indicateur`).
 - Le fichier couvre la France métropolitaine (d'après son nom).
 
 ---
