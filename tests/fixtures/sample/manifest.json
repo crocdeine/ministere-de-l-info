@@ -1,0 +1,932 @@
+{
+  "format": 1,
+  "genere_le": "2026-09-25T10:47:23+00:00",
+  "duckdb_version": "1.5.2",
+  "source": "ministere.duckdb",
+  "departement": "80",
+  "scrutins": [
+    "2012_pres_t1",
+    "2012_pres_t2",
+    "2022_pres_t1",
+    "2022_pres_t2",
+    "2007_legi_t1",
+    "2007_legi_t2",
+    "2024_legi_t1",
+    "2024_legi_t2",
+    "2008_muni_t1",
+    "2008_muni_t2",
+    "2026_muni_t1",
+    "2026_muni_t2"
+  ],
+  "tolerance_simplification_deg": 0.002,
+  "encodage_geometries": "WKB (BLOB), EPSG:4326",
+  "tables": {
+    "geographies_regions": {
+      "fichier": "geographies_regions.parquet",
+      "lignes": 1,
+      "octets": 35236,
+      "filtre": "code_insee IN (SELECT code_region FROM geographies_departements WHERE code_insee = '80')",
+      "colonnes": [
+        [
+          "code_insee",
+          "VARCHAR"
+        ],
+        [
+          "nom",
+          "VARCHAR"
+        ],
+        [
+          "geometry",
+          "GEOMETRY"
+        ],
+        [
+          "geometry_simplified_national",
+          "GEOMETRY"
+        ],
+        [
+          "geometry_simplified_regional",
+          "GEOMETRY"
+        ]
+      ],
+      "colonnes_geometrie": [
+        "geometry",
+        "geometry_simplified_national",
+        "geometry_simplified_regional"
+      ]
+    },
+    "geographies_departements": {
+      "fichier": "geographies_departements.parquet",
+      "lignes": 1,
+      "octets": 27831,
+      "filtre": "code_insee = '80'",
+      "colonnes": [
+        [
+          "code_insee",
+          "VARCHAR"
+        ],
+        [
+          "code_region",
+          "VARCHAR"
+        ],
+        [
+          "nom",
+          "VARCHAR"
+        ],
+        [
+          "geometry",
+          "GEOMETRY"
+        ],
+        [
+          "geometry_simplified_national",
+          "GEOMETRY"
+        ],
+        [
+          "geometry_simplified_departemental",
+          "GEOMETRY"
+        ]
+      ],
+      "colonnes_geometrie": [
+        "geometry",
+        "geometry_simplified_national",
+        "geometry_simplified_departemental"
+      ]
+    },
+    "geographies_epci": {
+      "fichier": "geographies_epci.parquet",
+      "lignes": 17,
+      "octets": 73646,
+      "filtre": "code_siren IN (SELECT code_epci FROM geographies_communes WHERE code_departement = '80')",
+      "colonnes": [
+        [
+          "code_siren",
+          "VARCHAR"
+        ],
+        [
+          "nom",
+          "VARCHAR"
+        ],
+        [
+          "type_epci",
+          "VARCHAR"
+        ],
+        [
+          "code_departement_principal",
+          "VARCHAR"
+        ],
+        [
+          "geometry",
+          "GEOMETRY"
+        ],
+        [
+          "geometry_simplified_epci",
+          "GEOMETRY"
+        ]
+      ],
+      "colonnes_geometrie": [
+        "geometry",
+        "geometry_simplified_epci"
+      ]
+    },
+    "geographies_communes": {
+      "fichier": "geographies_communes.parquet",
+      "lignes": 771,
+      "octets": 285668,
+      "filtre": "code_departement = '80'",
+      "colonnes": [
+        [
+          "code_insee",
+          "VARCHAR"
+        ],
+        [
+          "nom",
+          "VARCHAR"
+        ],
+        [
+          "code_departement",
+          "VARCHAR"
+        ],
+        [
+          "code_region",
+          "VARCHAR"
+        ],
+        [
+          "code_epci",
+          "VARCHAR"
+        ],
+        [
+          "geometry",
+          "GEOMETRY"
+        ],
+        [
+          "geometry_simplified_communal",
+          "GEOMETRY"
+        ]
+      ],
+      "colonnes_geometrie": [
+        "geometry",
+        "geometry_simplified_communal"
+      ]
+    },
+    "geographies_arrondissements_municipaux": {
+      "fichier": "geographies_arrondissements_municipaux.parquet",
+      "lignes": 0,
+      "octets": 207,
+      "filtre": "code_commune_mere IN (SELECT code_insee FROM geographies_communes WHERE code_departement = '80')",
+      "colonnes": [
+        [
+          "code_insee",
+          "VARCHAR"
+        ],
+        [
+          "code_commune_mere",
+          "VARCHAR"
+        ],
+        [
+          "nom",
+          "VARCHAR"
+        ],
+        [
+          "geometry",
+          "GEOMETRY"
+        ],
+        [
+          "geometry_simplified_communal",
+          "GEOMETRY"
+        ]
+      ],
+      "colonnes_geometrie": [
+        "geometry",
+        "geometry_simplified_communal"
+      ]
+    },
+    "geographies_circonscriptions": {
+      "fichier": "geographies_circonscriptions.parquet",
+      "lignes": 5,
+      "octets": 28879,
+      "filtre": "code_departement = '80'",
+      "colonnes": [
+        [
+          "code",
+          "VARCHAR"
+        ],
+        [
+          "nom",
+          "VARCHAR"
+        ],
+        [
+          "code_departement",
+          "VARCHAR"
+        ],
+        [
+          "nom_departement",
+          "VARCHAR"
+        ],
+        [
+          "geometry",
+          "GEOMETRY"
+        ],
+        [
+          "geometry_simplified_circo",
+          "GEOMETRY"
+        ]
+      ],
+      "colonnes_geometrie": [
+        "geometry",
+        "geometry_simplified_circo"
+      ]
+    },
+    "populations": {
+      "fichier": "populations.parquet",
+      "lignes": 2313,
+      "octets": 6320,
+      "filtre": "code_insee_commune IN (SELECT code_insee FROM geographies_communes WHERE code_departement = '80')",
+      "colonnes": [
+        [
+          "code_insee_commune",
+          "VARCHAR"
+        ],
+        [
+          "annee",
+          "INTEGER"
+        ],
+        [
+          "municipale",
+          "INTEGER"
+        ],
+        [
+          "comptee_a_part",
+          "INTEGER"
+        ],
+        [
+          "totale",
+          "INTEGER"
+        ],
+        [
+          "source",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "elections": {
+      "fichier": "elections.parquet",
+      "lignes": 56,
+      "octets": 1771,
+      "filtre": null,
+      "colonnes": [
+        [
+          "id_election",
+          "VARCHAR"
+        ],
+        [
+          "type_scrutin",
+          "VARCHAR"
+        ],
+        [
+          "annee",
+          "INTEGER"
+        ],
+        [
+          "tour",
+          "INTEGER"
+        ],
+        [
+          "libelle",
+          "VARCHAR"
+        ],
+        [
+          "ancien_decoupage",
+          "BOOLEAN"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "blocs_politiques": {
+      "fichier": "blocs_politiques.parquet",
+      "lignes": 6,
+      "octets": 738,
+      "filtre": null,
+      "colonnes": [
+        [
+          "bloc",
+          "VARCHAR"
+        ],
+        [
+          "libelle",
+          "VARCHAR"
+        ],
+        [
+          "couleur",
+          "VARCHAR"
+        ],
+        [
+          "ordre",
+          "INTEGER"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "nuances_harmonisees": {
+      "fichier": "nuances_harmonisees.parquet",
+      "lignes": 226,
+      "octets": 5689,
+      "filtre": null,
+      "colonnes": [
+        [
+          "nuance",
+          "VARCHAR"
+        ],
+        [
+          "annee",
+          "INTEGER"
+        ],
+        [
+          "bloc",
+          "VARCHAR"
+        ],
+        [
+          "source_bloc",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "candidats_presidentielle": {
+      "fichier": "candidats_presidentielle.parquet",
+      "lignes": 23,
+      "octets": 3051,
+      "filtre": null,
+      "colonnes": [
+        [
+          "annee",
+          "INTEGER"
+        ],
+        [
+          "nom",
+          "VARCHAR"
+        ],
+        [
+          "prenom",
+          "VARCHAR"
+        ],
+        [
+          "bloc",
+          "VARCHAR"
+        ],
+        [
+          "libelle",
+          "VARCHAR"
+        ],
+        [
+          "parti",
+          "VARCHAR"
+        ],
+        [
+          "source_bloc",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "resultats_participation": {
+      "fichier": "resultats_participation.parquet",
+      "lignes": 8941,
+      "octets": 85539,
+      "filtre": "code_departement = '80' AND id_election IN ('2012_pres_t1', '2012_pres_t2', '2022_pres_t1', '2022_pres_t2', '2007_legi_t1', '2007_legi_t2', '2024_legi_t1', '2024_legi_t2', '2008_muni_t1', '2008_muni_t2', '2026_muni_t1', '2026_muni_t2')",
+      "colonnes": [
+        [
+          "id_election",
+          "VARCHAR"
+        ],
+        [
+          "code_departement",
+          "VARCHAR"
+        ],
+        [
+          "code_commune",
+          "VARCHAR"
+        ],
+        [
+          "code_bv",
+          "VARCHAR"
+        ],
+        [
+          "inscrits",
+          "INTEGER"
+        ],
+        [
+          "abstentions",
+          "INTEGER"
+        ],
+        [
+          "votants",
+          "INTEGER"
+        ],
+        [
+          "blancs",
+          "INTEGER"
+        ],
+        [
+          "nuls",
+          "INTEGER"
+        ],
+        [
+          "exprimes",
+          "INTEGER"
+        ],
+        [
+          "code_circo",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "resultats_candidats": {
+      "fichier": "resultats_candidats.parquet",
+      "lignes": 52197,
+      "octets": 132780,
+      "filtre": "code_departement = '80' AND id_election IN ('2012_pres_t1', '2012_pres_t2', '2022_pres_t1', '2022_pres_t2', '2007_legi_t1', '2007_legi_t2', '2024_legi_t1', '2024_legi_t2', '2008_muni_t1', '2008_muni_t2', '2026_muni_t1', '2026_muni_t2')",
+      "colonnes": [
+        [
+          "id_election",
+          "VARCHAR"
+        ],
+        [
+          "code_departement",
+          "VARCHAR"
+        ],
+        [
+          "code_commune",
+          "VARCHAR"
+        ],
+        [
+          "code_bv",
+          "VARCHAR"
+        ],
+        [
+          "no_panneau",
+          "INTEGER"
+        ],
+        [
+          "nuance",
+          "VARCHAR"
+        ],
+        [
+          "sexe",
+          "VARCHAR"
+        ],
+        [
+          "nom",
+          "VARCHAR"
+        ],
+        [
+          "prenom",
+          "VARCHAR"
+        ],
+        [
+          "voix",
+          "INTEGER"
+        ],
+        [
+          "liste",
+          "VARCHAR"
+        ],
+        [
+          "libelle_abrege_liste",
+          "VARCHAR"
+        ],
+        [
+          "libelle_etendu_liste",
+          "VARCHAR"
+        ],
+        [
+          "nom_tete_liste",
+          "VARCHAR"
+        ],
+        [
+          "prenom_tete_liste",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "economie_filosofi": {
+      "fichier": "economie_filosofi.parquet",
+      "lignes": 3409,
+      "octets": 11709,
+      "filtre": "code_commune IN (SELECT code_insee FROM geographies_communes WHERE code_departement = '80')",
+      "colonnes": [
+        [
+          "code_commune",
+          "VARCHAR"
+        ],
+        [
+          "annee",
+          "INTEGER"
+        ],
+        [
+          "taux_pauvrete",
+          "DOUBLE"
+        ],
+        [
+          "niveau_vie_median",
+          "DOUBLE"
+        ],
+        [
+          "d1_niveau_vie",
+          "DOUBLE"
+        ],
+        [
+          "d9_niveau_vie",
+          "DOUBLE"
+        ],
+        [
+          "secret",
+          "BOOLEAN"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "economie_rp": {
+      "fichier": "economie_rp.parquet",
+      "lignes": 5397,
+      "octets": 58936,
+      "filtre": "code_commune IN (SELECT code_insee FROM geographies_communes WHERE code_departement = '80')",
+      "colonnes": [
+        [
+          "code_commune",
+          "VARCHAR"
+        ],
+        [
+          "annee_millesime",
+          "INTEGER"
+        ],
+        [
+          "tx_chomage_dec",
+          "DOUBLE"
+        ],
+        [
+          "part_ouvriers_employes",
+          "DOUBLE"
+        ],
+        [
+          "part_emploi_industriel",
+          "DOUBLE"
+        ],
+        [
+          "pop_active",
+          "INTEGER"
+        ],
+        [
+          "secret",
+          "BOOLEAN"
+        ],
+        [
+          "part_logements_sociaux",
+          "DOUBLE"
+        ],
+        [
+          "nb_logements_sociaux",
+          "INTEGER"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "economie_social": {
+      "fichier": "economie_social.parquet",
+      "lignes": 3496,
+      "octets": 14185,
+      "filtre": "code_commune IN (SELECT code_insee FROM geographies_communes WHERE code_departement = '80')",
+      "colonnes": [
+        [
+          "code_commune",
+          "VARCHAR"
+        ],
+        [
+          "annee",
+          "INTEGER"
+        ],
+        [
+          "nb_foyers_rsa",
+          "INTEGER"
+        ],
+        [
+          "taux_foyers_rsa",
+          "DOUBLE"
+        ],
+        [
+          "apl_medecins",
+          "DOUBLE"
+        ],
+        [
+          "desert_medical",
+          "BOOLEAN"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "economie_emploi_urssaf": {
+      "fichier": "economie_emploi_urssaf.parquet",
+      "lignes": 16573,
+      "octets": 34227,
+      "filtre": "code_commune IN (SELECT code_insee FROM geographies_communes WHERE code_departement = '80') AND secteur_gs LIKE '%Industrie%'",
+      "colonnes": [
+        [
+          "code_commune",
+          "VARCHAR"
+        ],
+        [
+          "annee",
+          "INTEGER"
+        ],
+        [
+          "secteur_gs",
+          "VARCHAR"
+        ],
+        [
+          "code_ape",
+          "VARCHAR"
+        ],
+        [
+          "nb_salaries",
+          "INTEGER"
+        ],
+        [
+          "nb_etablissements",
+          "INTEGER"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "economie_contexte": {
+      "fichier": "economie_contexte.parquet",
+      "lignes": 104,
+      "octets": 1765,
+      "filtre": null,
+      "colonnes": [
+        [
+          "code_geo",
+          "VARCHAR"
+        ],
+        [
+          "type_geo",
+          "VARCHAR"
+        ],
+        [
+          "annee",
+          "INTEGER"
+        ],
+        [
+          "indicateur",
+          "VARCHAR"
+        ],
+        [
+          "valeur",
+          "DOUBLE"
+        ],
+        [
+          "source",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "leg_elus": {
+      "fichier": "leg_elus.parquet",
+      "lignes": 41,
+      "octets": 5588,
+      "filtre": "code_departement = '80'",
+      "colonnes": [
+        [
+          "id",
+          "VARCHAR"
+        ],
+        [
+          "chambre",
+          "VARCHAR"
+        ],
+        [
+          "legislature",
+          "INTEGER"
+        ],
+        [
+          "nom",
+          "VARCHAR"
+        ],
+        [
+          "prenom",
+          "VARCHAR"
+        ],
+        [
+          "sexe",
+          "VARCHAR"
+        ],
+        [
+          "date_naissance",
+          "DATE"
+        ],
+        [
+          "code_departement",
+          "VARCHAR"
+        ],
+        [
+          "nom_departement",
+          "VARCHAR"
+        ],
+        [
+          "num_circo",
+          "INTEGER"
+        ],
+        [
+          "groupe_sigle",
+          "VARCHAR"
+        ],
+        [
+          "groupe_nom",
+          "VARCHAR"
+        ],
+        [
+          "bloc_politique",
+          "VARCHAR"
+        ],
+        [
+          "bloc_override",
+          "BOOLEAN"
+        ],
+        [
+          "date_debut_mandat",
+          "DATE"
+        ],
+        [
+          "date_fin_mandat",
+          "DATE"
+        ],
+        [
+          "est_actif",
+          "BOOLEAN"
+        ],
+        [
+          "profession",
+          "VARCHAR"
+        ],
+        [
+          "source",
+          "VARCHAR"
+        ],
+        [
+          "region_nom",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "leg_activite": {
+      "fichier": "leg_activite.parquet",
+      "lignes": 17,
+      "octets": 3035,
+      "filtre": "elu_id IN (SELECT id FROM leg_elus WHERE code_departement = '80')",
+      "colonnes": [
+        [
+          "elu_id",
+          "VARCHAR"
+        ],
+        [
+          "chambre",
+          "VARCHAR"
+        ],
+        [
+          "date_extraction",
+          "DATE"
+        ],
+        [
+          "semaines_presence",
+          "INTEGER"
+        ],
+        [
+          "commission_presences",
+          "INTEGER"
+        ],
+        [
+          "commission_interventions",
+          "INTEGER"
+        ],
+        [
+          "hemicycle_interventions",
+          "INTEGER"
+        ],
+        [
+          "amendements_proposes",
+          "INTEGER"
+        ],
+        [
+          "amendements_signes",
+          "INTEGER"
+        ],
+        [
+          "amendements_adoptes",
+          "INTEGER"
+        ],
+        [
+          "rapports",
+          "INTEGER"
+        ],
+        [
+          "propositions_ecrites",
+          "INTEGER"
+        ],
+        [
+          "propositions_signees",
+          "INTEGER"
+        ],
+        [
+          "questions_ecrites",
+          "INTEGER"
+        ],
+        [
+          "questions_orales",
+          "INTEGER"
+        ],
+        [
+          "source",
+          "VARCHAR"
+        ],
+        [
+          "score_participation",
+          "FLOAT"
+        ],
+        [
+          "score_participation_specialite",
+          "FLOAT"
+        ],
+        [
+          "score_loyaute",
+          "FLOAT"
+        ],
+        [
+          "score_majorite",
+          "FLOAT"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "leg_blocs_override": {
+      "fichier": "leg_blocs_override.parquet",
+      "lignes": 2,
+      "octets": 1011,
+      "filtre": null,
+      "colonnes": [
+        [
+          "elu_id",
+          "VARCHAR"
+        ],
+        [
+          "chambre",
+          "VARCHAR"
+        ],
+        [
+          "bloc_force",
+          "VARCHAR"
+        ],
+        [
+          "justification",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
+    }
+  },
+  "tables_absentes_de_la_source": [],
+  "tables_source_non_exportees": [
+    "leg_groupes_blocs",
+    "leg_mandats"
+  ],
+  "vues_source": [
+    "v_activite_par_bloc",
+    "v_composition_legislature",
+    "v_contexte_hdf_vs_france",
+    "v_croisement_eco_elections",
+    "v_desindustrialisation_commune",
+    "v_economie_commune",
+    "v_economie_sociale_commune",
+    "v_elus_actuels",
+    "v_elus_hdf_actuels",
+    "v_evolution_blocs_circo21",
+    "v_evolution_blocs_hdf_legi",
+    "v_evolution_blocs_hdf_muni",
+    "v_evolution_economie_hdf",
+    "v_listes_commune_muni",
+    "v_mandats_legislatif",
+    "v_participation_circo_legi",
+    "v_participation_commune_pres",
+    "v_population_commune",
+    "v_population_departement",
+    "v_population_epci",
+    "v_population_region",
+    "v_resultats_candidats_avec_bloc",
+    "v_scores_circo21_pres",
+    "v_scores_circo_legi",
+    "v_scores_commune_muni",
+    "v_scores_commune_pres"
+  ],
+  "octets_total": 817811
+}
