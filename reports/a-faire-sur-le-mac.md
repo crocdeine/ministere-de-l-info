@@ -4,6 +4,8 @@ Dernière mise à jour : 2026-09-25 (constat réel du Mac : pas de Docker instal
 
 Ce fichier regroupe tout ce qui ne peut être fait que sur le Mac mini : la session cloud n'a ni la base de données, ni accès aux sites officiels. **Suivre les étapes dans l'ordre.**
 
+> **État au 2026-09-25** : étapes 0 à 4 faites par Mathias. Prochaine étape : **4 bis** (correctifs issus de ce retour), puis 5.
+
 ## Comment procéder (le plus simple)
 
 Pour chaque étape, ouvrir le Terminal dans le dossier du projet, lancer Claude Code, et lui écrire simplement :
@@ -112,6 +114,36 @@ git push
 ```
 
 Le script refuse de dépasser 5 Mo. Signaler au directeur tout avertissement `EcartSchemaEchantillon`.
+
+---
+
+## Étape 4 bis — Appliquer les correctifs issus du retour du 25/09 ✅ Prête
+
+Correctifs : lot 2 (LMAJ 2008 → droite, LCMD 2008 → centre, 229 nuances), anciens groupes du Sénat d'avant 2002 exclus, chômage RP 2015/2016 (faux secret statistique), échantillon complété avec les tables du Législatif, corrections d'interface.
+
+```bash
+cd "/Volumes/le gros stockage/ministere-de-l-info"
+git pull
+uv sync --frozen --group etl
+cp data/ministere.duckdb data/ministere.duckdb.bak-2026-09-25
+uv run python scripts/init_elections_schema.py
+uv run python scripts/load_elections_municipales.py
+uv run python scripts/migrations/0007_add_municipales_views.py
+uv run python scripts/load_legislatif.py --source senat
+uv run python scripts/load_economie.py --source rp --millesimes 2015,2016
+uv run pytest -q
+uv run python scripts/export_sample_db.py
+git add tests/fixtures/sample/
+git commit -m "test: échantillon Parquet régénéré (tables législatives)"
+git push
+```
+
+Contrôles attendus :
+- `SELECT annee, COUNT(*) FROM nuances_harmonisees GROUP BY 1 ORDER BY 1;` → municipales 2008=15, 2014=17, 2020=23, 2026=25 ; **total 229**.
+- LMAJ 2008 en DTE (43 communes, 114 281 voix au 1er tour) ; LCMD 2008 en CENT (6 communes).
+- `test_aucun_mandat_non_classe` passe. S'il échoue encore, **noter les sigles des groupes restants** (3 groupes du Sénat pouvaient manquer à la liste) et les transmettre.
+- Le chargement RP affiche un avertissement listant les clés manquantes par millésime : **le copier dans le résumé** (il dira si la donnée chômage 2015/2016 existe sous un autre nom).
+- Revérification à l'écran : Économie (plus d'erreur `isnan`, années sans chômage non proposées), Présidentielles (le bouton Zone reste cohérent après changement d'onglet), Législatif (participation en %).
 
 ---
 
