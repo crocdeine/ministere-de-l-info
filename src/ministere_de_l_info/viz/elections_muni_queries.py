@@ -241,7 +241,7 @@ def get_metrics_commune_muni(annee: int, tour: int, code_commune: str) -> dict:
             [annee, tour, code_commune],
         ).fetchone()[0]
 
-        # est_nuancee : au moins 1 nuance avec bloc mappé (excluant NC/LMAJ/LNC → bloc NULL)
+        # est_nuancee : au moins 1 nuance avec bloc mappé (excluant NC/LNC → bloc NULL ; LMAJ 2008 = DTE depuis ADR-0010)
         nuancee_row = con.execute(
             """
             SELECT COUNT(*) > 0

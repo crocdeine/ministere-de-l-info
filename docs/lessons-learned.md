@@ -57,7 +57,7 @@ rapports de `reports/` et du code. Les sections ajoutées indiquent leur phase d
 - **`no_panneau` NULL en 2008** : synthétisé par `ROW_NUMBER()` pour respecter la clé ; ce
   n'est pas un identifiant stable de liste.
 - **Seuils de nuançage municipaux** : seules les listes des communes de 3 500 habitants et
-  plus sont nuancées ; les codes `NC`, `LMAJ`, `LNC` ne sont pas rattachés à un bloc
+  plus sont nuancées ; les codes `NC` et `LNC` ne sont pas rattachés à un bloc (`LMAJ` 2008 = « liste de la majorité », DTE depuis l'ADR-0010)
   (communes « Non classé » dans l'UI).
 - **Documenter l'absence de source** : les circulaires de nuançage des législatives
   2002-2017 ne sont pas publiées au JO ; le classement est reconstruit et tracé colonne
