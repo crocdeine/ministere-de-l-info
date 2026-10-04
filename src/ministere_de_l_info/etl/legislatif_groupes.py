@@ -401,7 +401,7 @@ _SENAT: tuple[CorrespondanceGroupe, ...] = (
     ),
     _senat("SOCR", "GAU", "Socialiste et républicain (2017-2020)", f"PS dominant → GAU : {_G2020}"),
     _senat(
-        "ECOLO",
+        "Écologiste",  # sigle tel qu'écrit dans ODSEN_GENERAL
         "GAU",
         "Écologiste (2012-2017)",
         f"EELV = VEC → GAU : {_G2020} ; {_PROCHE}",
@@ -544,10 +544,23 @@ GROUPES_SENAT_ANTERIEURS_2002: tuple[GroupeHorsPerimetre, ...] = (
         f"Formation centriste des années 1970 ; {_CONNAISSANCE}",
     ),
     GroupeHorsPerimetre(
-        "COM",
+        "C",
         "Groupe communiste",
-        "jusqu'aux années 1990",
-        f"Devenu Communiste républicain et citoyen (CRC, classé) ; {_CONNAISSANCE}",
+        "jusqu'en 1995",
+        "Devenu Communiste républicain et citoyen (CRC, classé) en 1995 ; derniers mandats "
+        "terminés le 1er octobre 1995 ; pages des groupes et fiches des sénateurs sur senat.fr, vérifiées le 2026-10-04 (reports/verification-classements-j2-2026-10-04.md)",
+    ),
+    GroupeHorsPerimetre(
+        "GDSRG",
+        "Sénateurs radicaux de gauche rattachés à la Gauche démocratique",
+        "années 1970-1980",
+        "Derniers mandats terminés en 1983 ; pages des groupes et fiches des sénateurs sur senat.fr, vérifiées le 2026-10-04 (reports/verification-classements-j2-2026-10-04.md)",
+    ),
+    GroupeHorsPerimetre(
+        "RP",
+        "Groupe des républicains populaires",
+        "1959-1965",
+        "Derniers mandats terminés en 1968 ; pages des groupes et fiches des sénateurs sur senat.fr, vérifiées le 2026-10-04 (reports/verification-classements-j2-2026-10-04.md)",
     ),
 )
 

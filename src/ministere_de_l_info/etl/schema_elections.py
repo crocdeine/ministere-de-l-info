@@ -234,13 +234,23 @@ _NUANCES_PRES: list[tuple[str, int, str, str]] = [
     ("ROYA", 2007, "GAU", "Royal – PS → GAU"),
     ("SARK", 2007, "DTE", "Sarkozy – UMP → DTE"),
     ("SCHI", 2007, "EXG", "Schivardi – PT trotskiste → EXG"),
-    ("VILL", 2007, "DTE", "de Villiers – MPF (DVDR) → DTE (CE 31/01/2020 n°437675)"),
+    (
+        "VILL",
+        2007,
+        "DTE",
+        "de Villiers – MPF (DVDR) → DTE (INTA1931378J p. 8 : MPF ∈ DVD ; p. 10 : DVD → DTE)",
+    ),
     ("VOYN", 2007, "GAU", "Voynet – Verts (DVGV) → GAU"),
     # ── 2012 (10 candidats) ────────────────────────────────────────────────
     ("ARTH", 2012, "EXG", "Arthaud – LO → EXG"),
     ("BAYR", 2012, "CENT", "Bayrou – MoDem → CENT"),
     ("CHEM", 2012, "DIV", "Cheminade – Solidarité et Progrès → DIV"),
-    ("DUPO", 2012, "DTE", "Dupont-Aignan – DLR (DVDR) → DTE (CE 31/01/2020 n°437675)"),
+    (
+        "DUPO",
+        2012,
+        "DTE",
+        "Dupont-Aignan – DLR (devenu DLF) → DTE (INTA1931378J p. 10 : DLF → DTE)",
+    ),
     ("HOLL", 2012, "GAU", "Hollande – PS → GAU"),
     ("JOLY", 2012, "GAU", "Joly – EELV (DVGV) → GAU ; pas de bloc écolo officiel"),
     ("LEPE", 2012, "EXD", "Le Pen Marine – FN → EXD"),
@@ -295,7 +305,7 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
         "MPF",
         2002,
         "DTE",
-        "MPF (Villiers) souverainiste conservateur → DTE (CE 31/01/2020 n°437675)",
+        "MPF (Villiers) → DTE (INTA1931378J p. 8 : MPF ∈ DVD ; p. 10 : DVD → DTE)",
     ),
     (
         "PREP",
@@ -374,7 +384,12 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     # ── 2017 (17 nuances) ──────────────────────────────────────────────────
     ("COM", 2017, "GAU", "PCF → GAU"),
     ("DIV", 2017, "DIV", "Divers → mapping direct"),
-    ("DLF", 2017, "DTE", "Debout la France (Dupont-Aignan) → DTE (CE 31/01/2020 n°437675)"),
+    (
+        "DLF",
+        2017,
+        "DTE",
+        "Debout la France → DTE (INTA1931378J p. 10 ; CE n° 437675 a suspendu DLF → EXD)",
+    ),
     ("DVD", 2017, "DTE", "Divers Droite → DTE"),
     ("DVG", 2017, "GAU", "Divers Gauche → GAU"),
     (
@@ -650,7 +665,7 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
         "GAU",
         f"Liste du Parti communiste français → GAU ({_SRC_2020} ; ADR-0010 ; avant : EXG)",
     ),
-    ("LDIV", 2020, "DIV", "Divers (D3.2)"),
+    ("LDIV", 2020, "DIV", f"Divers — grille officielle ({_SRC_2020})"),
     (
         "LDVC",
         2020,
@@ -658,8 +673,8 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
         f"Divers centre → CENT ({_SRC_2020}) ; CE 31/01/2020 n°437675 a seulement "
         "suspendu l'attribution de LDVC aux listes simplement soutenues par LREM/MoDem/UDI",
     ),
-    ("LDVD", 2020, "DTE", "Divers Droite (D3.2)"),
-    ("LDVG", 2020, "GAU", "Divers Gauche (D3.2)"),
+    ("LDVD", 2020, "DTE", f"Divers Droite — grille officielle ({_SRC_2020})"),
+    ("LDVG", 2020, "GAU", f"Divers Gauche — grille officielle ({_SRC_2020})"),
     (
         "LECO",
         2020,
@@ -667,8 +682,8 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
         f"Autre liste écologiste, hors EELV (LVEC distinct) → AUT = DIV ({_SRC_2020} ; "
         "ADR-0010 ; avant : GAU)",
     ),
-    ("LEXD", 2020, "EXD", "Extrême droite (D3.2)"),
-    ("LEXG", 2020, "EXG", "Extrême gauche (D3.2)"),
+    ("LEXD", 2020, "EXD", f"Extrême droite — grille officielle ({_SRC_2020})"),
+    ("LEXG", 2020, "EXG", f"Extrême gauche — grille officielle ({_SRC_2020})"),
     (
         "LFI",
         2020,
@@ -676,14 +691,14 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
         "La France Insoumise 2020 — GAU per circulaire INTA1931378J ; "
         "bascule EXG uniquement à partir de 2026 (INTP2602966C + CE 27/02/2026 n°512694) (D3.2)",
     ),
-    ("LLR", 2020, "DTE", "Les Républicains (D3.2)"),
+    ("LLR", 2020, "DTE", f"Les Républicains — grille officielle ({_SRC_2020})"),
     # LNC (~1 787 occurrences) : non inséré — parallèle structurel avec NC ;
     # identité LNC ambiguë (Nouveau Centre ou Liste Non Classée) → NULL (D3.2, Q9 validé)
-    ("LRDG", 2020, "GAU", "Radicaux de Gauche — allié PS (D3.2)"),
-    ("LREM", 2020, "CENT", "La République En Marche (D3.2)"),
-    ("LRN", 2020, "EXD", "Rassemblement National (D3.2)"),
-    ("LSOC", 2020, "GAU", "Socialiste (D3.2)"),
-    ("LUC", 2020, "CENT", "Union Centre (D3.2)"),
+    ("LRDG", 2020, "GAU", f"Radicaux de Gauche — allié PS — grille officielle ({_SRC_2020})"),
+    ("LREM", 2020, "CENT", f"La République En Marche — grille officielle ({_SRC_2020})"),
+    ("LRN", 2020, "EXD", f"Rassemblement National — grille officielle ({_SRC_2020})"),
+    ("LSOC", 2020, "GAU", f"Socialiste — grille officielle ({_SRC_2020})"),
+    ("LUC", 2020, "CENT", f"Union Centre — grille officielle ({_SRC_2020})"),
     (
         "LUD",
         2020,
@@ -691,8 +706,8 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
         f"Liste union de la droite (dont LR) → DTE ({_SRC_2020} ; ADR-0010 ; avant : CENT)",
     ),
     ("LUDI", 2020, "CENT", f"Liste UDI → CENT ({_SRC_2020} ; ADR-0010 ; avant : DIV)"),
-    ("LUG", 2020, "GAU", "Union de la Gauche (D3.2)"),
-    ("LVEC", 2020, "GAU", "Verts / EELV (D3.2)"),
+    ("LUG", 2020, "GAU", f"Union de la Gauche — grille officielle ({_SRC_2020})"),
+    ("LVEC", 2020, "GAU", f"Verts / EELV — grille officielle ({_SRC_2020})"),
     # Codes officiels ajoutés par l'ADR-0010 (sans effet s'ils sont absents des données HdF)
     ("LREG", 2020, "DIV", f"Liste régionaliste → AUT = DIV ({_SRC_2020} ; ajout ADR-0010)"),
     ("LGJ", 2020, "DIV", f"Liste Gilets jaunes → AUT = DIV ({_SRC_2020} ; ajout ADR-0010)"),
@@ -708,10 +723,10 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
         f"Liste investie par le Parti communiste français → GAU ({_SRC_2026} ; "
         "ADR-0010 ; avant : EXG)",
     ),
-    ("LDIV", 2026, "DIV", "Divers (D3.2)"),
-    ("LDVC", 2026, "CENT", "Divers Centre — per circulaire INTP2602966C (2 fév. 2026) (D3.2)"),
-    ("LDVD", 2026, "DTE", "Divers Droite (D3.2)"),
-    ("LDVG", 2026, "GAU", "Divers Gauche (D3.2)"),
+    ("LDIV", 2026, "DIV", f"Divers — grille officielle ({_SRC_2026})"),
+    ("LDVC", 2026, "CENT", f"Divers Centre — grille officielle ({_SRC_2026})"),
+    ("LDVD", 2026, "DTE", f"Divers Droite — grille officielle ({_SRC_2026})"),
+    ("LDVG", 2026, "GAU", f"Divers Gauche — grille officielle ({_SRC_2026})"),
     (
         "LECO",
         2026,
@@ -719,8 +734,8 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
         f"Liste écologiste hors Les Écologistes (LVEC distinct) → DIV ({_SRC_2026} ; "
         "ADR-0010 ; avant : GAU)",
     ),
-    ("LEXD", 2026, "EXD", "Extrême droite (D3.2)"),
-    ("LEXG", 2026, "EXG", "Extrême gauche (D3.2)"),
+    ("LEXD", 2026, "EXD", f"Extrême droite — grille officielle ({_SRC_2026})"),
+    ("LEXG", 2026, "EXG", f"Extrême gauche — grille officielle ({_SRC_2026})"),
     (
         "LFI",
         2026,
@@ -728,11 +743,16 @@ _NUANCES_MUNI: list[tuple[str, int, str, str]] = [
         "La France Insoumise 2026 — EXG per circulaire INTP2602966C (2 fév. 2026) "
         "+ CE 27/02/2026 n°512694 (rejet recours LFI) (D3.2)",
     ),
-    ("LHOR", 2026, "CENT", "Horizons — parti centriste Édouard Philippe (D3.2)"),
-    ("LLR", 2026, "DTE", "Les Républicains (D3.2)"),
-    ("LRN", 2026, "EXD", "Rassemblement National (D3.2)"),
-    ("LSOC", 2026, "GAU", "Socialiste (D3.2)"),
-    ("LUC", 2026, "CENT", "Union Centre (D3.2)"),
+    (
+        "LHOR",
+        2026,
+        "CENT",
+        f"Horizons — parti centriste Édouard Philippe — grille officielle ({_SRC_2026})",
+    ),
+    ("LLR", 2026, "DTE", f"Les Républicains — grille officielle ({_SRC_2026})"),
+    ("LRN", 2026, "EXD", f"Rassemblement National — grille officielle ({_SRC_2026})"),
+    ("LSOC", 2026, "GAU", f"Socialiste — grille officielle ({_SRC_2026})"),
+    ("LUC", 2026, "CENT", f"Union Centre — grille officielle ({_SRC_2026})"),
     (
         "LUDI",
         2026,
@@ -825,7 +845,7 @@ _CANDIDATS_PRES_2017: list[tuple[int, str, str, str, str, str, str]] = [
         "Debout la France",
         "DTE",
         "Nicolas Dupont-Aignan",
-        "Nuance DVDR — CE 31/01/2020 n°437675 conforte DTE",
+        "Nuance DVDR — DLF → DTE : INTA1931378J p. 10 (CE n° 437675 a suspendu DLF → EXD)",
     ),
     (
         2017,
@@ -894,7 +914,7 @@ _CANDIDATS_PRES_2022: list[tuple[int, str, str, str, str, str, str]] = [
         "Debout la France",
         "DTE",
         "Nicolas Dupont-Aignan",
-        "Nuance DVDR — CE 31/01/2020 n°437675 conforte DTE",
+        "Nuance DVDR — DLF → DTE : INTA1931378J p. 10 (CE n° 437675 a suspendu DLF → EXD)",
     ),
     (2022, "HIDALGO", "Anne", "Parti Socialiste", "GAU", "Anne Hidalgo", "PS — nuance PS → GAU"),
     (

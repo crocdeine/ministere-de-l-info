@@ -2,8 +2,9 @@
 
 Justification : le groupe 'NI' (Non Inscrits) au Sénat masque l'appartenance
 politique réelle de certains sénateurs RN qui n'ont pas constitué de groupe
-officiel. Ces cas nécessitent un classement manuel basé sur leur étiquette
-électorale connue (candidats sous étiquette RN aux sénatoriales 2023).
+officiel. Ils sont classés selon la nuance attribuée par le ministère de
+l'Intérieur à leur élection (résultats officiels des sénatoriales 2023,
+data.gouv.fr, jeu 651559bbf0ed2c8d9e50db43, vérifié le 2026-10-04).
 
 Vérification : chaque entrée ci-dessous a été confirmée par son matricule
 exact dans ODSEN_GENERAL.csv (chargé par legislatif_senat.py).
@@ -22,13 +23,23 @@ OVERRIDES_BLOCS: list[dict] = [
         "elu_id": "21085M",
         "chambre": "SENAT",
         "bloc_force": "EXD",
-        "justification": "Sénateur RN siégeant en NI — Joshua Hochart (Nord, élu 2023)",
+        "justification": (
+            "Joshua Hochart (Nord), NI au Sénat : nuance RN attribuée par le ministère de "
+            "l'Intérieur (liste LRN), résultats officiels des sénatoriales 2023, data.gouv "
+            "651559bbf0ed2c8d9e50db43 ; RN/LRN → Extrême droite : IOMA2322276J annexes 1-2 "
+            "(p. 6-7)"
+        ),
     },
     {
         "elu_id": "21069M",
         "chambre": "SENAT",
         "bloc_force": "EXD",
-        "justification": "Sénateur RN siégeant en NI — Christopher Szczurek (Pas-de-Calais, élu 2023)",
+        "justification": (
+            "Christopher Szczurek (Pas-de-Calais), NI au Sénat : nuance RN attribuée par le ministère de "
+            "l'Intérieur (liste LRN), résultats officiels des sénatoriales 2023, data.gouv "
+            "651559bbf0ed2c8d9e50db43 ; RN/LRN → Extrême droite : IOMA2322276J annexes 1-2 "
+            "(p. 6-7)"
+        ),
     },
 ]
 
