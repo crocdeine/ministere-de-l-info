@@ -19,4 +19,4 @@ Règles :
 
 | Date | De → vers | Raison |
 |---|---|---|
-| — | aucune | — |
+| 2026-10-04 | Claude → Gemini 3.1 Pro (High) | Validation de J2 et compte-rendu via omniroute |
