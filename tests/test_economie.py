@@ -92,14 +92,15 @@ def test_economie_logements_sociaux(con):
 
 
 def test_economie_secret_statistique(con):
-    """Des communes ont le secret statistique INSEE (secret = TRUE)."""
-    n_secret_f = con.execute(
-        "SELECT COUNT(*) FROM economie_filosofi WHERE secret = TRUE"
-    ).fetchone()[0]
-    n_secret_r = con.execute("SELECT COUNT(*) FROM economie_rp WHERE secret = TRUE").fetchone()[0]
-    assert n_secret_f > 0 or n_secret_r > 0, (
-        "Aucune ligne avec secret=TRUE — vérifier la logique de détection du secret INSEE"
-    )
+    """Aucun millésime RP n'est marqué secret en bloc (faux positifs 2015/2016, 2026-09-25).
+
+    La logique de détection du secret est couverte par tests/test_economie_rp_memoire.py ;
+    la base réelle HdF ne contient plus de commune sous secret depuis ce correctif.
+    """
+    millesimes_tout_secret = con.execute(
+        "SELECT annee_millesime FROM economie_rp GROUP BY 1 HAVING bool_and(secret)"
+    ).fetchall()
+    assert millesimes_tout_secret == [], millesimes_tout_secret
 
 
 def test_vue_economie_commune(con):

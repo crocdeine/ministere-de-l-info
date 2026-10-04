@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "genere_le": "2026-09-25T10:47:23+00:00",
+  "genere_le": "2026-10-04T20:07:16+00:00",
   "duckdb_version": "1.5.2",
   "source": "ministere.duckdb",
   "departement": "80",
@@ -328,8 +328,8 @@
     },
     "nuances_harmonisees": {
       "fichier": "nuances_harmonisees.parquet",
-      "lignes": 226,
-      "octets": 5689,
+      "lignes": 229,
+      "octets": 6133,
       "filtre": null,
       "colonnes": [
         [
@@ -550,7 +550,7 @@
     "economie_rp": {
       "fichier": "economie_rp.parquet",
       "lignes": 5397,
-      "octets": 58936,
+      "octets": 58929,
       "filtre": "code_commune IN (SELECT code_insee FROM geographies_communes WHERE code_departement = '80')",
       "colonnes": [
         [
@@ -693,8 +693,8 @@
     },
     "leg_elus": {
       "fichier": "leg_elus.parquet",
-      "lignes": 41,
-      "octets": 5731,
+      "lignes": 31,
+      "octets": 5046,
       "filtre": "code_departement = '80'",
       "colonnes": [
         [
@@ -771,6 +771,59 @@
         ],
         [
           "region_nom",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
+    },
+    "leg_mandats": {
+      "fichier": "leg_mandats.parquet",
+      "lignes": 31,
+      "octets": 2952,
+      "filtre": "EXISTS (SELECT 1 FROM leg_elus e WHERE e.id = leg_mandats.elu_id AND e.chambre = leg_mandats.chambre AND e.code_departement = '80')",
+      "colonnes": [
+        [
+          "elu_id",
+          "VARCHAR"
+        ],
+        [
+          "chambre",
+          "VARCHAR"
+        ],
+        [
+          "legislature",
+          "INTEGER"
+        ],
+        [
+          "groupe_sigle",
+          "VARCHAR"
+        ],
+        [
+          "groupe_nom",
+          "VARCHAR"
+        ],
+        [
+          "code_departement",
+          "VARCHAR"
+        ],
+        [
+          "num_circo",
+          "INTEGER"
+        ],
+        [
+          "date_debut",
+          "DATE"
+        ],
+        [
+          "date_fin",
+          "DATE"
+        ],
+        [
+          "granularite",
+          "VARCHAR"
+        ],
+        [
+          "source",
           "VARCHAR"
         ]
       ],
@@ -889,13 +942,47 @@
         ]
       ],
       "colonnes_geometrie": []
+    },
+    "leg_groupes_blocs": {
+      "fichier": "leg_groupes_blocs.parquet",
+      "lignes": 56,
+      "octets": 4209,
+      "filtre": null,
+      "colonnes": [
+        [
+          "chambre",
+          "VARCHAR"
+        ],
+        [
+          "groupe",
+          "VARCHAR"
+        ],
+        [
+          "legislature_debut",
+          "INTEGER"
+        ],
+        [
+          "legislature_fin",
+          "INTEGER"
+        ],
+        [
+          "bloc",
+          "VARCHAR"
+        ],
+        [
+          "libelle",
+          "VARCHAR"
+        ],
+        [
+          "source_bloc",
+          "VARCHAR"
+        ]
+      ],
+      "colonnes_geometrie": []
     }
   },
   "tables_absentes_de_la_source": [],
-  "tables_source_non_exportees": [
-    "leg_groupes_blocs",
-    "leg_mandats"
-  ],
+  "tables_source_non_exportees": [],
   "vues_source": [
     "v_activite_par_bloc",
     "v_composition_legislature",
@@ -924,5 +1011,5 @@
     "v_scores_commune_muni",
     "v_scores_commune_pres"
   ],
-  "octets_total": 817954
+  "octets_total": 824867
 }
