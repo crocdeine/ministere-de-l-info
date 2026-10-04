@@ -4,6 +4,26 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import folium
+
+# Fond Plan IGN (Géoplateforme, Licence Ouverte, sans clé), atténué pour ne pas
+# interférer avec les couleurs des données. CARTO exige une clé depuis 2026.
+_URL_PLAN_IGN: str = (
+    "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0"
+    "&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM"
+    "&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}"
+)
+
+
+def nouvelle_carte(location: list[float], zoom_start: int) -> folium.Map:
+    """Carte Folium sur fond Plan IGN atténué."""
+    m = folium.Map(location=location, zoom_start=zoom_start, tiles=None)
+    folium.TileLayer(
+        _URL_PLAN_IGN, attr="Fond : © IGN — Plan IGN", name="Plan IGN", opacity=0.35
+    ).add_to(m)
+    return m
+
+
 _COULEURS_YLORD5: list[str] = ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"]
 _COULEUR_CONTOURS: str = "#4292c6"
 _COULEUR_FOND_CONTOURS: str = "#f7f7f7"

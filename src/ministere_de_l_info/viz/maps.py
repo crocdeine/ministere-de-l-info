@@ -11,6 +11,7 @@ import duckdb
 import folium
 import folium.features
 
+from ministere_de_l_info.sources import LO2, mention
 from ministere_de_l_info.viz._config import (
     _CENTRE_FRANCE,
     _LIBELLES_NIVEAUX,
@@ -30,6 +31,7 @@ from ministere_de_l_info.viz._display import (
     _compute_breaks,
     _fmt_fr,
     _fmt_pct,
+    nouvelle_carte,
 )
 from ministere_de_l_info.viz._queries import (
     _build_query_choropleth,
@@ -161,7 +163,7 @@ def make_choropleth(
 
     geojson_data = {"type": "FeatureCollection", "features": features}
 
-    m = folium.Map(location=_CENTRE_FRANCE, zoom_start=_ZOOM_DEPART, tiles="CartoDB positron")
+    m = nouvelle_carte(_CENTRE_FRANCE, _ZOOM_DEPART)
 
     if zoomed:
         bounds = _fit_bounds_for_filter(con, niveau, geom_col, filtre_departement, filtre_region)
@@ -250,7 +252,12 @@ def make_choropleth(
         source_suffix = f" {annee}"
     else:
         source_suffix = ""
-    source_txt = f"{_SOURCE}{source_suffix}"
+    source = (
+        f"Source : {mention('circos')} (non officiel)"
+        if niveau == "circonscription"
+        else f"{_SOURCE} — {LO2}"
+    )
+    source_txt = f"{source}{source_suffix}"
     m.get_root().html.add_child(
         folium.Element(
             '<div style="position:fixed;bottom:12px;right:12px;z-index:1000;background:white;'

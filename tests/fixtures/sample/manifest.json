@@ -694,7 +694,7 @@
     "leg_elus": {
       "fichier": "leg_elus.parquet",
       "lignes": 41,
-      "octets": 5588,
+      "octets": 5731,
       "filtre": "code_departement = '80'",
       "colonnes": [
         [
@@ -720,10 +720,6 @@
         [
           "sexe",
           "VARCHAR"
-        ],
-        [
-          "date_naissance",
-          "DATE"
         ],
         [
           "code_departement",
@@ -928,5 +924,5 @@
     "v_scores_commune_muni",
     "v_scores_commune_pres"
   ],
-  "octets_total": 817811
+  "octets_total": 817954
 }

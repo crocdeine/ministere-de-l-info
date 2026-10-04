@@ -187,7 +187,6 @@ def load_legislatif_datan(
                 nom,
                 prenom,
                 _sexe(row.get("civ")),
-                _parse_date(row.get("naissance")),
                 code_dep,
                 nom_dep,
                 None,  # region_nom non disponible dans Datan
@@ -246,12 +245,12 @@ def load_legislatif_datan(
         """
         INSERT INTO leg_elus (
             id, chambre, legislature,
-            nom, prenom, sexe, date_naissance,
+            nom, prenom, sexe,
             code_departement, nom_departement, region_nom, num_circo,
             groupe_sigle, groupe_nom, bloc_politique, bloc_override,
             date_debut_mandat, date_fin_mandat,
             est_actif, profession, source
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (id, chambre) DO UPDATE SET
             legislature       = excluded.legislature,
             groupe_sigle      = excluded.groupe_sigle,

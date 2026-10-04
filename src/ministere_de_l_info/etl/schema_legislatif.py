@@ -49,7 +49,6 @@ def create_legislatif_schema(con: duckdb.DuckDBPyConnection) -> None:
             nom              VARCHAR     NOT NULL,
             prenom           VARCHAR     NOT NULL,
             sexe             VARCHAR(1),
-            date_naissance   DATE,
             code_departement VARCHAR(3)  NOT NULL,
             nom_departement  VARCHAR,
             region_nom       VARCHAR,
@@ -69,6 +68,8 @@ def create_legislatif_schema(con: duckdb.DuckDBPyConnection) -> None:
 
     # Migration F2.2 : ajout region_nom si table existait avant
     con.execute("ALTER TABLE leg_elus ADD COLUMN IF NOT EXISTS region_nom VARCHAR")
+    # Minimisation RGPD (audit 2026-10-04) : date de naissance non utilisée, retirée
+    con.execute("ALTER TABLE leg_elus DROP COLUMN IF EXISTS date_naissance")
 
     con.execute("""
         CREATE TABLE IF NOT EXISTS leg_activite (

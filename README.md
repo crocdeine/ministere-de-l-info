@@ -201,4 +201,4 @@ uv run pre-commit run --all-files  # lancement manuel
 
 - **Auteur** : Mathias
 - **Sources** : IGN ADMIN-EXPRESS-COG · INSEE (Mélodi, Filosofi, RP) · ministère de l'Intérieur / data.gouv.fr · Datan · Sénat (data.senat.fr) · CNAF · DREES · URSSAF · Eurostat
-- **Licence** : données publiques (Licence Ouverte / Open Licence 2.0 pour les sources publiées sur data.gouv.fr) ; les conditions de réutilisation propres à chaque autre source (Eurostat, Datan, etc.) sont à consulter chez le producteur
+- **Licence** : code sous MIT (`LICENSE`) ; base de données sous ODbL 1.0, avec la liste des sources et de leurs licences (`LICENSE-DONNEES.md`, détail dans `docs/sources.md`)

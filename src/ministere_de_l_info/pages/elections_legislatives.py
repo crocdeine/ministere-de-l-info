@@ -7,7 +7,9 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._blocs_politiques import legende_classement_blocs
 from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
+from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz.elections_legi_queries import (
     get_bv_details_legi,
     get_circo_bounds,
@@ -145,10 +147,7 @@ def _render_vue_hdf(
         f"{scores_df['code_circo'].n_unique()}",
     )
 
-    st.caption(
-        "Source : data.gouv.fr — Données des élections agrégées. "
-        "Classement des blocs : nomenclature officielle Ministère de l'Intérieur."
-    )
+    st.caption(f"Source : {mention('elections')}. " + legende_classement_blocs("legi", annee))
 
     # Carte choroplèthe circos
     st.subheader(f"Carte HdF par circonscription — {annee}, {'1er' if tour == 1 else '2e'} tour")

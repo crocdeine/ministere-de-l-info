@@ -7,7 +7,9 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._blocs_politiques import legende_classement_blocs
 from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
+from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz.elections_queries import (
     _BLOCS_ORDERED,
     DB_PATH,
@@ -139,11 +141,7 @@ def render() -> None:
     )
     m4.metric("Bloc majoritaire", libelles.get(bloc_zone, "—"))
 
-    st.caption(
-        "Source : data.gouv.fr — Données des élections agrégées. "
-        "Classement des blocs : nomenclature officielle Ministère de l'Intérieur "
-        "(voir docs/sources-officielles/nuances/)."
-    )
+    st.caption(f"Source : {mention('elections')}. " + legende_classement_blocs("pres", annee))
 
     # ── Carte ───────────────────────────────────────────────────────────────────
     st.subheader(f"Carte — {annee}, {'1er' if tour == 1 else '2e'} tour")

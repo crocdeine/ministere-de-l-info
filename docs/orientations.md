@@ -34,3 +34,14 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
 - Stack non négociable (CLAUDE.md) ; nomenclature officielle des blocs (ADR-0005 révisé par ADR-0010) ;
   Législatif par législature (ADR-0011) ; exécution native sur Mac (ADR-0012).
 - Décisions de la vague 2 en attente (lots A à G) : voir `reports/synthese-vague-2-2026-09-24.md` §3.
+
+## Décisions du 2026-10-04 (validation de l'audit)
+
+- Base de données publiée sous **ODbL** ; code sous **MIT** (ADR-0013).
+- **Minimisation** : pas de date de naissance des élus dans la base.
+- **Non-inscrits** : classés selon la nuance attribuée par la préfecture à leur élection
+  (et non « Divers » par défaut) — à appliquer en J2.
+- **Neutralité des titres** : pas de parti nommé dans les questions éditoriales ; on raisonne
+  par blocs ; pas d'intitulé qui présuppose une conclusion (« Désindustrialisation » → « Emploi
+  industriel et accès aux médecins »).
+- Une classification reconstruite par le projet n'est jamais présentée comme officielle.

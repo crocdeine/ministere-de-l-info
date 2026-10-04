@@ -212,7 +212,7 @@ de 15 à 64 ans.
 - **Une corrélation n'est pas une causalité** : le graphique montre une tendance
   territoriale, pas une explication du vote.
 
-### Onglet Désindustrialisation
+### Onglet Emploi industriel et accès aux médecins
 
 - **Emploi industriel 2006-2025** : effectifs salariés du secteur privé dans l'industrie
   en Hauts-de-France (source URSSAF). Les bandes grisées signalent la crise de 2008-2010

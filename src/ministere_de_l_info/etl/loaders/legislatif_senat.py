@@ -315,7 +315,6 @@ def load_legislatif_senat(
         elif bloc is None:
             non_classes[(groupe, None)] += 1
 
-        date_naissance = _parse_date(row.get("Date naissance"))
         # Aucune date de mandat dans ODSEN_GENERAL : NULL plutôt que la date du jour.
         date_debut = None
         date_fin = None
@@ -330,7 +329,6 @@ def load_legislatif_senat(
                 str(row["Nom usuel"]).strip(),
                 str(row["Prénom usuel"]).strip(),
                 None,
-                date_naissance,
                 code_dep,
                 circo_nom,
                 None,  # region_nom — non disponible dans le CSV Sénat
@@ -386,12 +384,12 @@ def load_legislatif_senat(
         """
         INSERT INTO leg_elus (
             id, chambre, legislature,
-            nom, prenom, sexe, date_naissance,
+            nom, prenom, sexe,
             code_departement, nom_departement, region_nom, num_circo,
             groupe_sigle, groupe_nom, bloc_politique, bloc_override,
             date_debut_mandat, date_fin_mandat,
             est_actif, profession, source
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT (id, chambre) DO UPDATE SET
             nom              = excluded.nom,
             prenom           = excluded.prenom,

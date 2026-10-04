@@ -9,12 +9,16 @@ import folium
 import folium.features
 import polars as pl
 
-from ministere_de_l_info.viz._display import _build_legend_html, _fmt_fr
+from ministere_de_l_info.viz._display import _build_legend_html, _fmt_fr, nouvelle_carte
 
 _SOURCE_HTML: str = (
     '<div style="position:fixed;bottom:12px;right:12px;z-index:1000;background:white;'
     "color:#555;padding:4px 10px;border-radius:4px;font-size:11px;border:1px solid #ddd;"
-    'pointer-events:none;">Source : data.gouv.fr — Élections agrégées</div>'
+    "pointer-events:none;\">Source : ministère de l'Intérieur (data.gouv.fr) — Licence Ouverte 2.0"
+    "</div>"
+)
+_SOURCE_HTML_CIRCOS: str = _SOURCE_HTML.replace(
+    "</div>", " · Contours des circonscriptions : J. Desboeufs (non officiels)</div>"
 )
 
 
@@ -88,7 +92,7 @@ def make_choropleth_elections_bloc_dominant(
             }
         )
 
-    m = folium.Map(location=[50.35, 3.4], zoom_start=10, tiles="CartoDB positron")
+    m = nouvelle_carte([50.35, 3.4], 10)
     if bounds:
         m.fit_bounds(bounds)
 
@@ -163,7 +167,7 @@ def make_choropleth_legi_circos_bloc_dominant(
             }
         )
 
-    m = folium.Map(location=[50.2, 2.8], zoom_start=8, tiles="CartoDB positron")
+    m = nouvelle_carte([50.2, 2.8], 8)
     if bounds:
         m.fit_bounds(bounds)
 
@@ -185,7 +189,7 @@ def make_choropleth_legi_circos_bloc_dominant(
     ).add_to(m)
 
     m.get_root().html.add_child(folium.Element(_legend_blocs_html(blocs_meta, titre)))
-    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    m.get_root().html.add_child(folium.Element(_SOURCE_HTML_CIRCOS))
     return m
 
 
@@ -238,7 +242,7 @@ def make_choropleth_elections_score_bloc(
             }
         )
 
-    m = folium.Map(location=[50.35, 3.4], zoom_start=10, tiles="CartoDB positron")
+    m = nouvelle_carte([50.35, 3.4], 10)
     if bounds:
         m.fit_bounds(bounds)
 
@@ -373,7 +377,7 @@ def make_choropleth_muni_communes_bloc_dominant(
             }
         )
 
-    m = folium.Map(location=[50.2, 2.8], zoom_start=8, tiles="CartoDB positron")
+    m = nouvelle_carte([50.2, 2.8], 8)
     if bounds:
         m.fit_bounds(bounds)
 

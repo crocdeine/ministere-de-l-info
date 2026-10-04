@@ -7,7 +7,9 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._blocs_politiques import legende_classement_blocs
 from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
+from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz.elections_muni_queries import (
     get_communes_hdf_muni_list,
     get_communes_muni_geo,
@@ -148,10 +150,7 @@ def _render_carte_hdf(
     except Exception as exc:
         st.error(f"Erreur carte : {exc}")
 
-    st.caption(
-        "Source : data.gouv.fr — Données des élections agrégées. "
-        "Classement des blocs : nomenclature officielle Ministère de l'Intérieur."
-    )
+    st.caption(f"Source : {mention('elections')}. " + legende_classement_blocs("muni", annee))
 
 
 def _render_evolution_hdf(

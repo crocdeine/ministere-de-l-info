@@ -4,10 +4,10 @@ Mise à jour : 2026-10-04. Détail des constats : `docs/audit-2026-10-04.md`.
 
 | Jalon | Objet | État |
 |---|---|---|
-| Phase 0 | Audit de l'existant, outils, sauvegarde, documents de suivi | ✅ terminé — en attente de validation |
-| J1 | Conformité : licences, légendes des blocs, sources affichées, détection de secrets | à faire |
-| J2 | Exactitude : groupes sénatoriaux, non-inscrits, valeurs manquantes, sources des classements | à faire |
-| J3 | Lisibilité honnête : échelles, municipales en %, titres neutres, palette accessible | à faire |
+| Phase 0 | Audit de l'existant, outils, sauvegarde, documents de suivi | ✅ validé le 2026-10-04 |
+| J1 | Conformité : licences, légendes des blocs, sources affichées, détection de secrets | ✅ fait le 2026-10-04 — republication de la base en attente d'accord |
+| J2 | Exactitude : groupes sénatoriaux, non-inscrits, valeurs manquantes, sources des classements (dont 23 codes municipaux 2020/2026 à rattacher ligne à ligne à leur circulaire) | à faire |
+| J3 | Lisibilité honnête : échelles, municipales en %, palette accessible, indicateur « Bloc majoritaire » tronqué (titres neutres : faits en J1) | à faire |
 | J4 | Hygiène et durcissement : rangement, code mort, cache, infra | à faire |
 | J5 | Fusion dans `main` | à faire |
 

@@ -1,8 +1,8 @@
 """Page Économie — module render() (Phase E4 + E+).
 
 Répond aux questions éditoriales de l'ADR-0006 :
-1. Les communes les plus pauvres votent-elles RN ?
-2. La désindustrialisation prédit-elle le vote EXD ?
+1. Le niveau de pauvreté d'une commune est-il associé à son vote par bloc ?
+2. La part de l'emploi industriel est-elle associée au vote par bloc ?
 3. La part d'ouvriers/employés détermine-t-elle la couleur politique ?
 4. Les communes pauvres s'abstiennent-elles ou votent-elles contestataire ?
 """
@@ -27,6 +27,8 @@ from ministere_de_l_info._theme import (
     render_donnees_indisponibles,
     render_page_header,
 )
+from ministere_de_l_info.sources import mention
+from ministere_de_l_info.viz._display import nouvelle_carte
 from ministere_de_l_info.viz.economie_queries import (
     annees_croisement_exploitables,
     get_annees_par_indicateur,
@@ -70,7 +72,7 @@ _PREFIXES_ONGLETS: dict[str, tuple[str, ...]] = {
     "Carte des indicateurs": ("eco_indicateur", "eco_annee", "eco_drilldown"),
     "Évolution HdF": ("eco_evol_", "eco_ctx_"),
     "Économie × Élections": ("eco_crois_",),
-    "Désindustrialisation": ("industrie_",),
+    "Emploi industriel et accès aux médecins": ("industrie_",),
 }
 _ONGLETS: list[str] = list(_PREFIXES_ONGLETS)
 
@@ -105,7 +107,7 @@ def _make_choropleth(df: pl.DataFrame, libelle: str) -> folium.Map:
 
     Les communes sans données (secret INSEE ou valeur manquante) sont affichées en gris.
     """
-    m = folium.Map(location=[50.3, 2.9], zoom_start=8)
+    m = nouvelle_carte([50.3, 2.9], 8)
 
     features = []
     for row in df.iter_rows(named=True):
@@ -219,13 +221,13 @@ def _render_carte_tab() -> None:
     n_valides = df.filter(pl.col("valeur").is_not_null() & ~pl.col("secret")).height
     n_secret = df.filter(pl.col("secret")).height
     if indicateur in _FILOSOFI_INDICS:
-        source = "INSEE Filosofi"
+        source = mention("insee_filosofi_rp")
     elif indicateur == "nb_foyers_rsa":
-        source = "CNAF data.caf.fr"
+        source = mention("cnaf")
     elif indicateur == "apl_medecins":
-        source = "DREES data.solidarites-sante.gouv.fr"
+        source = mention("drees")
     else:
-        source = "INSEE Recensement de la Population"
+        source = mention("insee_filosofi_rp")
     secret_info = (
         f" · {n_secret:,} sous secret statistique INSEE (gris)".replace(",", " ")
         if n_secret
@@ -404,7 +406,10 @@ def _render_contexte_section() -> None:
             delta_color=delta_color,
         )
 
-    st.caption("Source : Eurostat — lfst_r_lfu3rt / nama_10r_2gdp")
+    st.caption(
+        f"Source : {mention('eurostat')} — jeux lfst_r_lfu3rt et nama_10r_2gdp, "
+        "drapeaux de qualité non repris."
+    )
 
 
 def _render_evolution_tab() -> None:
@@ -441,7 +446,7 @@ def _render_evolution_tab() -> None:
         )
         fig.update_layout(height=420, margin={"t": 50, "b": 30})
         st.plotly_chart(fig, width="stretch")
-        st.caption("Source : CNAF data.caf.fr — snapshot décembre")
+        st.caption(f"Source : {mention('cnaf')} — situation en décembre")
         return
 
     evol_df = get_evolution_hdf()
@@ -504,9 +509,9 @@ def _render_evolution_tab() -> None:
 def _render_croisement_tab() -> None:
     """Onglet Économie × Élections — scatter plot corrélation territoriale."""
     st.markdown(
-        "**Questions éditoriales** : Les communes les plus pauvres votent-elles RN ? "
-        "La désindustrialisation prédit-elle le vote EXD ? "
-        "La part d'ouvriers/employés détermine-t-elle la couleur politique ?"
+        "**Questions explorées** : le niveau de pauvreté, la part de l'emploi industriel "
+        "ou la part d'ouvriers et employés d'une commune sont-ils associés à son vote "
+        "par bloc ?"
     )
 
     indicateurs = _INDICATEURS_CROISEMENT
@@ -628,7 +633,7 @@ def _render_croisement_tab() -> None:
 
 
 def _render_industrie_tab() -> None:
-    """Onglet Désindustrialisation — emploi GS1 Industrie + déserts médicaux."""
+    """Onglet Emploi industriel et accès aux médecins — emploi GS1 Industrie + APL."""
     st.subheader("Emploi industriel (GS1) — Hauts-de-France 2006-2025")
     hdf_df = get_desindustrialisation_commune()
     if hdf_df.is_empty():
@@ -663,7 +668,10 @@ def _render_industrie_tab() -> None:
         )
         fig.update_layout(height=400, margin={"t": 50, "b": 30})
         st.plotly_chart(fig, width="stretch")
-        st.caption("Source : URSSAF / ACOSS — open.urssaf.fr")
+        st.caption(
+            f"Source : {mention('urssaf')}. Champ : secteur privé, établissements "
+            "employeurs ; cases masquées par l'URSSAF non comptées."
+        )
 
     st.subheader("Détail d'une commune")
     communes_ind = get_communes_industrie_hdf()
@@ -725,8 +733,9 @@ def _render_industrie_tab() -> None:
                 st.error(f"Erreur carte déserts médicaux : {exc}")
                 logger.exception("Erreur carte déserts médicaux")
             st.caption(
-                "Rouge : APL < 2,5 consult./hab./an (seuil officiel DREES). "
-                "Source : DREES data.solidarites-sante.gouv.fr"
+                "Rouge : APL < 2,5 consultations par habitant et par an, seuil de "
+                "sous-densité médicale utilisé par la DREES (convention, pas un zonage "
+                f"réglementaire). Source : {mention('drees')}"
             )
 
 

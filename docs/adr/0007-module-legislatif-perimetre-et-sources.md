@@ -133,6 +133,9 @@ méthodologique à valider par Mathias.
    le libellé « 2002-présent » ne vaut que pour l'AN.
 7. **Code conservé des sources abandonnées** : le rapport Phase F indique « code non
    conservé » alors que `legislatif_nosdeputes.py` et `legislatif_clair.py` sont
-   toujours présents. Suppression ou conservation à décider.
+   toujours présents. **Résolu le 2026-10-04** : fichiers supprimés (code mort, aucun
+   import ; récupérables dans l'historique git).
 8. **Nom de la vue `v_elus_hdf_actuels`** : trompeur depuis le passage au national
    (aucun filtre HdF dans la vue).
+9. **Date de naissance** : colonne `leg_elus.date_naissance` retirée le 2026-10-04
+   (minimisation RGPD : donnée non utilisée par l'interface, publiée dans la base).

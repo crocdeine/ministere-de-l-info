@@ -88,6 +88,9 @@ Toute décision d'architecture non triviale est documentée dans `docs/adr/`. Ne
 | [0008](docs/adr/0008-economie-sources-complementaires.md) | Économie — sources complémentaires | CNAF, DREES, URSSAF, Eurostat ; tables `economie_social`, `economie_emploi_urssaf`, `economie_contexte`. Rétroactif. |
 | [0009](docs/adr/0009-design-system-et-navigation.md) | Design system et navigation | Tokens CSS, `app.py` routeur `st.navigation()`/`st.Page()`, `_blocs_politiques.py`. Rétroactif. |
 | [0010](docs/adr/0010-revision-nuances-et-blocs.md) | Révision nuances et blocs | Grilles officielles dès 2020, doctrine « grille la plus proche », 18 reclassements. Révise 0005. |
+| [0011](docs/adr/0011-legislatif-groupes-par-legislature.md) | Législatif par législature | Classement des groupes parlementaires par législature (`leg_groupes_blocs`, `leg_mandats`). |
+| [0012](docs/adr/0012-execution-native-mac.md) | Exécution native sur Mac | LaunchAgent, 127.0.0.1, port 8502 ; Docker conservé pour la distribution. |
+| [0013](docs/adr/0013-licences-et-mentions-des-sources.md) | Licences et mentions des sources | Code MIT, base ODbL, registre `sources.py`, légende des blocs par scrutin, `date_naissance` supprimée, fond Plan IGN. |
 
 ---
 

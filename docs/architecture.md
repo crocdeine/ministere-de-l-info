@@ -86,9 +86,7 @@ ministere-de-l-info/
 │   │       ├── economie_eurostat.py    # Eurostat SDMX → economie_contexte
 │   │       ├── legislatif_senat.py     # data.senat.fr ODSEN_GENERAL → leg_elus + leg_mandats
 │   │       ├── legislatif_datan.py     # Datan → leg_elus + leg_mandats + leg_activite
-│   │       ├── legislatif_overrides.py # Corrections manuelles → leg_blocs_override
-│   │       ├── legislatif_nosdeputes.py  # Source abandonnée (non appelée)
-│   │       └── legislatif_clair.py       # Source abandonnée (non appelée)
+│   │       └── legislatif_overrides.py # Corrections manuelles → leg_blocs_override
 │   │
 │   ├── pages/                      # render() appelés par les fichiers de pages/
 │   │   ├── elections_presidentielles.py  # 2002-2022, zone circo 21 ou HdF, drill-down BV

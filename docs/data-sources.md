@@ -308,8 +308,8 @@ exigerait les fichiers de mandats de data.senat.fr (non chargés).
 
 | Source | Module | Raison | Code |
 |--------|--------|--------|------|
-| NosDéputés.fr (Regards Citoyens) | Législatif | Endpoint de métriques vide depuis la dissolution de juin 2024 | `etl/loaders/legislatif_nosdeputes.py`, non appelé |
-| API CLAIR (`api.clair.vote`) | Législatif | HTTP 500 sur tous les endpoints | `etl/loaders/legislatif_clair.py`, non appelé |
+| NosDéputés.fr (Regards Citoyens) | Législatif | Endpoint de métriques vide depuis la dissolution de juin 2024 | loader supprimé le 2026-10-04 (historique git) |
+| API CLAIR (`api.clair.vote`) | Législatif | HTTP 500 sur tous les endpoints | loader supprimé le 2026-10-04 (historique git) |
 | INSEE Sirene | Économie | Prévu par l'ADR-0006 pour l'emploi industriel ; remplacé par le RP (communal) et l'URSSAF (série longue) | — |
 | INSEE BDM / IDBank | Économie | Protection anti-robot ; remplacé par Eurostat | — |
 

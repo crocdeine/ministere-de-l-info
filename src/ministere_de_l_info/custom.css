@@ -303,7 +303,7 @@
   /* Carte */
   --map-contour-fill: #f7f7f7; /* niveaux sans données */
   --map-contour-stroke: #000091; /* contours bleu France */
-  --map-tile-bg: #fafafa; /* fond de tuile CartoDB positron */
+  --map-tile-bg: #fafafa; /* fond de tuile (Plan IGN atténué, ADR-0013) */
   --map-stroke-on-fill: #ffffff; /* séparateur entre polygones */
   --map-secret-fill: #cccccc; /* secret statistique INSEE */
 }
