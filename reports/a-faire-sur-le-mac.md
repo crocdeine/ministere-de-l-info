@@ -117,7 +117,7 @@ Le script refuse de dépasser 5 Mo. Signaler au directeur tout avertissement `Ec
 
 ---
 
-## Étape 4 bis — Appliquer les correctifs issus du retour du 25/09 ✅ Prête
+## Étape 4 bis — Appliquer les correctifs issus du retour du 25/09 ✔️ Faite le 2026-10-04 (directeur)
 
 Correctifs : lot 2 (LMAJ 2008 → droite, LCMD 2008 → centre, 229 nuances), anciens groupes du Sénat d'avant 2002 exclus, chômage RP 2015/2016 (faux secret statistique), échantillon complété avec les tables du Législatif, corrections d'interface.
 
@@ -175,7 +175,7 @@ manuellement sans validation explicite de Mathias en chat.
 
 ---
 
-## Étape 6 — Recharger le Sénat après les sénatoriales du 27/09 ⏳ Après mise à jour de data.senat.fr
+## Étape 6 — Recharger le Sénat après les sénatoriales du 27/09 ⏳ En attente des groupes (veille quotidienne : `scripts/veille_groupes_senat.py`, tâche planifiée « veille-groupes-senat »)
 
 ```bash
 cp data/ministere.duckdb data/ministere.duckdb.bak-avant-senat-2026

@@ -35,6 +35,6 @@ recherche web, texte intégral non relu ; **D** = déduite, à vérifier.
 
 ## Points ouverts
 
-- Releases déjà publiées : encore sans mention ODbL et avec `date_naissance` (republication à décider).
+- Base republiée sous ODbL, sans `date_naissance` : release `db-2026-10-04` (2026-10-04). Les releases antérieures (`v0.5`, `db-2026-05`) restent en ligne sans mention ODbL : à retirer ou annoter (décision Mathias).
 - Résultats électoraux : date de chargement non tracée dans `_etl_metadata`.
 - Fond de carte : Plan IGN (Licence Ouverte), mention « © IGN » affichée sur chaque carte.
