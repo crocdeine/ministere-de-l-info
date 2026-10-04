@@ -10,6 +10,7 @@ from streamlit_folium import st_folium
 from ministere_de_l_info._blocs_politiques import legende_classement_blocs
 from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
 from ministere_de_l_info.sources import mention
+from ministere_de_l_info.viz._display import fmt_nd
 from ministere_de_l_info.viz.elections_muni_queries import (
     get_communes_hdf_muni_list,
     get_communes_muni_geo,
@@ -234,9 +235,9 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
     st.caption(f"Commune sélectionnée : **{nom_commune}** ({code_commune})")
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Inscrits", f"{metrics['inscrits']:,}".replace(",", " "))
-    m2.metric("Votants", f"{metrics['votants']:,}".replace(",", " "))
-    m3.metric("Participation", f"{metrics['taux_participation_pct']:.1f} %")
+    m1.metric("Inscrits", fmt_nd(metrics["inscrits"]))
+    m2.metric("Votants", fmt_nd(metrics["votants"]))
+    m3.metric("Participation", fmt_nd(metrics["taux_participation_pct"], ".1f", " %"))
     if metrics["est_nuancee"] and metrics["bloc_dominant"]:
         m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "—"))
     else:
@@ -258,13 +259,14 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
             table_bloc = (
                 bloc_classee.with_columns(
                     pl.col("bloc").replace(libelles).alias("Bloc"),
-                    pl.col("pct_exprimes").fill_null(0.0),
                 )
                 .select(["Bloc", "voix", "pct_exprimes"])
                 .rename({"voix": "Voix", "pct_exprimes": "% exprimés"})
             )
             st.dataframe(
-                table_bloc.to_pandas().style.format({"Voix": "{:,.0f}", "% exprimés": "{:.2f}"}),
+                table_bloc.to_pandas().style.format(
+                    {"Voix": "{:,.0f}", "% exprimés": "{:.2f}"}, na_rep="n.d."
+                ),
                 width="stretch",
                 hide_index=True,
             )
@@ -287,7 +289,6 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
                 pl.col("nom_tete_liste").fill_null("—").alias("Nom tête de liste"),
                 pl.col("prenom_tete_liste").fill_null("").alias("Prénom"),
                 pl.col("libelle_abrege_liste").fill_null("—").alias("Libellé abrégé"),
-                pl.col("pct_exprimes").fill_null(0.0),
             )
             .select(
                 [
@@ -303,7 +304,9 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
             .rename({"rang": "Rang", "voix": "Voix", "pct_exprimes": "% exprimés"})
         )
         st.dataframe(
-            table_listes.to_pandas().style.format({"Voix": "{:,.0f}", "% exprimés": "{:.2f}"}),
+            table_listes.to_pandas().style.format(
+                {"Voix": "{:,.0f}", "% exprimés": "{:.2f}"}, na_rep="n.d."
+            ),
             width="stretch",
             hide_index=True,
         )

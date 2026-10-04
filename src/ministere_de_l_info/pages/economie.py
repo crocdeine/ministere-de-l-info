@@ -88,18 +88,72 @@ _INDICATEURS_CROISEMENT: dict[str, str] = {
 }
 
 
+SEUIL_DESERT_APL = 2.5
+_ETATS_DESERT: dict[str, tuple[str, str]] = {
+    "desert": ("#C62828", "Sous le seuil (APL < 2,5)"),
+    "hors_desert": ("#DDE6EE", "Au-dessus du seuil (APL ≥ 2,5)"),
+    "sans_donnee": ("#5F6368", "Sans donnée (n.d.)"),
+}
+
+
+def _etat_desert(valeur: float | None) -> str:
+    """Catégorie d'une commune : désert, hors désert ou sans donnée (NULL/NaN)."""
+    if valeur is None or valeur != valeur:
+        return "sans_donnee"
+    return "desert" if valeur < SEUIL_DESERT_APL else "hors_desert"
+
+
 def _make_desert_map(df: pl.DataFrame) -> folium.Map:
-    """Carte déserts médicaux — rouge si APL < 2,5, gris sinon (choroplèthe binaire)."""
-    return _make_choropleth(
-        df.with_columns(
-            pl.when(pl.col("valeur").is_not_null() & (pl.col("valeur") < 2.5))
-            .then(pl.lit(1.0))
-            .otherwise(pl.lit(None, dtype=pl.Float64))
-            .alias("valeur"),
-            pl.lit(False).alias("secret"),
+    """Carte déserts médicaux à 3 états distincts (désert / hors désert / sans donnée)."""
+    m = nouvelle_carte([50.3, 2.9], 8)
+    features = []
+    for row in df.iter_rows(named=True):
+        if not row["geojson"]:
+            continue
+        try:
+            geom = json.loads(row["geojson"])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        val = None if row["secret"] else row["valeur"]
+        etat = _etat_desert(val)
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "nom": row["nom_commune"],
+                    "etat": etat,
+                    "apl_str": "n.d." if etat == "sans_donnee" else f"{val:.2f}".replace(".", ","),
+                    "etat_str": _ETATS_DESERT[etat][1],
+                },
+                "geometry": geom,
+            }
+        )
+    folium.GeoJson(
+        {"type": "FeatureCollection", "features": features},
+        style_function=lambda f: {
+            "fillColor": _ETATS_DESERT[f["properties"]["etat"]][0],
+            "fillOpacity": 0.85,
+            "color": "#8A8F98",
+            "weight": 0.3,
+        },
+        tooltip=folium.features.GeoJsonTooltip(
+            fields=["nom", "apl_str", "etat_str"],
+            aliases=["Commune", "APL (consult./hab./an)", "État"],
         ),
-        "Désert médical (APL < 2,5)",
+    ).add_to(m)
+    items = "".join(
+        f'<div><span style="display:inline-block;width:14px;height:14px;background:{c};'
+        f'border:1px solid #8A8F98;margin-right:6px;vertical-align:middle"></span>{lib}</div>'
+        for c, lib in _ETATS_DESERT.values()
     )
+    m.get_root().html.add_child(
+        folium.Element(
+            '<div style="position:fixed;bottom:24px;right:12px;z-index:9999;background:#fff;'
+            'padding:8px 10px;border:1px solid #8A8F98;font:12px sans-serif;color:#1a1a1a">'
+            f"<b>Désert médical</b>{items}</div>"
+        )
+    )
+    return m
 
 
 def _make_choropleth(df: pl.DataFrame, libelle: str) -> folium.Map:
@@ -733,9 +787,10 @@ def _render_industrie_tab() -> None:
                 st.error(f"Erreur carte déserts médicaux : {exc}")
                 logger.exception("Erreur carte déserts médicaux")
             st.caption(
-                "Rouge : APL < 2,5 consultations par habitant et par an, seuil de "
+                "Désert médical : APL < 2,5 consultations par habitant et par an, seuil de "
                 "sous-densité médicale utilisé par la DREES (convention, pas un zonage "
-                f"réglementaire). Source : {mention('drees')}"
+                "réglementaire). Les communes sans donnée (gris foncé) sont distinguées de "
+                f"celles au-dessus du seuil. Source : {mention('drees')}"
             )
 
 

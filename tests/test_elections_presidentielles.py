@@ -95,10 +95,10 @@ class TestGetMetricsCommunePres:
             "bloc_dominant",
         } == set(m)
 
-    def test_commune_inconnue_retourne_zeros(self, db_ready):
+    def test_commune_inconnue_retourne_none(self, db_ready):
         m = get_metrics_commune_pres(2022, 1, "99999")
-        assert m["inscrits"] == 0
-        assert m["votants"] == 0
+        assert m["inscrits"] is None
+        assert m["votants"] is None
 
 
 class TestGetBvDetailsPres:

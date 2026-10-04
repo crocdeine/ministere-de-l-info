@@ -39,6 +39,13 @@ def _fmt_fr(n: float) -> str:
     return f"{int(n):,}".replace(",", " ")
 
 
+def fmt_nd(n: float | None, fmt: str = ",.0f", suffixe: str = "") -> str:
+    """Formate un nombre en français ; valeur absente (None/NaN) -> « n.d. », jamais 0."""
+    if n is None or n != n:
+        return "n.d."
+    return f"{n:{fmt}}".replace(",", "\u202f").replace(".", ",") + suffixe
+
+
 def _fmt_pct(n: float) -> str:
     """Formate un pourcentage avec signe (ex : +4.2% ou -1.3%)."""
     return f"{n:+.1f}%"

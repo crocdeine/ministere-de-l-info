@@ -25,6 +25,11 @@ __all__ = [
 ]
 
 
+def _opt_int(v: object) -> int | None:
+    """int(v) ou None si valeur absente (pas de 0 inventé)."""
+    return None if v is None else int(v)  # type: ignore[call-overload]
+
+
 @st.cache_data(ttl=60)
 def is_muni_data_loaded() -> bool:
     """Vérifie que les résultats municipaux sont chargés."""
@@ -263,10 +268,10 @@ def get_metrics_commune_muni(annee: int, tour: int, code_commune: str) -> dict:
         con.close()
 
     return {
-        "inscrits": int(part_row[0] or 0),
-        "votants": int(part_row[1] or 0),
-        "exprimes": int(part_row[2] or 0),
-        "taux_participation_pct": float(part_row[3] or 0.0),
+        "inscrits": _opt_int(part_row[0]),
+        "votants": _opt_int(part_row[1]),
+        "exprimes": _opt_int(part_row[2]),
+        "taux_participation_pct": None if part_row[3] is None else float(part_row[3]),
         "nb_listes": int(nb_listes or 0),
         "est_nuancee": bool(nuancee_row[0]) if nuancee_row else False,
         "bloc_dominant": bloc_row[0] if bloc_row else None,

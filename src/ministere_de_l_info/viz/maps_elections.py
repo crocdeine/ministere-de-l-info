@@ -193,6 +193,9 @@ def make_choropleth_legi_circos_bloc_dominant(
     return m
 
 
+_COULEUR_ND = "#5F6368"  # gris foncé : donnée non disponible
+
+
 def make_choropleth_elections_score_bloc(
     scores_df: pl.DataFrame,
     participation_df: pl.DataFrame,
@@ -208,17 +211,20 @@ def make_choropleth_elections_score_bloc(
     merged = bloc_scores.join(
         participation_df.select(["code_commune", "exprimes"]), on="code_commune", how="left"
     ).with_columns(
+        # exprimés absents ou nuls : pas de pourcentage calculable -> NULL (n.d.), jamais 0 %
         pl.when(pl.col("exprimes") > 0)
         .then(pl.col("voix").cast(pl.Float64) * 100.0 / pl.col("exprimes").cast(pl.Float64))
-        .otherwise(0.0)
+        .otherwise(None)
         .alias("pct")
     )
-    pct_map: dict[str, tuple[int, float]] = {
-        r[0]: (r[1], float(r[2]))
+    pct_map: dict[str, tuple[int, float | None]] = {
+        r[0]: (r[1], None if r[2] is None else float(r[2]))
         for r in merged.select(["code_commune", "voix", "pct"]).iter_rows()
     }
+    # commune sans ligne pour ce bloc : 0 voix si ses exprimés sont connus, sinon n.d.
+    exprimes_ok = set(participation_df.filter(pl.col("exprimes") > 0)["code_commune"].to_list())
 
-    max_val = max((v[1] for v in pct_map.values()), default=30.0)
+    max_val = max((v[1] for v in pct_map.values() if v[1] is not None), default=30.0)
     max_val = max(max_val, 1.0)
     colormap = cm.LinearColormap(colors=["#ffffff", couleur_bloc], vmin=0.0, vmax=max_val)
 
@@ -227,15 +233,15 @@ def make_choropleth_elections_score_bloc(
         code = row["code_commune"]
         if not row["geojson"]:
             continue
-        voix, pct = pct_map.get(code, (0, 0.0))
+        voix, pct = pct_map.get(code, (0, 0.0) if code in exprimes_ok else (None, None))
         features.append(
             {
                 "type": "Feature",
                 "properties": {
                     "code": code,
                     "nom": row["nom"],
-                    "pct_fmt": f"{pct:.1f} %",
-                    "voix_fmt": _fmt_fr(float(voix)),
+                    "pct_fmt": "n.d." if pct is None else f"{pct:.1f} %",
+                    "voix_fmt": "n.d." if voix is None else _fmt_fr(float(voix)),
                     "_pct": pct,
                 },
                 "geometry": json.loads(row["geojson"]),
@@ -249,7 +255,9 @@ def make_choropleth_elections_score_bloc(
     folium.GeoJson(
         {"type": "FeatureCollection", "features": features},
         style_function=lambda f, _cm=colormap: {
-            "fillColor": _cm(f["properties"]["_pct"]),
+            "fillColor": _COULEUR_ND
+            if f["properties"]["_pct"] is None
+            else _cm(f["properties"]["_pct"]),
             "fillOpacity": 0.85,
             "color": "white",
             "weight": 0.8,
@@ -275,6 +283,15 @@ def make_choropleth_elections_score_bloc(
                 legend_colors,
                 fmt_fn=lambda x: f"{x:.0f}%",
             )
+        )
+    )
+    m.get_root().html.add_child(
+        folium.Element(
+            '<div style="position:fixed;bottom:24px;left:12px;z-index:9999;background:#fff;'
+            'padding:4px 8px;border:1px solid #8A8F98;font:12px sans-serif">'
+            f'<span style="display:inline-block;width:14px;height:14px;background:{_COULEUR_ND};'
+            'border:1px solid #8A8F98;vertical-align:middle;margin-right:6px"></span>'
+            "n.d. (exprimés non disponibles)</div>"
         )
     )
     m.get_root().html.add_child(folium.Element(_SOURCE_HTML))

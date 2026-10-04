@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import duckdb
 import pytest
@@ -71,3 +72,15 @@ def test_date_naissance_retiree_de_leg_elus() -> None:
     create_legislatif_schema(con)  # migration idempotente sur une base existante
     colonnes = [r[0] for r in con.execute("DESCRIBE leg_elus").fetchall()]
     assert "date_naissance" not in colonnes
+
+
+def test_aucune_carte_hors_fond_ign() -> None:
+    """Toute carte passe par nouvelle_carte() (fond Plan IGN, ADR-0013)."""
+    racine = Path(__file__).resolve().parents[1]
+    fichiers = [*(racine / "src").rglob("*.py"), *(racine / "pages").rglob("*.py")]
+    fautifs = [
+        str(f.relative_to(racine))
+        for f in fichiers
+        if "folium.Map(" in f.read_text(encoding="utf-8") and f.name != "_display.py"
+    ]
+    assert fautifs == []

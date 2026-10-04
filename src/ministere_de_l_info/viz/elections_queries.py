@@ -48,6 +48,11 @@ def _open_ro() -> duckdb.DuckDBPyConnection:
     return con
 
 
+def _opt_int(v: object) -> int | None:
+    """int(v) ou None si valeur absente (pas de 0 inventé)."""
+    return None if v is None else int(v)  # type: ignore[call-overload]
+
+
 @st.cache_data(ttl=60)
 def is_data_loaded() -> bool:
     """Vérifie que les résultats présidentiels sont chargés."""
@@ -243,10 +248,10 @@ def get_metrics_commune_pres(annee: int, tour: int, code_commune: str) -> dict:
     finally:
         con.close()
     return {
-        "inscrits": int(row[0] or 0),
-        "votants": int(row[1] or 0),
-        "exprimes": int(row[2] or 0),
-        "taux_participation_pct": float(row[3] or 0.0),
+        "inscrits": _opt_int(row[0]),
+        "votants": _opt_int(row[1]),
+        "exprimes": _opt_int(row[2]),
+        "taux_participation_pct": None if row[3] is None else float(row[3]),
         "bloc_dominant": bloc_row[0] if bloc_row else "DIV",
     }
 

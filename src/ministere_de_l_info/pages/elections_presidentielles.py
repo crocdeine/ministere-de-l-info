@@ -10,6 +10,7 @@ from streamlit_folium import st_folium
 from ministere_de_l_info._blocs_politiques import legende_classement_blocs
 from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
 from ministere_de_l_info.sources import mention
+from ministere_de_l_info.viz._display import fmt_nd
 from ministere_de_l_info.viz.elections_queries import (
     _BLOCS_ORDERED,
     DB_PATH,
@@ -251,7 +252,8 @@ def render() -> None:
             how="left",
         )
         .join(dominant_df, on="code_commune", how="left")
-        .fill_null(0)
+        # voix de bloc absentes = 0 ; inscrits/exprimés/taux absents restent NULL (n.d.)
+        .with_columns(pl.col(c).fill_null(0) for c in bloc_codes if c in pivot.columns)
     )
 
     blocs_disponibles = sorted(
@@ -288,7 +290,12 @@ def render() -> None:
         .sort("Commune")
     )
 
-    st.dataframe(table_display, width="stretch", hide_index=True, height=400)
+    st.dataframe(
+        table_display.to_pandas().style.format(na_rep="n.d."),
+        width="stretch",
+        hide_index=True,
+        height=400,
+    )
 
     csv_bytes = table_display.write_csv().encode("utf-8")
     st.download_button(
@@ -322,9 +329,9 @@ def render() -> None:
         st.caption(f"Commune sélectionnée : **{nom_commune}** ({code_commune})")
 
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Inscrits", f"{metrics['inscrits']:,}".replace(",", " "))
-        m2.metric("Votants", f"{metrics['votants']:,}".replace(",", " "))
-        m3.metric("Participation", f"{metrics['taux_participation_pct']:.1f} %")
+        m1.metric("Inscrits", fmt_nd(metrics["inscrits"]))
+        m2.metric("Votants", fmt_nd(metrics["votants"]))
+        m3.metric("Participation", fmt_nd(metrics["taux_participation_pct"], ".1f", " %"))
         m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "—"))
 
         bv_df = get_bv_details_pres(annee, tour, code_commune)

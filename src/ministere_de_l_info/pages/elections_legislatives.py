@@ -10,6 +10,7 @@ from streamlit_folium import st_folium
 from ministere_de_l_info._blocs_politiques import legende_classement_blocs
 from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
 from ministere_de_l_info.sources import mention
+from ministere_de_l_info.viz._display import fmt_nd
 from ministere_de_l_info.viz.elections_legi_queries import (
     get_bv_details_legi,
     get_circo_bounds,
@@ -325,9 +326,9 @@ def _render_vue_circo(
         st.caption(f"Commune sélectionnée : **{nom_commune}** ({code_commune})")
 
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Inscrits", f"{metrics['inscrits']:,}".replace(",", " "))
-        m2.metric("Votants", f"{metrics['votants']:,}".replace(",", " "))
-        m3.metric("Participation", f"{metrics['taux_participation_pct']:.1f} %")
+        m1.metric("Inscrits", fmt_nd(metrics["inscrits"]))
+        m2.metric("Votants", fmt_nd(metrics["votants"]))
+        m3.metric("Participation", fmt_nd(metrics["taux_participation_pct"], ".1f", " %"))
         m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "—"))
 
         bv_df = get_bv_details_legi(annee, tour, code_commune)

@@ -385,10 +385,10 @@ class TestGetMetricsCommuneLegi:
         assert m["bloc_dominant"] in {"EXG", "GAU", "DIV", "CENT", "DTE", "EXD"}
         assert m["votants"] <= m["inscrits"]
 
-    def test_commune_inconnue_retourne_zeros(self, db_ready):
+    def test_commune_inconnue_retourne_none(self, db_ready):
         m = get_metrics_commune_legi(2022, 1, "99999")
-        assert m["inscrits"] == 0
-        assert m["votants"] == 0
+        assert m["inscrits"] is None
+        assert m["votants"] is None
 
 
 class TestGetBvDetailsLegi:
