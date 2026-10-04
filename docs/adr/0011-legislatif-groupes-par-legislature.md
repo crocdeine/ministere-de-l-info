@@ -327,3 +327,29 @@ WHERE bloc_groupe IS NULL AND groupe_sigle IS NOT NULL GROUP BY ALL ORDER BY 4 D
 SELECT chambre, legislature, est_actif, COUNT(*) FROM v_mandats_legislatif
 WHERE groupe_sigle IS NULL GROUP BY ALL;
 ```
+
+## Addendum 2026-10-04 — non-inscrits classés par nuance préfectorale d'élection
+
+Décision Mathias (2026-10-04, `docs/orientations.md`) : un député non inscrit est classé
+selon la nuance attribuée par la préfecture lors de son élection, convertie en bloc par
+`nuances_harmonisees` (législatives de l'année de la législature, ADR-0010). Révise D1
+(« Non-inscrits : `DIV` ») pour l'AN ; le Sénat est inchangé (overrides).
+
+- **Schéma** (idempotent, `create_legislatif_schema`) : `leg_mandats` reçoit
+  `nuance_election`, `nuance_annee`, `nuance_source` (`ALTER TABLE ... ADD COLUMN IF NOT
+  EXISTS`) ; `nuances_harmonisees` est créée si absente (DDL partagée
+  `schema_elections.create_nuances_harmonisees`). Classement **par mandat**.
+- **Vues** : `bloc_final = COALESCE(bloc_force, bloc de la nuance d'élection, bloc du
+  groupe)` ; nouvelle colonne `bloc_nuance` ; `source_bloc` = « nuance préfectorale <CODE>
+  (législatives <année>, <dép>-<circo>) → <BLOC> (nuances_harmonisees) », ou motif de
+  non-résolution suivi du fondement du groupe NI (DIV).
+- **Source** : même jeu que le module Élections (« Données des élections agrégées »,
+  `data/exploration/general-results.parquet`, lu en national, sans matérialisation) ; pas
+  de nouvelle source. Élections générales seulement : ni partielles ni remplaçants.
+- **Appariement** (`etl/loaders/legislatif_nuances_ni.py`) : même département, prénom
+  identique, nom identique ou préfixe (normalisés), candidat élu (en tête au second tour
+  ou > 50 % au premier tour sans second tour), une seule nuance. Sinon : DIV et motif
+  « nuance d'élection non retrouvée » (remplaçant, élection partielle, homonymie).
+- **Chargement** : `scripts/load_legislatif.py --source nuances` (relancé avec `datan`
+  et `all`). Résultat 2026-10-04 : 100 mandats NI, 70 nuances retrouvées, 30 non
+  retrouvées (`reports/etl-non-inscrits-2026-10-04.md`).
