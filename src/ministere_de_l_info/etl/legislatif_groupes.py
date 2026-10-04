@@ -209,7 +209,8 @@ _AN: tuple[CorrespondanceGroupe, ...] = (
         17,
         "DIV",
         "Non inscrits",
-        "Aucun groupe, pas de nuance commune ; exceptions dans leg_blocs_override",
+        "Groupe NI : bloc par défaut, sans nuance commune ; chaque mandat est classé selon "
+        "sa nuance préfectorale d'élection quand elle est retrouvée (orientation 2026-10-04)",
     ),
     _an(
         "LT", 15, 15, "DIV", "Libertés et territoires", "Groupe composite sans parti dominant → DIV"

@@ -21,7 +21,9 @@ Vues (5)
 - v_composition_legislature : effectifs par chambre × législature × bloc_final
 - v_activite_par_bloc    : agrégats d'activité par bloc × chambre (actifs seulement)
 
-Règle de bloc : ``bloc_final = COALESCE(bloc_force, bloc du groupe pour la législature)``.
+Règle de bloc : ``bloc_final = COALESCE(bloc_force, bloc de la nuance d'élection,
+bloc du groupe pour la législature)`` ; la nuance d'élection (nuances_harmonisees) n'est
+renseignée que pour les non-inscrits AN (``etl/loaders/legislatif_nuances_ni.py``).
 Un groupe absent de leg_groupes_blocs donne bloc_final NULL (non classé), jamais DIV.
 
 Sources
@@ -35,6 +37,8 @@ from __future__ import annotations
 import logging
 
 import duckdb
+
+from ministere_de_l_info.etl.schema_elections import create_nuances_harmonisees
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +138,13 @@ def create_legislatif_schema(con: duckdb.DuckDBPyConnection) -> None:
             source           VARCHAR(30) NOT NULL
         )
     """)
+    # Non-inscrits AN (orientation 2026-10-04) : nuance préfectorale de l'élection du mandat,
+    # convertie en bloc par nuances_harmonisees dans les vues. nuance_source = scrutin et
+    # circonscription si retrouvée, sinon motif de non-résolution (nuance_election NULL).
+    for col in ("nuance_election VARCHAR", "nuance_annee INTEGER", "nuance_source VARCHAR"):
+        con.execute(f"ALTER TABLE leg_mandats ADD COLUMN IF NOT EXISTS {col}")
+    # Référentiel (nuance, année) → bloc du module Élections, joint par les vues.
+    create_nuances_harmonisees(con)
 
     # ADR-0011 — référentiel groupe × période → bloc. Bornes NULL = toutes périodes
     # (Sénat) ; AN : intervalles de législatures toujours bornés.
@@ -168,6 +179,24 @@ def _jointure_groupe(alias_groupe: str, alias_source: str) -> str:
     )
 
 
+def _bloc_et_source(m: str, nh: str, g: str, o: str) -> str:
+    """Colonnes bloc_nuance, source_bloc, bloc_final (override > nuance d'élection > groupe)."""
+    return f"""
+            {nh}.bloc AS bloc_nuance,
+            CASE
+                WHEN {nh}.bloc IS NOT NULL THEN
+                    'nuance préfectorale ' || {m}.nuance_election || ' (' || {m}.nuance_source
+                    || ') → ' || {nh}.bloc || ' (nuances_harmonisees)'
+                WHEN {m}.nuance_election IS NOT NULL THEN
+                    'nuance préfectorale ' || {m}.nuance_election || ' (' || {m}.nuance_source
+                    || ') absente de nuances_harmonisees ; ' || {g}.source_bloc
+                WHEN {m}.nuance_source IS NOT NULL THEN
+                    {m}.nuance_source || ' ; ' || {g}.source_bloc
+                ELSE {g}.source_bloc
+            END AS source_bloc,
+            COALESCE({o}.bloc_force, {nh}.bloc, {g}.bloc) AS bloc_final"""
+
+
 def create_legislatif_views(con: duckdb.DuckDBPyConnection) -> None:
     """Crée ou remplace les vues analytiques du module Législatif."""
     con.execute(f"""
@@ -175,10 +204,19 @@ def create_legislatif_views(con: duckdb.DuckDBPyConnection) -> None:
         SELECT
             e.*,
             g.bloc        AS bloc_groupe,
-            g.source_bloc AS source_bloc,
-            COALESCE(o.bloc_force, g.bloc) AS bloc_final
+            {_bloc_et_source("mn", "nh", "g", "o")}
         FROM leg_elus e
         LEFT JOIN leg_groupes_blocs g ON {_jointure_groupe("g", "e")}
+        -- ponytail: un mandat par élu et législature (Datan) ; à revoir avec la source complète
+        LEFT JOIN (
+            SELECT elu_id, chambre, legislature,
+                   ANY_VALUE(nuance_election) AS nuance_election,
+                   ANY_VALUE(nuance_annee)    AS nuance_annee,
+                   ANY_VALUE(nuance_source)   AS nuance_source
+            FROM leg_mandats WHERE nuance_source IS NOT NULL GROUP BY ALL
+        ) mn ON mn.elu_id = e.id AND mn.chambre = e.chambre AND mn.legislature = e.legislature
+        LEFT JOIN nuances_harmonisees nh
+            ON nh.nuance = mn.nuance_election AND nh.annee = mn.nuance_annee
         LEFT JOIN leg_blocs_override o
             ON e.id = o.elu_id AND e.chambre = o.chambre
         WHERE e.est_actif = TRUE
@@ -201,16 +239,20 @@ def create_legislatif_views(con: duckdb.DuckDBPyConnection) -> None:
             m.date_fin,
             m.granularite,
             m.source,
+            m.nuance_election,
+            m.nuance_annee,
+            m.nuance_source,
             e.nom,
             e.prenom,
             e.est_actif,
             g.bloc        AS bloc_groupe,
-            g.source_bloc AS source_bloc,
             o.bloc_force,
-            COALESCE(o.bloc_force, g.bloc) AS bloc_final
+            {_bloc_et_source("m", "nh", "g", "o")}
         FROM leg_mandats m
         JOIN leg_elus e ON e.id = m.elu_id AND e.chambre = m.chambre
         LEFT JOIN leg_groupes_blocs g ON {_jointure_groupe("g", "m")}
+        LEFT JOIN nuances_harmonisees nh
+            ON nh.nuance = m.nuance_election AND nh.annee = m.nuance_annee
         LEFT JOIN leg_blocs_override o
             ON m.elu_id = o.elu_id AND m.chambre = o.chambre
     """)

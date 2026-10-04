@@ -5,6 +5,7 @@ Usage :
     uv run python scripts/load_legislatif.py --source senat
     uv run python scripts/load_legislatif.py --source datan
     uv run python scripts/load_legislatif.py --source overrides
+    uv run python scripts/load_legislatif.py --source nuances   # non-inscrits AN
     uv run python scripts/load_legislatif.py --force
     uv run python scripts/load_legislatif.py --source senat --force   # après un renouvellement
 
@@ -13,7 +14,9 @@ Sources et tables DuckDB :
   senat     → leg_elus + leg_mandats (chambre=SENAT, France entière, ODSEN_GENERAL.csv)
   datan     → leg_elus + leg_mandats + leg_activite (chambre=AN, législatures 12-17)
   overrides → leg_blocs_override (corrections manuelles de blocs)
-  all       → senat + datan + overrides
+  nuances   → leg_mandats.nuance_* des non-inscrits AN (nuance préfectorale d'élection,
+              data/exploration/general-results.parquet ; relancé après chaque chargement datan)
+  all       → senat + datan + nuances + overrides
 
 Idempotent : chaque loader fait DELETE+INSERT par source ; le référentiel est rechargé
 intégralement. Un groupe non classé produit un WARNING (bloc NULL), jamais DIV.
@@ -37,6 +40,9 @@ from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.etl.legislatif_groupes import populate_groupes_blocs  # noqa: E402
 from ministere_de_l_info.etl.loaders.legislatif_datan import load_legislatif_datan  # noqa: E402
+from ministere_de_l_info.etl.loaders.legislatif_nuances_ni import (  # noqa: E402
+    attribuer_nuances_non_inscrits,
+)
 from ministere_de_l_info.etl.loaders.legislatif_overrides import load_overrides  # noqa: E402
 from ministere_de_l_info.etl.loaders.legislatif_senat import load_legislatif_senat  # noqa: E402
 from ministere_de_l_info.etl.schema_legislatif import (  # noqa: E402
@@ -47,6 +53,8 @@ from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
 _DB_PATH = get_settings().db_path
 _RAW_DIR = ROOT / "data" / "raw"
+# Résultats par candidat (nommage inversé de la source, gotcha n° 8), dépôt manuel
+_PARQUET_CANDIDATS = ROOT / "data" / "exploration" / "general-results.parquet"
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -83,7 +91,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Chargement données législatives")
     parser.add_argument(
         "--source",
-        choices=["senat", "datan", "overrides", "all"],
+        choices=["senat", "datan", "nuances", "overrides", "all"],
         default="all",
         help="Source à charger (défaut : all)",
     )
@@ -122,6 +130,15 @@ def main() -> None:
         if args.source in ("datan", "all"):
             logger.info("=== Chargement Datan (AN, législatures 12-17, national) ===")
             load_legislatif_datan(con, _RAW_DIR, force=args.force)
+
+        if args.source in ("datan", "nuances", "all"):
+            if _PARQUET_CANDIDATS.exists():
+                logger.info("=== Nuances d'élection des non-inscrits AN ===")
+                attribuer_nuances_non_inscrits(con, _PARQUET_CANDIDATS)
+            else:
+                logger.warning(
+                    "%s absent : non-inscrits AN classés selon le groupe (DIV)", _PARQUET_CANDIDATS
+                )
 
         if args.source in ("overrides", "all"):
             logger.info("=== Application des overrides blocs ===")

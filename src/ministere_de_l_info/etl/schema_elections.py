@@ -969,6 +969,20 @@ _CANDIDATS_PRES_2022: list[tuple[int, str, str, str, str, str, str]] = [
 # ── Création du schéma ────────────────────────────────────────────────────────
 
 
+def create_nuances_harmonisees(con: duckdb.DuckDBPyConnection) -> None:
+    """Crée la table (nuance, annee) → bloc. Idempotent ; partagée avec le module Législatif."""
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS nuances_harmonisees (
+            nuance VARCHAR NOT NULL,
+            annee  INTEGER NOT NULL,
+            bloc   VARCHAR NOT NULL,
+            PRIMARY KEY (nuance, annee)
+        )
+    """)
+    # Migration D1.2 : justification courte du bloc, sur le modèle de candidats_presidentielle
+    con.execute("ALTER TABLE nuances_harmonisees ADD COLUMN IF NOT EXISTS source_bloc VARCHAR")
+
+
 def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
     """Crée les 6 tables électorales. Idempotent (CREATE TABLE IF NOT EXISTS)."""
     con.execute("""
@@ -1023,14 +1037,7 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
         )
     """)
 
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS nuances_harmonisees (
-            nuance VARCHAR NOT NULL,
-            annee  INTEGER NOT NULL,
-            bloc   VARCHAR NOT NULL,
-            PRIMARY KEY (nuance, annee)
-        )
-    """)
+    create_nuances_harmonisees(con)
 
     con.execute("""
         CREATE TABLE IF NOT EXISTS candidats_presidentielle (
@@ -1054,8 +1061,6 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
         "ALTER TABLE elections ADD COLUMN IF NOT EXISTS ancien_decoupage BOOLEAN DEFAULT FALSE"
     )
     con.execute("ALTER TABLE resultats_participation ADD COLUMN IF NOT EXISTS code_circo VARCHAR")
-    # Migration D1.2 : justification courte du bloc, sur le modèle de candidats_presidentielle
-    con.execute("ALTER TABLE nuances_harmonisees ADD COLUMN IF NOT EXISTS source_bloc VARCHAR")
 
     logger.info("Schéma électoral créé/vérifié : 6 tables")
 
