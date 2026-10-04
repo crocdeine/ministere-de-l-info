@@ -1,0 +1,15 @@
+# Feuille de route
+
+Mise à jour : 2026-10-04. Détail des constats : `docs/audit-2026-10-04.md`.
+
+| Jalon | Objet | État |
+|---|---|---|
+| Phase 0 | Audit de l'existant, outils, sauvegarde, documents de suivi | ✅ terminé — en attente de validation |
+| J1 | Conformité : licences, légendes des blocs, sources affichées, détection de secrets | à faire |
+| J2 | Exactitude : groupes sénatoriaux, non-inscrits, valeurs manquantes, sources des classements | à faire |
+| J3 | Lisibilité honnête : échelles, municipales en %, titres neutres, palette accessible | à faire |
+| J4 | Hygiène et durcissement : rangement, code mort, cache, infra | à faire |
+| J5 | Fusion dans `main` | à faire |
+
+Pistes ultérieures (vague 2, `reports/synthese-vague-2-2026-09-24.md` §4) : URL partageables, page
+Méthodologie / glossaire, fiche commune, réduction des erreurs pyright, nouvelles sources (lot F).
