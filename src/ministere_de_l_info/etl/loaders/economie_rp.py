@@ -14,6 +14,7 @@ Convention suffixes INSEE RP :
 
 Indicateurs calculés :
   tx_chomage_dec          = chomeurs_15_64_ans_p  / actifs_15_64_ans_p * 100
+                          (chômeurs = hommes + femmes si le total n'est pas diffusé : RP 2015, 2016)
   part_ouvriers_employes  = (actifs_ouvriers_15_64_ans_c + actifs_employes_15_64_ans_c)
                             / actifs_15_64_ans_c * 100
   part_emploi_industriel  = emplois_au_lieu_travail_industrie_c
@@ -61,6 +62,15 @@ CLEFS_REQUISES: dict[str, tuple[str, ...]] = {
 }
 
 
+# Chômeurs 15-64 ans : total publié, sinon hommes + femmes (RP 2015 et 2016 ne diffusent
+# que le détail par sexe ; somme = total à 0,001 près sur 2017-2021, vérifié le 2026-10-04).
+_CHOMEURS = """COALESCE(
+                    MAX(CASE WHEN clef_json = 'chomeurs_15_64_ans_p' THEN valeur END),
+                    MAX(CASE WHEN clef_json = 'chomeurs_15_64_ans_hommes_p' THEN valeur END)
+                    + MAX(CASE WHEN clef_json = 'chomeurs_15_64_ans_femmes_p' THEN valeur END)
+                )"""
+
+
 def diagnostiquer_clefs(
     con: duckdb.DuckDBPyConnection, path_sql: str, filtre_sql: str
 ) -> dict[int, list[str]]:
@@ -91,6 +101,8 @@ def diagnostiquer_clefs(
                 chom.setdefault(int(annee), []).append(str(clef))
     manquantes: dict[int, list[str]] = {}
     for annee in sorted(presentes):
+        if {"chomeurs_15_64_ans_hommes_p", "chomeurs_15_64_ans_femmes_p"} <= presentes[annee]:
+            presentes[annee].add("chomeurs_15_64_ans_p")  # total reconstitué (_CHOMEURS)
         absentes = [c for c in clefs if c not in presentes[annee]]
         if not absentes:
             continue
@@ -159,7 +171,7 @@ def load_economie_rp(
             CASE
                 WHEN MAX(CASE WHEN clef_json = 'actifs_15_64_ans_p' THEN valeur END) > 0
                 THEN (
-                    MAX(CASE WHEN clef_json = 'chomeurs_15_64_ans_p' THEN valeur END) /
+                    {_CHOMEURS} /
                     MAX(CASE WHEN clef_json = 'actifs_15_64_ans_p'   THEN valeur END) * 100.0
                 )::DOUBLE
                 ELSE NULL
@@ -206,8 +218,8 @@ def load_economie_rp(
             -- Secret : valeur NULL pour la commune alors que le millésime diffuse la clef
             -- ailleurs (une clef absente du millésime entier n'est pas un secret).
             (
-                MAX(CASE WHEN clef_json = 'chomeurs_15_64_ans_p' THEN valeur END) IS NULL
-                AND SUM(COUNT(CASE WHEN clef_json = 'chomeurs_15_64_ans_p' THEN valeur END))
+                {_CHOMEURS} IS NULL
+                AND SUM(COUNT(CASE WHEN clef_json LIKE 'chomeurs_15_64_ans_%' THEN valeur END))
                     OVER (PARTITION BY annee) > 0
             ) AS secret
 

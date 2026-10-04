@@ -90,6 +90,32 @@ def test_millesime_sans_clef_chomage_non_secret(
     assert not any("RP 2017" in m for m in messages)
 
 
+def test_chomage_total_reconstitue_par_sexe(con: duckdb.DuckDBPyConnection, tmp_path: Path) -> None:
+    """RP 2015-2016 : total des chômeurs absent, détail hommes/femmes diffusé → taux calculé."""
+    chemin = tmp_path / "economie" / "donnees-insee-olap-hdf.parquet"
+    chemin.parent.mkdir(parents=True)
+    src = duckdb.connect()
+    src.execute(
+        "CREATE TABLE olap (code_com VARCHAR, annee INTEGER, source VARCHAR, "
+        "clef_json VARCHAR, valeur DOUBLE)"
+    )
+    src.executemany(
+        "INSERT INTO olap VALUES ('80021', 2015, 'rp_actifs_emploi', ?, ?)",
+        [
+            ("actifs_15_64_ans_p", 1000.0),
+            ("actifs_15_64_ans_c", 1000.0),
+            ("chomeurs_15_64_ans_hommes_p", 70.0),
+            ("chomeurs_15_64_ans_femmes_p", 50.0),
+        ],
+    )
+    src.execute(f"COPY olap TO '{chemin}' (FORMAT PARQUET)")
+    src.close()
+    load_economie_rp(con, tmp_path)
+    tx, secret = con.execute("SELECT tx_chomage_dec, secret FROM economie_rp").fetchone()
+    assert tx == pytest.approx(12.0)
+    assert secret is False
+
+
 def test_secret_communal_conserve(con: duckdb.DuckDBPyConnection, raw_dir: Path) -> None:
     load_economie_rp(con, raw_dir)
     rows = dict(
