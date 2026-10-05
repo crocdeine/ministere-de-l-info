@@ -20,6 +20,17 @@ COULEURS_BLOCS: dict[str, str] = {
     "EXD": "#1F3864",
 }
 
+# Variante pour les TRAITS et textes sur fond blanc : le jaune CENT (#F5B800) n'a que 1,8:1 de
+# contraste. Seuls les traits sont assombris (3,3:1, seuil WCAG 1.4.11) ; les remplissages
+# gardent COULEURS_BLOCS (choix éditorial, ADR-0009).
+COULEUR_TRAIT_CENT: str = "#B38600"
+
+
+def couleurs_traits(couleurs: dict[str, str]) -> dict[str, str]:
+    """Couleurs de blocs pour des lignes/textes : CENT assombri, le reste inchangé."""
+    return {**couleurs, "CENT": COULEUR_TRAIT_CENT}
+
+
 LIBELLES_BLOCS: dict[str, str] = {
     "EXG": "Extrême gauche",
     "GAU": "Gauche",

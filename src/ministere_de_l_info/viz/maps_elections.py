@@ -193,6 +193,7 @@ def make_choropleth_legi_circos_bloc_dominant(
     return m
 
 
+ECHELLE_SCORE_MAX: float = 60.0  # % exprimés : borne haute fixe de l'échelle du score d'un bloc
 _COULEUR_ND = "#5F6368"  # gris foncé : donnée non disponible
 
 
@@ -224,8 +225,9 @@ def make_choropleth_elections_score_bloc(
     # commune sans ligne pour ce bloc : 0 voix si ses exprimés sont connus, sinon n.d.
     exprimes_ok = set(participation_df.filter(pl.col("exprimes") > 0)["code_commune"].to_list())
 
-    max_val = max((v[1] for v in pct_map.values() if v[1] is not None), default=30.0)
-    max_val = max(max_val, 1.0)
+    # Échelle FIXE 0-60 % (et non 0-max de la carte) : un bloc à 8 % ne doit pas paraître aussi
+    # saturé qu'un bloc à 60 %. Au-delà de 60 %, la couleur reste au maximum (annoncé en légende).
+    max_val = ECHELLE_SCORE_MAX
     colormap = cm.LinearColormap(colors=["#ffffff", couleur_bloc], vmin=0.0, vmax=max_val)
 
     features: list[dict] = []
@@ -282,6 +284,7 @@ def make_choropleth_elections_score_bloc(
                 breaks,
                 legend_colors,
                 fmt_fn=lambda x: f"{x:.0f}%",
+                note="Échelle fixe 0-60 % (au-delà : couleur maximale)",
             )
         )
     )

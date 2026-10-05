@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 
+import branca.colormap as cm
 import folium
 import plotly.express as px
 import polars as pl
@@ -28,7 +29,14 @@ from ministere_de_l_info._theme import (
     render_page_header,
 )
 from ministere_de_l_info.sources import mention
-from ministere_de_l_info.viz._display import nouvelle_carte
+from ministere_de_l_info.viz._display import (
+    _COULEURS_YLORD5,
+    NOTE_CLASSES_FIXES,
+    _build_legend_html,
+    _fmt_fr,
+    bornes_fixes,
+    nouvelle_carte,
+)
 from ministere_de_l_info.viz.economie_queries import (
     annees_croisement_exploitables,
     get_annees_par_indicateur,
@@ -156,7 +164,7 @@ def _make_desert_map(df: pl.DataFrame) -> folium.Map:
     return m
 
 
-def _make_choropleth(df: pl.DataFrame, libelle: str) -> folium.Map:
+def _make_choropleth(df: pl.DataFrame, libelle: str, indicateur: str) -> folium.Map:
     """Construit une carte choroplèthe Folium pour un indicateur économique.
 
     Les communes sans données (secret INSEE ou valeur manquante) sont affichées en gris.
@@ -191,44 +199,41 @@ def _make_choropleth(df: pl.DataFrame, libelle: str) -> folium.Map:
 
     geo_json = {"type": "FeatureCollection", "features": features}
 
-    # NULL pour les communes avec secret statistique → nan_fill_color gris
-    data_pd = (
-        df.with_columns(
-            pl.when(pl.col("secret")).then(None).otherwise(pl.col("valeur")).alias("valeur_plot")
-        )
-        .select(["code_commune", "valeur_plot"])
-        .to_pandas()
+    # Classes fixes par indicateur (identiques pour toutes les années) ; communes sous secret
+    # statistique ou sans valeur : gris.
+    breaks = bornes_fixes(indicateur)
+    colormap = cm.StepColormap(
+        colors=_COULEURS_YLORD5, index=breaks, vmin=breaks[0], vmax=breaks[-1]
     )
+    valeurs = {
+        r["code_commune"]: None if r["secret"] or r["valeur"] != r["valeur"] else r["valeur"]
+        for r in df.iter_rows(named=True)
+    }
+    a_des_valeurs = any(v is not None for v in valeurs.values())
 
-    # Si aucune commune n'a de valeur exploitable (ex. RP 2015/2016 entièrement sous
-    # secret statistique), `folium.Choropleth` plante (`np.isnan` sur une colonne
-    # entièrement None, castée en dtype `object`). On affiche alors les contours en
-    # gris uni, sans légende de dégradé, plutôt que de lever une exception.
-    if data_pd["valeur_plot"].notna().any():
-        choropleth = folium.Choropleth(
-            geo_data=geo_json,
-            data=data_pd,
-            columns=["code_commune", "valeur_plot"],
-            key_on="feature.properties.code_commune",
-            fill_color="YlOrRd",
-            nan_fill_color="#CCCCCC",
-            fill_opacity=0.75,
-            line_opacity=0.2,
-            legend_name=libelle,
+    def _style(f: dict) -> dict:
+        v = valeurs.get(f["properties"]["code_commune"])
+        return {
+            "fillColor": "#CCCCCC" if v is None else colormap(v),
+            "fillOpacity": 0.75 if v is not None else 0.5,
+            "color": "#999999",
+            "weight": 0.3,
+        }
+
+    tooltip_target = folium.GeoJson(geo_json, style_function=_style)
+    tooltip_target.add_to(m)
+    if a_des_valeurs:
+        m.get_root().html.add_child(
+            folium.Element(
+                _build_legend_html(
+                    libelle,
+                    breaks,
+                    _COULEURS_YLORD5,
+                    fmt_fn=lambda x: _fmt_fr(x) if x >= 100 else f"{x:g}".replace(".", ","),
+                    note=NOTE_CLASSES_FIXES,
+                )
+            )
         )
-        choropleth.add_to(m)
-        tooltip_target: folium.Choropleth | folium.GeoJson = choropleth.geojson
-    else:
-        tooltip_target = folium.GeoJson(
-            geo_json,
-            style_function=lambda _: {
-                "fillColor": "#CCCCCC",
-                "color": "#999999",
-                "weight": 0.5,
-                "fillOpacity": 0.5,
-            },
-        )
-        tooltip_target.add_to(m)
     tooltip_target.add_child(
         folium.features.GeoJsonTooltip(
             fields=["nom", "valeur_str"],
@@ -308,7 +313,7 @@ def _render_carte_tab() -> None:
         )
 
     try:
-        carte = _make_choropleth(df, libelle)
+        carte = _make_choropleth(df, libelle, indicateur)
         st_folium(carte, use_container_width=True, height=540, returned_objects=[])
     except Exception as exc:
         st.error(f"Erreur carte : {exc}")

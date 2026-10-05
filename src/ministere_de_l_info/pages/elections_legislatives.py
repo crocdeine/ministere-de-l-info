@@ -7,7 +7,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info._blocs_politiques import legende_classement_blocs
+from ministere_de_l_info._blocs_politiques import couleurs_traits, legende_classement_blocs
 from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
 from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz._display import fmt_nd
@@ -398,8 +398,8 @@ def _render_evolution_chart(
         )
         mode_evol: str = st.radio(  # type: ignore[assignment]
             "Unité",
-            ["Voix totales", "Part des exprimés (%)"],
-            index=index_persiste(cle_mode_evol, ["Voix totales", "Part des exprimés (%)"]),
+            ["Part des exprimés (%)", "Voix totales"],
+            index=index_persiste(cle_mode_evol, ["Part des exprimés (%)", "Voix totales"]),
             key=cle_mode_evol,
         )
 
@@ -428,7 +428,7 @@ def _render_evolution_chart(
         x="annee",
         y=y_col,
         color="bloc",
-        color_discrete_map=couleurs,
+        color_discrete_map=couleurs_traits(couleurs),
         category_orders={"bloc": bloc_codes},
         markers=True,
         labels={"annee": "Année", y_col: y_label, "bloc": "Bloc"},
@@ -450,6 +450,13 @@ def _render_evolution_chart(
         legend_title_text="Bloc",
         margin={"t": 30, "b": 30},
     )
-    fig.update_traces(hovertemplate="<b>%{x}</b><br>%{y:,.0f}<extra>%{fullData.name}</extra>")
+    fmt_y = "%{y:.1f} %" if y_col == "pct" else "%{y:,.0f} voix"
+    fig.update_traces(hovertemplate=f"<b>%{{x}}</b><br>{fmt_y}<extra>%{{fullData.name}}</extra>")
     with ev_right:
         st.plotly_chart(fig, width="stretch")
+        if tour_evol == 2:
+            st.caption(
+                "2e tour : seules les circonscriptions où un second tour a eu lieu sont "
+                "comptées (celles pourvues dès le 1er tour en sont exclues de fait). "
+                "Les totaux ne sont donc pas ceux de l'ensemble du territoire."
+            )

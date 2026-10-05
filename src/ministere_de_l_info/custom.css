@@ -443,6 +443,16 @@ samp {
   color: var(--text-strong);
 }
 
+/* Valeur textuelle longue (ex. « Extrême gauche ») : retour à la ligne, jamais d'ellipse */
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] > div {
+  overflow: visible !important;
+  white-space: normal !important;
+  text-overflow: unset !important;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
 [data-testid="stMetricLabel"] {
   font-family: var(--type-overline-family);
   font-size: var(--type-overline-size);

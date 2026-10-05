@@ -52,7 +52,7 @@ class TestChoroplethIndicateurEntierementNull:
     def test_make_choropleth_ne_leve_pas_isnan(self) -> None:
         """Avant fix : `folium.Choropleth` levait `TypeError: ufunc 'isnan'...`."""
         df = self._df_tout_secret()
-        carte = _make_choropleth(df, "Taux de chômage (RP, %)")
+        carte = _make_choropleth(df, "Taux de chômage (RP, %)", "tx_chomage_dec")
         assert carte is not None
 
     def test_make_choropleth_valeur_non_typee_pl_null(self) -> None:
@@ -69,7 +69,7 @@ class TestChoroplethIndicateurEntierementNull:
         )
         assert df.schema["valeur"] == pl.Null
         # Ne doit pas lever d'exception (contournement dans `_make_choropleth`).
-        carte = _make_choropleth(df, "Indicateur")
+        carte = _make_choropleth(df, "Indicateur", "tx_chomage_dec")
         assert carte is not None
 
 

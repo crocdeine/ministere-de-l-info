@@ -7,7 +7,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info._blocs_politiques import legende_classement_blocs
+from ministere_de_l_info._blocs_politiques import couleurs_traits, legende_classement_blocs
 from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
 from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz._display import fmt_nd
@@ -183,8 +183,8 @@ def render() -> None:
         )
         mode_evol: str = st.radio(  # type: ignore[assignment]
             "Unité",
-            ["Voix totales", "Part des exprimés (%)"],
-            index=index_persiste("pres_mode_evol", ["Voix totales", "Part des exprimés (%)"]),
+            ["Part des exprimés (%)", "Voix totales"],
+            index=index_persiste("pres_mode_evol", ["Part des exprimés (%)", "Voix totales"]),
             horizontal=False,
             key="pres_mode_evol",
         )
@@ -209,7 +209,7 @@ def render() -> None:
         x="annee",
         y=y_col,
         color="bloc",
-        color_discrete_map=couleurs,
+        color_discrete_map=couleurs_traits(couleurs),
         category_orders={"bloc": bloc_codes},
         markers=True,
         labels={"annee": "Année", y_col: y_label, "bloc": "Bloc"},

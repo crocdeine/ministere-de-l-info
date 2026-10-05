@@ -28,10 +28,10 @@ _COULEURS_YLORD5: list[str] = ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0
 _COULEUR_CONTOURS: str = "#4292c6"
 _COULEUR_FOND_CONTOURS: str = "#f7f7f7"
 
-# Palette et seuils pour le mode évolution démographique (RdYlGn divergente)
+# Palette et seuils pour le mode évolution démographique (PuOr divergente, sans rouge-vert : daltonisme, pas de connotation « baisse = mal »)
 # 6 break points → 5 classes : <-3% | -3→-1% | -1→+1% | +1→+3% | >+3%
 _SEUILS_EVOLUTION: list[float] = [-100.0, -3.0, -1.0, 1.0, 3.0, 100.0]
-_COULEURS_RDYLGN5: list[str] = ["#d73027", "#fc8d59", "#ffffbf", "#91cf60", "#1a9850"]
+_COULEURS_EVOLUTION5: list[str] = ["#e66101", "#fdb863", "#f7f7f7", "#b2abd2", "#5e3c99"]
 
 
 def _fmt_fr(n: float) -> str:
@@ -56,6 +56,7 @@ def _build_legend_html(
     breaks: list[float],
     colors: list[str],
     fmt_fn: Callable[[float], str] | None = None,
+    note: str | None = None,
 ) -> str:
     """Construit le HTML d'une légende discrète à fond blanc (contraste WCAG AA)."""
     _fmt = fmt_fn if fmt_fn is not None else _fmt_fr
@@ -76,6 +77,8 @@ def _build_legend_html(
             f"</div>"
         )
     rows_html = "\n".join(rows)
+    if note:
+        rows_html += f'<div style="margin-top:5px;font-size:11px;color:#555;">{note}</div>'
     return (
         '<div style="position:fixed;bottom:40px;left:12px;z-index:1000;'
         "background:white;color:#222;padding:10px 14px;border-radius:6px;"
@@ -86,13 +89,35 @@ def _build_legend_html(
     )
 
 
-def _compute_breaks(values: list[float], n_classes: int = 5) -> list[float]:
-    """Calcule n_classes+1 bornes équidistantes depuis les valeurs observées."""
-    if not values:
-        return [0.0] * (n_classes + 1)
-    vmin, vmax = min(values), max(values)
-    if vmin == vmax:
-        spread = max(abs(vmin) * 0.1, 1.0)
-        vmin, vmax = vmin - spread, vmax + spread * n_classes
-    step = (vmax - vmin) / n_classes
-    return [vmin + i * step for i in range(n_classes + 1)]
+# Bornes de classes FIXES par indicateur : identiques quelle que soit l'année ou la zone
+# affichée, pour que deux cartes soient comparables (audit I7). Seuils arrondis, fixés a priori
+# (ordres de grandeur observés), pas recalculés sur les données affichées. 5 classes = 6 bornes ;
+# les bornes extrêmes ne servent qu'à encadrer la première et la dernière classe.
+_INF: float = 1e12
+BORNES_FIXES: dict[str, list[float]] = {
+    # Géographie : population municipale, selon le niveau territorial
+    "population_municipale:region": [0, 1e6, 2e6, 4e6, 6e6, _INF],
+    "population_municipale:departement": [0, 250e3, 500e3, 750e3, 1e6, _INF],
+    "population_municipale:epci": [0, 20e3, 50e3, 100e3, 250e3, _INF],
+    "population_municipale:arrondissement_municipal": [0, 20e3, 40e3, 60e3, 80e3, _INF],
+    "population_municipale:circonscription": [0, 80e3, 100e3, 120e3, 140e3, _INF],
+    "population_municipale:commune": [0, 500, 2e3, 10e3, 50e3, _INF],
+    # Économie (communes HdF)
+    "taux_pauvrete": [0, 5, 10, 15, 20, 100],
+    "niveau_vie_median": [0, 16e3, 19e3, 22e3, 25e3, _INF],
+    "tx_chomage_dec": [0, 6, 9, 12, 15, 100],
+    "part_ouvriers_employes": [0, 30, 40, 50, 60, 100],
+    "part_emploi_industriel": [0, 5, 10, 15, 25, 100],
+    "part_logements_sociaux": [0, 5, 10, 20, 30, 100],
+    "nb_foyers_rsa": [0, 10, 50, 200, 1e3, _INF],
+    "apl_medecins": [0, 2.5, 3.5, 4.5, 5.5, _INF],
+}
+NOTE_CLASSES_FIXES: str = "Classes fixes, identiques pour toutes les années"
+
+
+def bornes_fixes(cle: str) -> list[float]:
+    """Bornes de classes fixes d'un indicateur (ValueError si inconnu : pas de repli auto)."""
+    try:
+        return list(BORNES_FIXES[cle])
+    except KeyError:
+        raise ValueError(f"Pas de bornes fixes définies pour « {cle} »") from None

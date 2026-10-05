@@ -7,7 +7,7 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
-from ministere_de_l_info._blocs_politiques import legende_classement_blocs
+from ministere_de_l_info._blocs_politiques import couleurs_traits, legende_classement_blocs
 from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
 from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz._display import fmt_nd
@@ -64,6 +64,13 @@ _WARNINGS_SEUIL: dict[int, str] = {
         "Les communes sans nuance apparaissent en gris hachuré sur la carte."
     ),
 }
+
+_NOTE_SEUIL_NUANCAGE = (
+    "ⓘ Le seuil de nuançage change selon le scrutin : 3 500 habitants en 2008, "
+    "1 000 en 2014, 3 500 en 2020 et 2026. Les communes prises en compte ne sont donc pas les "
+    "mêmes d'une année à l'autre : en voix absolues, le saut de 2014 est artificiel. "
+    "La part porte sur les seules communes nuancées de chaque scrutin."
+)
 
 _ANNOTATION_LFI = (
     "ⓘ La nuance LFI est classée **GAUCHE** jusqu'aux européennes 2024 incluses, "
@@ -170,25 +177,54 @@ def _render_evolution_hdf(
     # Uniquement t1 pour la cohérence de la comparaison temporelle
     ev_t1 = ev_df.filter((pl.col("tour") == 1) & pl.col("bloc").is_not_null())
 
+    # Le seuil de nuançage varie (3 500 hab. en 2008, 1 000 en 2014, 3 500 en 2020 et 2026) :
+    # les voix absolues sautent artificiellement en 2014. Défaut : part des exprimés des
+    # seules communes nuancées (voix du bloc / voix de tous les blocs classés).
+    modes = ["Part des exprimés (%)", "Voix totales"]
+    mode_evol: str = st.radio(  # type: ignore[assignment]
+        "Unité",
+        modes,
+        index=index_persiste("muni_mode_evol", modes),
+        horizontal=True,
+        key="muni_mode_evol",
+    )
+    st.caption(_NOTE_SEUIL_NUANCAGE)
+
     if not ev_t1.is_empty():
-        ev_plot = ev_t1.with_columns(pl.col("bloc").replace(libelles).alias("Bloc"))
+        if mode_evol == modes[0]:
+            totaux_nuances = ev_t1.group_by("annee").agg(pl.sum("voix").alias("total"))
+            ev_t1 = ev_t1.join(totaux_nuances, on="annee").with_columns(
+                (pl.col("voix").cast(pl.Float64) * 100.0 / pl.col("total").cast(pl.Float64)).alias(
+                    "pct"
+                )
+            )
+            y_col, y_label, fmt_y = (
+                "pct",
+                "Part des exprimés des communes nuancées (%)",
+                "%{y:.1f} %",
+            )
+        else:
+            y_col, y_label, fmt_y = "voix", "Voix totales", "%{y:,.0f} voix"
         fig = px.line(
-            ev_plot.to_pandas(),
+            ev_t1.to_pandas(),
             x="annee",
-            y="voix",
+            y=y_col,
             color="bloc",
-            color_discrete_map=couleurs,
+            color_discrete_map=couleurs_traits(couleurs),
             category_orders={"bloc": bloc_codes},
             markers=True,
-            labels={"annee": "Année", "voix": "Voix totales", "bloc": "Bloc"},
+            labels={"annee": "Année", y_col: y_label, "bloc": "Bloc"},
             height=360,
         )
         fig.update_layout(
             xaxis={"tickmode": "array", "tickvals": _ANNEES_MUNI},
             legend_title_text="Bloc",
             margin={"t": 30, "b": 30},
+            separators=", ",
         )
-        fig.update_traces(hovertemplate="<b>%{x}</b><br>%{y:,.0f}<extra>%{fullData.name}</extra>")
+        fig.update_traces(
+            hovertemplate=f"<b>%{{x}}</b><br>{fmt_y}<extra>%{{fullData.name}}</extra>"
+        )
         st.plotly_chart(fig, width="stretch")
 
     st.caption(_ANNOTATION_LFI)
