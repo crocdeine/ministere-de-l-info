@@ -27,6 +27,8 @@ _DEPUTES = [
     ("PA4", "Battu", "Jean", "08", 1, True, [(17, "NI")]),  # candidat non élu (partielle)
     ("PA5", "Aliot", "Thérèse", "971", 2, False, [(14, "NI")]),  # accents perdus, code ZA
     ("PA6", "Membre", "Luc", "75", 1, True, [(17, "DR")]),  # non concerné
+    # Nom dont « MARTIN » (candidate battue, même prénom et département) est un préfixe
+    ("PA7", "Martinez", "Lea", "84", 3, False, [(14, "NI")]),
 ]
 
 # (id_election, dept, commune, bv, nom, prénom, nuance, voix)
@@ -134,7 +136,11 @@ def test_classement_par_mandat(con: duckdb.DuckDBPyConnection) -> None:
 
 @pytest.mark.parametrize(
     ("elu_id", "leg", "motif"),
-    [("PA3", 15, "absent(e) des candidats"), ("PA4", 17, "non élu(e)")],
+    [
+        ("PA3", 15, "absent(e) des candidats"),
+        ("PA4", 17, "non élu(e)"),
+        ("PA7", 14, "non élu(e)"),  # préfixe homonyme non élu : pas de faux appariement
+    ],
 )
 def test_nuance_non_retrouvee_reste_div(
     con: duckdb.DuckDBPyConnection, elu_id: str, leg: int, motif: str
@@ -172,5 +178,5 @@ def test_idempotent(con: duckdb.DuckDBPyConnection, parquet: Path) -> None:
         con.execute("SELECT COUNT(*) FROM leg_mandats WHERE nuance_source IS NOT NULL").fetchone()[
             0
         ]
-        == 5
+        == 6  # 5 NI + PA7 (préfixe homonyme non élu, motif tracé)
     )

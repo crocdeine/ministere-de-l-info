@@ -406,7 +406,7 @@ def get_metrics_commune_legi(annee: int, tour: int, code_commune: str) -> dict:
         "votants": _opt_int(row[1]),
         "exprimes": _opt_int(row[2]),
         "taux_participation_pct": None if row[3] is None else float(row[3]),
-        "bloc_dominant": bloc_row[0] if bloc_row else "DIV",
+        "bloc_dominant": bloc_row[0] if bloc_row else None,
     }
 
 

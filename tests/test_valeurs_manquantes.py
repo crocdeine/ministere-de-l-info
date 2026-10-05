@@ -104,3 +104,14 @@ def test_carte_deserts_trois_etats() -> None:
     assert html.count('"etat": "sans_donnee"') == 2  # NULL et secret statistique
     assert "APL &lt; 2,5" in html or "APL < 2,5" in html
     assert "Sans donnée" in html
+
+
+def test_detail_bv_absences_en_none() -> None:
+    """Détail par bureau : participation absente et bloc introuvable restent None (pas 0 ni DIV)."""
+    from ministere_de_l_info.viz.elections_queries import _build_bv_df
+
+    df = _build_bv_df([("0001", None, None, None, None)], [])
+    ligne = df.row(0, named=True)
+    assert ligne["inscrits"] is None
+    assert ligne["taux_participation_pct"] is None
+    assert ligne["bloc_gagnant"] is None

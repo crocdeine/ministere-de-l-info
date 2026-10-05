@@ -252,7 +252,7 @@ def get_metrics_commune_pres(annee: int, tour: int, code_commune: str) -> dict:
         "votants": _opt_int(row[1]),
         "exprimes": _opt_int(row[2]),
         "taux_participation_pct": None if row[3] is None else float(row[3]),
-        "bloc_dominant": bloc_row[0] if bloc_row else "DIV",
+        "bloc_dominant": bloc_row[0] if bloc_row else None,
     }
 
 
@@ -273,14 +273,14 @@ def _build_bv_df(part_rows: list, voix_rows: list) -> pl.DataFrame:
     part_df = pl.DataFrame(
         {
             "code_bv": [r[0] for r in part_rows],
-            "inscrits": [int(r[1] or 0) for r in part_rows],
-            "votants": [int(r[2] or 0) for r in part_rows],
-            "exprimes": [int(r[3] or 0) for r in part_rows],
-            "taux_participation_pct": [float(r[4] or 0.0) for r in part_rows],
+            "inscrits": [_opt_int(r[1]) for r in part_rows],
+            "votants": [_opt_int(r[2]) for r in part_rows],
+            "exprimes": [_opt_int(r[3]) for r in part_rows],
+            "taux_participation_pct": [None if r[4] is None else float(r[4]) for r in part_rows],
         }
     )
     if not voix_rows:
-        result = part_df.with_columns(pl.lit("DIV").alias("bloc_gagnant"))
+        result = part_df.with_columns(pl.lit(None, dtype=pl.Utf8).alias("bloc_gagnant"))
         for b in _BLOCS_ORDERED:
             result = result.with_columns(pl.lit(0).cast(pl.Int64).alias(f"voix_{b}"))
         return result.sort("code_bv")
@@ -310,7 +310,6 @@ def _build_bv_df(part_rows: list, voix_rows: list) -> pl.DataFrame:
         part_df.join(bloc_gagnant_df, on="code_bv", how="left")
         .join(pivot, on="code_bv", how="left")
         .with_columns([pl.col(f"voix_{b}").fill_null(0) for b in _BLOCS_ORDERED])
-        .with_columns(pl.col("bloc_gagnant").fill_null("DIV"))
         .sort("code_bv")
     )
 

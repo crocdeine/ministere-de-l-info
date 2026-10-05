@@ -329,7 +329,7 @@ def _render_vue_circo(
         m1.metric("Inscrits", fmt_nd(metrics["inscrits"]))
         m2.metric("Votants", fmt_nd(metrics["votants"]))
         m3.metric("Participation", fmt_nd(metrics["taux_participation_pct"], ".1f", " %"))
-        m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "—"))
+        m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "n.d."))
 
         bv_df = get_bv_details_legi(annee, tour, code_commune)
         if bv_df.is_empty():
@@ -359,7 +359,7 @@ def _render_vue_circo(
             for col in ["Inscrits", "Votants", "Exprimés"] + list(_BLOCS_ORDERED):
                 fmt[col] = "{:,}"
             st.dataframe(
-                bv_display.to_pandas().style.format(fmt),
+                bv_display.to_pandas().style.format(fmt, na_rep="n.d."),
                 width="stretch",
                 hide_index=True,
                 height=400,
