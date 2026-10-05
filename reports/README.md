@@ -23,6 +23,7 @@ sommaire (`grep -n '^## ' <fichier>`) avant d'ouvrir une section.
 
 | Fichier | Objet | Taille |
 |---|---|---|
+| [synthese-j2-2026-10-05.md](synthese-j2-2026-10-05.md) | Synthèse du jalon J2 (exactitude), 3 questions | 2 Ko |
 | [etl-non-inscrits-2026-10-04.md](etl-non-inscrits-2026-10-04.md) | Non-inscrits AN classés par nuance préfectorale d'élection : 100 mandats, 70 retrouvés, liste complète | 22 Ko |
 | [infra-native-mac-situation-reelle-2026-09-25.md](infra-native-mac-situation-reelle-2026-09-25.md) | Adaptation de l'installation native au constat réel du 25/09 (pas de Docker, disque externe, ancien agent de sauvegarde) | 17 Ko |
 | [a-faire-sur-le-mac.md](a-faire-sur-le-mac.md) | Liste tenue à jour des tâches à exécuter sur le Mac (base, réseau ministère) | 3 Ko |
