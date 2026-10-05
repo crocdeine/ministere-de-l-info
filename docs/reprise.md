@@ -37,10 +37,13 @@ Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), 
   republier la base (`scripts/publish_db.sh`, nouvelle release `db-AAAA-MM-JJ`, tag hors `v*`).
 - Fichier Sénat d'octobre mis de côté : `data/raw/legislatif/senat-odsen-general-2026-10-04.csv`.
 
-## Règles pour une session via omniroute (modèle non Claude ou moins puissant)
+## Règles pour une session de relais (omniroute, Antigravity ou tout modèle non Claude)
 
 - Autorisé : documentation, tests, nettoyage technique, mise à jour du journal.
 - **Interdit** (mettre en attente) : tout classement politique, toute relecture de neutralité ou
   de conformité juridique, validation finale de données, publication, fusion dans `main`.
 - Ne jamais envoyer `.env` ni aucun secret au modèle.
 - Noter la bascule dans `docs/modeles.md` (journal des bascules).
+- Ne jamais écrire « validé », « relu » ou « vérifié » sans avoir exécuté les commandes
+  correspondantes (tests, requêtes) et cité leur résultat.
+- Terminer en mettant à jour ce fichier : ce qui a été fait, ce qui reste.

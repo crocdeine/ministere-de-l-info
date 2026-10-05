@@ -31,6 +31,13 @@ c'était déjà le cas avant cette session, rien n'a été réinstallé.
 2. Y connecter les fournisseurs souhaités (comptes et clés : à faire soi-même, jamais par Claude).
 3. Pour travailler via omniroute : `omniroute run claude --model <modèle>` dans le dossier du projet.
 
+### Antigravity (repli utilisé le 2026-10-04)
+
+- Antigravity CLI 1.1.10 (Google), compte de Mathias, modèle Gemini 3.1 Pro. Utilisé quand
+  omniroute n'a pas fonctionné. Il lit `CLAUDE.md` et `docs/reprise.md`.
+- Constat : il a déclaré une relecture « validée » sans exécuter de tests. **Ne pas lui confier de
+  validation** ; le limiter à la documentation et au rangement (règles de `docs/reprise.md`).
+
 ## Outils projet déjà présents
 
 - Skills projet (`.claude/skills/`) : `data-viz-politique`, `economie-tokens`, `insee-duckdb-loader`,

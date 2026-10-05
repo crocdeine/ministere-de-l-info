@@ -19,4 +19,5 @@ Règles :
 
 | Date | De → vers | Raison |
 |---|---|---|
-| 2026-10-04 | Claude → Gemini 3.1 Pro (High) | Validation de J2 et compte-rendu via omniroute |
+| 2026-10-04 | Claude → Gemini 3.1 Pro (High), via Antigravity | Limite d'abonnement Claude atteinte ; omniroute non fonctionnel. Tâches documentaires uniquement (sa « relecture » de J2 n'est pas retenue) |
+| 2026-10-05 | Gemini → Claude Opus | Retour de l'abonnement |
