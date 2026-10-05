@@ -291,7 +291,9 @@ def render() -> None:
     )
 
     st.dataframe(
-        table_display.to_pandas().style.format(na_rep="n.d."),
+        table_display.to_pandas().style.format(
+            {"Particip. %": "{:.1f}"}, precision=0, thousands=" ", na_rep="n.d."
+        ),
         width="stretch",
         hide_index=True,
         height=400,
