@@ -16,6 +16,7 @@ from ministere_de_l_info._blocs_politiques import BLOCS_ORDERED as _BLOCS_ORDERE
 from ministere_de_l_info._blocs_politiques import COULEURS_BLOCS as _COULEURS_BLOCS
 from ministere_de_l_info._blocs_politiques import LIBELLES_BLOCS as _LIBELLES_BLOCS
 from ministere_de_l_info._theme import render_page_header
+from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz.elections_queries import format_pct_fr
 from ministere_de_l_info.viz.legislatif_queries import (
     BLOC_NON_CLASSE,
@@ -171,7 +172,12 @@ def _render_elus_tab(chambre: str | None, codes_dept: tuple[str, ...] | None) ->
         height=min(35 * display_df.height + 38, 600),
     )
 
-    st.caption("Source : Sénat (data.senat.fr) + Assemblée nationale (Datan / data.gouv.fr)")
+    st.caption(
+        f"Sources : {mention('senat')} ; {mention('datan')} ; {mention('an_amo')}. "
+        "Députés non inscrits : bloc de la nuance attribuée par la préfecture à leur élection "
+        "(ou à celle de leur titulaire pour un remplaçant), résultats du ministère de "
+        "l'Intérieur ; « Divers » si cette nuance n'est pas publiée (élections partielles)."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -439,7 +445,8 @@ def _render_evolution_tab(chambre: str | None, codes_dept: tuple[str, ...] | Non
         "Source : Datan (data.gouv.fr). Classement des groupes par législature selon la "
         "grille officielle en vigueur à l'élection (ADR-0005, ADR-0011) : LFI est classée "
         "à gauche pour les 15e, 16e et 17e législatures. "
-        "La 16e législature a été écourtée par la dissolution de juin 2024."
+        "La 16e législature a été écourtée par la dissolution de juin 2024. "
+        "Non-inscrits : classés selon leur nuance d'élection (voir ci-dessus)."
     )
 
 
