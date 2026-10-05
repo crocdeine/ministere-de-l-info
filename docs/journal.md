@@ -74,3 +74,9 @@ L'historique antérieur au 2026-10-04 est dans `reports/` (voir `reports/README.
   re-sourçage ; 637 tests. Points mineurs M1-M3 corrigés (absences en n.d. dans le détail par bureau
   et le bloc dominant, test du préfixe homonyme) : 639 tests, couverture 77,14 %.
 - M4 assumé : 3 suppléantes de la XVe (démission le jour de l'entrée en fonction) restent « sans groupe ».
+
+## 2026-10-06 — Décisions sur les non-inscrits, lancement de J3
+
+- Mathias valide : nuance du titulaire pour les remplaçants, chargement de la source AMO de
+  l'Assemblée nationale, maintien de Ménard et Dupont-Aignan en DTE (voir docs/orientations.md).
+- Lancés en parallèle : ETL AMO (ingenieur-etl) et jalon J3 lisibilité (developpeur-ui).

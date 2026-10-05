@@ -45,3 +45,12 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
   par blocs ; pas d'intitulé qui présuppose une conclusion (« Désindustrialisation » → « Emploi
   industriel et accès aux médecins »).
 - Une classification reconstruite par le projet n'est jamais présentée comme officielle.
+
+## Décisions du 2026-10-06 (non-inscrits, suite de J2)
+
+- **Remplaçants** (suppléants devenus députés) : reçoivent la nuance préfectorale d'élection de leur
+  titulaire.
+- **Source officielle des mandats de l'Assemblée nationale (AMO)** : autorisée, pour identifier
+  élus, élus de partielles et remplaçants.
+- **Ménard et Dupont-Aignan** : classés Droite (DTE), application stricte de la nuance préfectorale ;
+  la règle s'applique sans exception.
