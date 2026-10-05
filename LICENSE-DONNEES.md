@@ -23,6 +23,7 @@ Toute réutilisation doit citer les sources ci-dessous.
 | Chômage BIT régional, PIB par habitant | Eurostat | CC BY 4.0 (politique de réutilisation de la Commission) |
 | Résultats électoraux agrégés | Ministère de l'Intérieur, via data.gouv.fr | Licence Ouverte 2.0 |
 | Députés et scores d'activité | Datan, d'après l'Assemblée nationale | Licence Ouverte 1.0 |
+| Historique des mandats de députés (AMO30, [data.assemblee-nationale.fr](https://data.assemblee-nationale.fr/acteurs/historique-des-deputes)) | Assemblée nationale | Licence Ouverte |
 | Sénateurs (ODSEN_GENERAL) | Sénat | Licence data.senat.fr (Licence Ouverte) |
 
 Les classements politiques (nuances → blocs) sont des choix documentés du projet

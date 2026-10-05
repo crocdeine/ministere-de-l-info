@@ -4,6 +4,7 @@ Date : 2026-10-04 · Agent : ingenieur-etl · Périmètre : AN, législatures XI
 
 ## Résumé exécutif
 
+- **Mise à jour 2026-10-06** : via l'AMO30 de l'AN, 26 des 30 non retrouvés sont des remplaçants classés selon leur titulaire (GAU 16, DTE 4, CENT 4, EXD 2) ; 4 élus de partielles restent DIV (résultats non publiés en open data). Total NI : CENT 23, DIV 5, DTE 15, EXD 11, GAU 46. Détail dans la section dédiée ci-dessous.
 - 100 mandats NI (Datan, dernière législature) : 70 nuances d'élection retrouvées, 30 non retrouvées (restent DIV, motif explicite).
 - Après : CENT 19, DIV 31 (30 non retrouvés + Aly, nuance DIV), DTE 11, EXD 9, GAU 30 ; 69 mandats changent de bloc. Actifs (XVIIe) : EXD 3, DTE 3, CENT 3, DIV 1.
 - Exemples cités par l'orientation : Maréchal (FN 2012) et Collard, Aliot (FN 2017) → EXD ; **Ménard (DVD 2022) et Dupont-Aignan (DSV 2022) → DTE, pas EXD**.
@@ -13,6 +14,93 @@ Date : 2026-10-04 · Agent : ingenieur-etl · Périmètre : AN, législatures XI
 - Tests : `tests/test_legislatif_nuances_ni.py` (7, hermétiques) ; suite complète sur copie de base 628 passés, 1 échec préexistant (`test_aucun_mandat_non_classe`, groupes sénatoriaux C, RP…), couverture 76,6 %.
 - Décisions : Q1 remplaçants (nuance de la candidature du titulaire ?) ; Q2 charger AMO (partielles et remplacements) ; Q3 valider DTE pour Ménard et Dupont-Aignan.
 - À faire sur le Mac : `uv run python scripts/load_legislatif.py --source nuances` sur la base réelle.
+
+## Mise à jour 2026-10-06 — remplaçants et partielles (source AMO)
+
+Décisions Mathias du 2026-10-06 (`docs/orientations.md`) appliquées : AMO autorisé ;
+remplaçant → nuance d'élection du titulaire ; partielle → nuance de la partielle si une
+source officielle la fournit, sinon DIV motivé.
+
+- **Source** : AMO30 « Historique des députés », Assemblée nationale,
+  `https://data.assemblee-nationale.fr/static/openData/repository/17/amo/tous_acteurs_mandats_organes_xi_legislature/AMO30_tous_acteurs_tous_mandats_tous_organes_historique.json.zip`
+  — Licence Ouverte (page licence du site), JSON zippé 13,7 Mo (95 Mo décompressé,
+  3 170 acteurs, 3 955 mandats de député), mis à jour le 2026-10-04. Cache
+  `data/raw/legislatif/`, lu en mémoire (table temporaire `_amo`) : identifiant, nom,
+  prénom, législature, cause du mandat, date de prise de fonction, circonscription,
+  suppléants. Aucune autre donnée personnelle chargée.
+- **Titulaire** : mandat de la même législature, cause « élections générales », dont le
+  NI figure parmi les suppléants (`suppleants.suppleant.suppleantRef`). Le champ
+  `mandatRemplaceRef` est vide pour les remplaçants (il ne sert qu'aux reprises de
+  mandat) : non utilisé. Nuance du titulaire par la règle d'appariement existante.
+- **Partielles** : aucun résultat publié en open data pour les 4 partielles concernées
+  (2003, 2008, 2010, 2024) ; data.gouv ne propose, côté ministère de l'Intérieur, que
+  des partielles de 2016. Elles restent DIV, motif explicite. Aucune nuance inventée.
+- **Correction des hypothèses du 2026-10-04** : Chouin est un remplaçant (de S. Rist),
+  pas un élu de partielle ; Souchet est un élu de partielle, pas un remplaçant.
+- **Résultat** : 26 / 30 résolus (GAU 16, DTE 4, CENT 4, EXD 2) ; 4 partielles en DIV.
+  Répartition des 100 mandats NI : CENT 23, DIV 5, DTE 15, EXD 11, GAU 46 (avant :
+  CENT 19, DIV 31, DTE 11, EXD 9, GAU 30). Les 70 cas déjà classés sont inchangés
+  (comparaison avant/après de `source_bloc` sur copie de la base : 30 lignes modifiées,
+  exactement les 30 cas).
+
+| Lég. | Député(e) | Circ. | Cause (AMO) | Avant | Après | Source |
+|---|---|---|---|---|---|---|
+| 12 | Edmond-Mariette Philippe | 972-3 | partielle | DIV | DIV | élu(e) lors d'une élection partielle (prise de fonction le 02/06/2003) — résultats non publiés en open data |
+| 13 | Abiven Yvon | 29-4 | remplacement | DIV | GAU | remplaçant de Marylise Lebranchu : SOC (législatives 2007, 29-4) → GAU |
+| 13 | Ajon Emmanuelle | 33-2 | remplacement | DIV | GAU | remplaçante de Michèle Delaunay : SOC (2007, 33-2) → GAU |
+| 13 | Autexier Jean-Yves | 75-21 | remplacement | DIV | GAU | remplaçant de George Pau-Langevin : SOC (2007, 75-21) → GAU |
+| 13 | Borowski Joëlle | 57-8 | remplacement | DIV | GAU | remplaçante d'Aurélie Filippetti : SOC (2007, 57-8) → GAU |
+| 13 | Chaintron Rémi | 71-6 | remplacement | DIV | GAU | remplaçant d'Arnaud Montebourg : SOC (2007, 71-6) → GAU |
+| 13 | Francois Patrice | 38-1 | remplacement | DIV | GAU | remplaçant de Geneviève Fioraso : SOC (2007, 38-1) → GAU |
+| 13 | Marie Audrey | 973-1 | remplacement | DIV | GAU | remplaçant de Christiane Taubira : DVG (2007, 973-1) → GAU |
+| 13 | Mussington Louis | 971-4 | remplacement | DIV | GAU | remplaçant de Victorin Lurel : SOC (2007, 971-4) → GAU |
+| 13 | Poursinoff Anny | 78-10 | partielle | DIV | DIV | élu(e) lors d'une élection partielle (12/07/2010) — résultats non publiés en open data |
+| 13 | Robert Yvon | 76-1 | remplacement | DIV | GAU | remplaçant de Valérie Fourneyron : SOC (2007, 76-1) → GAU |
+| 13 | Rouxel André | 50-5 | remplacement | DIV | GAU | remplaçant de Bernard Cazeneuve : SOC (2007, 50-5) → GAU |
+| 13 | Souchet Dominique | 85-5 | partielle | DIV | DIV | élu(e) lors d'une élection partielle (13/04/2008) — résultats non publiés en open data |
+| 14 | Baron Esther | 04-2 | remplacement | DIV | GAU | remplaçante de Christophe Castaner : SOC (2012, 04-2) → GAU |
+| 14 | Lefrand Guy | 27-1 | remplacement | DIV | DTE | remplaçant de Bruno Le Maire : UMP (2012, 27-1) → DTE |
+| 14 | Lubin Monique | 40-3 | remplacement (décès) | DIV | GAU | remplaçante de Henri Emmanuelli : SOC (2012, 40-3) → GAU |
+| 14 | Mallejac Claire | 29-6 | remplacement | DIV | GAU | remplaçante de Richard Ferrand : SOC (2012, 29-6) → GAU |
+| 14 | Pen Catherine | 975-1 | remplacement | DIV | GAU | remplaçante d'Annick Girardin : RDG (2012, 975-1) → GAU |
+| 14 | Rousselin Jean-Louis | 76-7 | remplacement | DIV | DTE | remplaçant d'Édouard Philippe : UMP (2012, 76-7) → DTE |
+| 15 | Beauvais Bernadette | 77-6 | remplacement (incompatibilité) | DIV | DTE | remplaçante de Jean-François Parigi : LR (2017, 77-6) → DTE |
+| 15 | Coriton Bastien | 76-5 | remplacement (incompatibilité) | DIV | GAU | remplaçant de Christophe Bouillon : SOC (2017, 76-5) → GAU |
+| 15 | Deguerry Jean | 01-5 | remplacement | DIV | DTE | remplaçant de Damien Abad : LR (2017, 01-5) → DTE |
+| 15 | Derelle Damien | 78-5 | remplacement | DIV | CENT | remplaçant de Yaël Braun-Pivet : REM (2017, 78-5) → CENT |
+| 15 | Houplain Myriane | 62-10 | remplacement (incompatibilité) | DIV | EXD | remplaçante de Ludovic Pajot : FN (2017, 62-10) → EXD |
+| 15 | Jeanne Ghylaine | 971-2 | remplacement | DIV | GAU | remplaçante de Justine Benin : DVG (2017, 971-2) → GAU |
+| 15 | Loquet Ludovic | 62-6 | remplacement | DIV | CENT | remplaçant de Brigitte Bourguignon : REM (2017, 62-6) → CENT |
+| 15 | Pech Margaux | 75-3 | remplacement | DIV | CENT | remplaçante de Stanislas Guerini : REM (2017, 75-3) → CENT |
+| 15 | Pujol Catherine | 66-2 | remplacement (incompatibilité) | DIV | EXD | remplaçante de Louis Aliot : FN (2017, 66-2) → EXD |
+| 17 | Chouin Stéphane | 45-1 | remplacement | DIV | CENT | remplaçant de Stéphanie Rist : ENS (2024, 45-1) → CENT |
+| 17 | Vuibert Lionel | 08-1 | partielle | DIV | DIV | élu(e) lors d'une élection partielle (09/12/2024) — résultats non publiés en open data |
+
+« remplacement » sans précision = député nommé au Gouvernement. Libellé exact en base
+(`source_bloc`) : « nuance préfectorale SOC (remplaçant(e) de Marylise Lebranchu, élu(e)
+aux législatives 2007, 29-4) → GAU (nuances_harmonisees) ».
+
+Contrôles (base réelle, après `uv run python scripts/load_legislatif.py --source nuances`) :
+
+```sql
+-- Attendu : CENT 23, DIV 5, DTE 15, EXD 11, GAU 46
+SELECT bloc_final, COUNT(*) FROM v_mandats_legislatif
+WHERE chambre = 'AN' AND groupe_sigle = 'NI' GROUP BY 1 ORDER BY 1;
+-- Attendu : 26 remplaçants classés, 4 partielles
+SELECT COUNT(*) FILTER (WHERE nuance_source LIKE 'remplaçant(e) de %'),
+       COUNT(*) FILTER (WHERE nuance_source LIKE '%élection partielle (prise%')
+FROM leg_mandats WHERE chambre = 'AN' AND groupe_sigle = 'NI';
+```
+
+Décisions à soumettre (questions fermées) :
+1. Partielles : rechercher les résultats sur les pages web du ministère de l'Intérieur
+   (archives non publiées en open data, sans licence explicite par jeu) pour les 4 cas ?
+   — oui / non.
+2. Afficher la mention « Assemblée nationale » dans la légende de la page Législatif
+   (actuellement seulement au tableau des sources de l'Accueil) ? — oui / non.
+
+À valider sur le Mac : chargement réel via `scripts/load_legislatif.py --source nuances`
+(télécharge l'AMO30 dans `data/raw/legislatif/`), puis requêtes ci-dessus.
 
 ## Faisabilité et source
 

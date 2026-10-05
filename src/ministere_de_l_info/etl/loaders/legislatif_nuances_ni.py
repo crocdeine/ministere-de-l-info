@@ -24,14 +24,27 @@ Le département suffit (pas de circonscription) : le redécoupage de 2010 (appli
 et l'absence de code de circonscription dans la source pour 2002, 2007 et 2024 sont sans
 effet. Échec → ``nuance_election`` NULL et motif explicite dans ``nuance_source`` ; le
 mandat garde le bloc du groupe NI (DIV).
+
+Mandats non retrouvés (orientation Mathias 2026-10-06), selon la cause du mandat dans
+l'AMO30 de l'Assemblée nationale (historique des mandats, Licence Ouverte) :
+- remplaçant(e) (« remplacement d'un député … ») : nuance de l'élection générale de son
+  titulaire (mandat de la même législature dont il ou elle est suppléant(e)), retrouvée
+  par la même règle d'appariement ;
+- élu(e) d'une partielle : résultats des partielles absents de l'open data (data.gouv ne
+  publie que quelques partielles de 2016) → DIV, motif explicite.
+Seuls l'identifiant, le nom, la législature, la cause, la date de prise de fonction, la
+circonscription et les suppléants sont lus, en table temporaire.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import zipfile
 from pathlib import Path
 
 import duckdb
+import httpx
 
 from ministere_de_l_info.etl._common import upsert_metadata
 
@@ -57,6 +70,76 @@ _DEPT_SOURCE = {
 
 NON_RETROUVEE = "nuance d'élection non retrouvée"
 _NR_SQL = NON_RETROUVEE.replace("'", "''")
+_WHERE_NI = "m.chambre = 'AN' AND m.groupe_sigle = 'NI'"
+
+AMO_URL = (
+    "https://data.assemblee-nationale.fr/static/openData/repository/17/amo/"
+    "tous_acteurs_mandats_organes_xi_legislature/"
+    "AMO30_tous_acteurs_tous_mandats_tous_organes_historique.json.zip"
+)
+
+
+def telecharger_amo(raw_dir: Path, force: bool = False) -> Path:
+    """Télécharge l'AMO30 (≈ 14 Mo) en cache dans ``raw_dir/legislatif``."""
+    dest = raw_dir / "legislatif" / AMO_URL.rsplit("/", 1)[1]
+    if dest.exists() and not force:
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    logger.info("Téléchargement AMO30 → %s", dest)
+    with httpx.stream("GET", AMO_URL, follow_redirects=True, timeout=120.0) as r:
+        r.raise_for_status()
+        with dest.open("wb") as f:
+            for chunk in r.iter_bytes(chunk_size=256 * 1024):
+                f.write(chunk)
+    return dest
+
+
+def _liste(x: object) -> list:
+    """Le JSON AMO (converti du XML) donne un objet seul ou une liste."""
+    return [] if x is None else x if isinstance(x, list) else [x]
+
+
+def lire_mandats_amo(zip_path: Path) -> list[tuple]:
+    """Mandats de député de l'AMO : (acteur, nom, prénom, législature, cause, prise de
+    fonction, département, circonscription, suppléants)."""
+    lignes = []
+    with zipfile.ZipFile(zip_path) as z:
+        for fichier in z.namelist():
+            if not fichier.startswith("json/acteur/"):
+                continue
+            a = json.loads(z.read(fichier))["acteur"]
+            uid = a["uid"]["#text"] if isinstance(a["uid"], dict) else a["uid"]
+            ident = a["etatCivil"]["ident"]
+            for m in _liste((a.get("mandats") or {}).get("mandat")):
+                if m.get("typeOrgane") != "ASSEMBLEE":
+                    continue
+                election = m.get("election") or {}
+                lieu = election.get("lieu") or {}
+                suppleants = _liste((m.get("suppleants") or {}).get("suppleant"))
+                lignes.append(
+                    (
+                        uid,
+                        ident["nom"],
+                        ident["prenom"],
+                        int(m["legislature"]),
+                        election.get("causeMandat"),
+                        (m.get("mandature") or {}).get("datePriseFonction"),
+                        lieu.get("numDepartement"),
+                        lieu.get("numCirco"),
+                        [s["suppleantRef"] for s in suppleants],
+                    )
+                )
+    return lignes
+
+
+def _charger_amo(con: duckdb.DuckDBPyConnection, lignes: list[tuple]) -> None:
+    con.execute(
+        "CREATE OR REPLACE TEMP TABLE _amo (acteur VARCHAR, nom VARCHAR, prenom VARCHAR, "
+        "legislature INTEGER, cause VARCHAR, prise_fonction DATE, dept VARCHAR, "
+        "circo VARCHAR, suppleants VARCHAR[])"
+    )
+    if lignes:
+        con.executemany("INSERT INTO _amo VALUES (?,?,?,?,?,?,?,?,?)", lignes)
 
 
 def _norm(col: str, joker: bool = False) -> str:
@@ -68,12 +151,8 @@ def _norm(col: str, joker: bool = False) -> str:
     return f"regexp_replace({expr}, '[^{garde}]', '', 'g')"
 
 
-def attribuer_nuances_non_inscrits(con: duckdb.DuckDBPyConnection, parquet_candidats: Path) -> int:
-    """Renseigne la nuance d'élection des mandats NI de l'AN ; renvoie le nombre retrouvé."""
-    con.execute(
-        "UPDATE leg_mandats SET nuance_election = NULL, nuance_annee = NULL, "
-        "nuance_source = NULL WHERE nuance_source IS NOT NULL"
-    )
+def _resoudre(con: duckdb.DuckDBPyConnection, parquet_candidats: Path) -> None:
+    """``_cibles`` (elu_id, legislature, dept, num_circo, nom, prenom) → ``_ni_resolution``."""
     annees = ", ".join(f"({leg}, {an})" for leg, an in ANNEE_ELECTION.items())
     ids = ", ".join(f"'{an}_legi_t{t}'" for an in ANNEE_ELECTION.values() for t in (1, 2))
     dept_case = " ".join(f"WHEN '{k}' THEN '{v}'" for k, v in _DEPT_SOURCE.items())
@@ -81,12 +160,10 @@ def attribuer_nuances_non_inscrits(con: duckdb.DuckDBPyConnection, parquet_candi
         f"""
         CREATE OR REPLACE TEMP TABLE _ni_resolution AS
         WITH ni AS (
-            SELECT m.elu_id, m.legislature, a.annee, upper(m.code_departement) AS dept,
-                   m.num_circo, {_norm("e.nom")} AS nom_n, {_norm("e.prenom")} AS prenom_n
-            FROM leg_mandats m
-            JOIN leg_elus e ON e.id = m.elu_id AND e.chambre = m.chambre
-            JOIN (VALUES {annees}) a(legislature, annee) ON a.legislature = m.legislature
-            WHERE m.chambre = 'AN' AND m.groupe_sigle = 'NI'
+            SELECT t.elu_id, t.legislature, a.annee, upper(t.dept) AS dept, t.num_circo,
+                   {_norm("t.nom")} AS nom_n, {_norm("t.prenom")} AS prenom_n
+            FROM _cibles t
+            JOIN (VALUES {annees}) a(legislature, annee) ON a.legislature = t.legislature
         ),
         c AS (
             SELECT id_election, CAST(left(id_election, 4) AS INTEGER) AS annee,
@@ -145,6 +222,29 @@ def attribuer_nuances_non_inscrits(con: duckdb.DuckDBPyConnection, parquet_candi
         """,
         [str(parquet_candidats)],
     )
+
+
+def attribuer_nuances_non_inscrits(
+    con: duckdb.DuckDBPyConnection, parquet_candidats: Path, amo_zip: Path | None = None
+) -> int:
+    """Renseigne la nuance d'élection des mandats NI de l'AN ; renvoie le nombre retrouvé.
+
+    ``amo_zip`` (AMO30) : traite les remplaçants et élus de partielles non retrouvés.
+    """
+    con.execute(
+        "UPDATE leg_mandats SET nuance_election = NULL, nuance_annee = NULL, "
+        "nuance_source = NULL WHERE nuance_source IS NOT NULL"
+    )
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE _cibles AS
+        SELECT m.elu_id, m.legislature, m.code_departement AS dept, m.num_circo,
+               e.nom, e.prenom
+        FROM leg_mandats m JOIN leg_elus e ON e.id = m.elu_id AND e.chambre = m.chambre
+        WHERE {_WHERE_NI}
+        """
+    )
+    _resoudre(con, parquet_candidats)
     con.execute(
         f"""
         UPDATE leg_mandats m SET
@@ -165,14 +265,18 @@ def attribuer_nuances_non_inscrits(con: duckdb.DuckDBPyConnection, parquet_candi
                     || r.annee || ' (' || r.dept || ') — remplaçant(e) ou élection partielle'
             END
         FROM _ni_resolution r
-        WHERE m.elu_id = r.elu_id AND m.chambre = 'AN' AND m.legislature = r.legislature
-          AND m.groupe_sigle = 'NI'
+        WHERE m.elu_id = r.elu_id AND m.legislature = r.legislature AND {_WHERE_NI}
         """
     )
+    if amo_zip is not None:
+        _charger_amo(con, lire_mandats_amo(amo_zip))
+        _remplacants_et_partielles(con, parquet_candidats)
+        con.execute("DROP TABLE _amo")
     n_total, n_ok = con.execute(
         "SELECT COUNT(*), COUNT(nuance_election) FROM leg_mandats WHERE nuance_source IS NOT NULL"
     ).fetchone()
     con.execute("DROP TABLE _ni_resolution")
+    con.execute("DROP TABLE _cibles")
     logger.info(
         "Non-inscrits AN : %d mandat(s), nuance d'élection retrouvée pour %d", n_total, n_ok
     )
@@ -180,10 +284,63 @@ def attribuer_nuances_non_inscrits(con: duckdb.DuckDBPyConnection, parquet_candi
         logger.warning(
             "%d mandat(s) NI sans nuance d'élection : bloc du groupe (DIV)", n_total - n_ok
         )
-    upsert_metadata(
-        con,
-        "leg_mandats_nuances_ni",
-        n_ok,
-        f"data.gouv élections agrégées ({parquet_candidats.name})",
-    )
+    source = f"data.gouv élections agrégées ({parquet_candidats.name})"
+    if amo_zip is not None:
+        source += f" + Assemblée nationale ({amo_zip.name})"
+    upsert_metadata(con, "leg_mandats_nuances_ni", n_ok, source)
     return n_ok
+
+
+def _remplacants_et_partielles(con: duckdb.DuckDBPyConnection, parquet_candidats: Path) -> None:
+    """Mandats NI non retrouvés : nuance du titulaire (remplaçant) ou motif partielle."""
+    # Titulaire = mandat issu de l'élection générale de la même législature dont le NI est
+    # suppléant. Plusieurs titulaires distincts (aucun cas dans l'AMO au 2026-10-04) :
+    # mandat écarté, il garde le motif générique.
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE _cibles AS
+        SELECT DISTINCT m.elu_id, m.legislature, t.dept,
+               TRY_CAST(t.circo AS INTEGER) AS num_circo, t.nom, t.prenom
+        FROM leg_mandats m
+        JOIN _amo r ON r.acteur = m.elu_id AND r.legislature = m.legislature
+        JOIN _amo t ON t.legislature = r.legislature AND list_contains(t.suppleants, r.acteur)
+        WHERE {_WHERE_NI} AND m.nuance_election IS NULL
+          AND r.cause ILIKE 'remplacement%' AND t.cause = 'élections générales'
+        QUALIFY COUNT(DISTINCT t.acteur) OVER (PARTITION BY m.elu_id, m.legislature) = 1
+        """
+    )
+    _resoudre(con, parquet_candidats)
+    con.execute(
+        f"""
+        UPDATE leg_mandats m SET
+            nuance_election = CASE WHEN len(r.nuances_elu) = 1 THEN r.nuances_elu[1] END,
+            nuance_annee = CASE WHEN len(r.nuances_elu) = 1 THEN r.annee END,
+            nuance_source = CASE
+                WHEN len(r.nuances_elu) = 1 THEN
+                    'remplaçant(e) de ' || t.prenom || ' ' || t.nom || ', élu(e) aux législatives '
+                    || r.annee || ', ' || r.dept || '-' || r.num_circo
+                    || COALESCE(', candidature « ' || r.nom_candidature || ' »', '')
+                ELSE
+                    '{_NR_SQL} : remplaçant(e) de ' || t.prenom || ' ' || t.nom
+                    || ', nuance du titulaire non retrouvée (législatives ' || r.annee
+                    || ', ' || r.dept || ')'
+            END
+        FROM _ni_resolution r JOIN _cibles t USING (elu_id, legislature)
+        WHERE m.elu_id = r.elu_id AND m.legislature = r.legislature AND {_WHERE_NI}
+        """
+    )
+    con.execute(
+        f"""
+        UPDATE leg_mandats m SET nuance_source =
+            '{_NR_SQL} : élu(e) lors d''une élection partielle (prise de fonction le '
+            || strftime(p.prise_fonction, '%d/%m/%Y') || ', ' || p.dept || '-' || p.circo
+            || ') — résultats des partielles non publiés en open data'
+        FROM (
+            SELECT acteur, legislature, arg_max(dept, prise_fonction) AS dept,
+                   arg_max(circo, prise_fonction) AS circo, MAX(prise_fonction) AS prise_fonction
+            FROM _amo WHERE cause ILIKE 'élection partielle%' GROUP BY ALL
+        ) p
+        WHERE p.acteur = m.elu_id AND p.legislature = m.legislature AND {_WHERE_NI}
+          AND m.nuance_election IS NULL AND m.nuance_source NOT LIKE '%remplaçant(e) de %'
+        """
+    )

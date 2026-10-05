@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import zipfile
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -23,8 +25,10 @@ _DEPUTES = [
     ("PA1", "Maréchal-Le Pen", "Marion", "84", 3, False, [(14, "NI")]),
     # NI en XVe, membre d'un groupe en XIVe (source complète simulée)
     ("PA2", "Durand", "Paul", "52", 1, False, [(14, "SOC"), (15, "NI")]),
-    ("PA3", "Suppléante", "Anne", "62", 10, False, [(15, "NI")]),  # absente des candidats
-    ("PA4", "Battu", "Jean", "08", 1, True, [(17, "NI")]),  # candidat non élu (partielle)
+    # Absente des candidats ; AMO : remplaçante du titulaire PA8 (FN 2017, 62-10)
+    ("PA3", "Suppléante", "Anne", "62", 10, False, [(15, "NI")]),
+    # Candidat non élu à la générale ; AMO : élu d'une partielle
+    ("PA4", "Battu", "Jean", "08", 1, True, [(17, "NI")]),
     ("PA5", "Aliot", "Thérèse", "971", 2, False, [(14, "NI")]),  # accents perdus, code ZA
     ("PA6", "Membre", "Luc", "75", 1, True, [(17, "DR")]),  # non concerné
     # Nom dont « MARTIN » (candidate battue, même prénom et département) est un préfixe
@@ -50,6 +54,35 @@ _CANDIDATS = [
     # 2012, 971-2 (code source ZA) : accents remplacés par « ? »
     ("2012_legi_t1", "ZA", "97101", "0001", "ALIOT", "Th?r?se", "DVG", 700),
     ("2012_legi_t1", "ZA", "97101", "0001", "AUTRE", "Paul", "SOC", 300),
+    # 2017, 62-10 : titulaire FN élu au second tour (sa suppléante PA3 lui succède)
+    ("2017_legi_t1", "62", "62001", "0001", "TITULAIRE", "Ludo", "FN", 450),
+    ("2017_legi_t1", "62", "62001", "0001", "ROSE", "Eva", "REM", 400),
+    ("2017_legi_t2", "62", "62001", "0001", "TITULAIRE", "Ludo", "FN", 510),
+    ("2017_legi_t2", "62", "62001", "0001", "ROSE", "Eva", "REM", 490),
+]
+
+# AMO30 simulé : (uid, nom, prénom, [(législature, cause, prise de fonction, département,
+# circo, suppléants, type d'organe)])
+_GEN = "élections générales"
+_PART = "élection partielle, remplacement d'un député démissionnaire"
+_AMO = [
+    ("PA1", "Maréchal-Le Pen", "Marion", [(14, _GEN, "2012-06-20", "84", "3", [], "ASSEMBLEE")]),
+    (
+        "PA3",
+        "Suppléante",
+        "Anne",
+        [(15, "remplacement d'un député décédé", "2017-07-21", "62", "10", [], "ASSEMBLEE")],
+    ),
+    (
+        "PA4",
+        "Battu",
+        "Jean",
+        [
+            (17, _PART, "2024-12-09", "08", "1", [], "ASSEMBLEE"),
+            (17, None, "2020-01-01", None, None, [], "CONSEIL_MUNICIPAL"),
+        ],
+    ),
+    ("PA8", "Titulaire", "Ludo", [(15, _GEN, "2017-06-21", "62", "10", ["PA3"], "ASSEMBLEE")]),
 ]
 
 _NUANCES = [
@@ -58,6 +91,7 @@ _NUANCES = [
     ("SOC", 2012, "GAU"),
     ("DVG", 2012, "GAU"),
     ("REM", 2017, "CENT"),
+    ("FN", 2017, "EXD"),
     ("ENS", 2024, "CENT"),
     ("RN", 2024, "EXD"),
 ]
@@ -77,8 +111,45 @@ def parquet(tmp_path: Path) -> Path:
     return chemin
 
 
+def _mandat_amo(
+    leg: int,
+    cause: str | None,
+    prise: str,
+    dept: str | None,
+    circo: str | None,
+    suppleants: list[str],
+    organe: str,
+) -> dict:
+    sup = [{"suppleantRef": s} for s in suppleants]
+    return {
+        "uid": "PM0",
+        "legislature": str(leg),
+        "typeOrgane": organe,
+        "suppleants": {"suppleant": sup[0] if len(sup) == 1 else sup} if sup else None,
+        "election": {"lieu": {"numDepartement": dept, "numCirco": circo}, "causeMandat": cause},
+        "mandature": {"datePriseFonction": prise},
+    }
+
+
 @pytest.fixture
-def con(parquet: Path) -> Iterator[duckdb.DuckDBPyConnection]:
+def amo(tmp_path: Path) -> Path:
+    """Archive au format AMO30 (JSON converti du XML : objet seul ou liste)."""
+    chemin = tmp_path / "amo30.json.zip"
+    with zipfile.ZipFile(chemin, "w") as z:
+        for uid, nom, prenom, mandats in _AMO:
+            liste = [_mandat_amo(*m) for m in mandats]
+            acteur = {
+                "uid": {"#text": uid},
+                "etatCivil": {"ident": {"nom": nom, "prenom": prenom}},
+                "mandats": {"mandat": liste[0] if len(liste) == 1 else liste},
+            }
+            z.writestr(f"json/acteur/{uid}.json", json.dumps({"acteur": acteur}))
+        z.writestr("json/organe/PO1.json", "{}")
+    return chemin
+
+
+@pytest.fixture
+def con(parquet: Path, amo: Path) -> Iterator[duckdb.DuckDBPyConnection]:
     c = duckdb.connect()
     c.execute(
         "CREATE TABLE _etl_metadata (table_name VARCHAR NOT NULL, loaded_at TIMESTAMP NOT NULL, "
@@ -105,7 +176,7 @@ def con(parquet: Path) -> Iterator[duckdb.DuckDBPyConnection]:
                 [elu_id, leg, groupe, dept, circo],
             )
     create_legislatif_views(c)
-    attribuer_nuances_non_inscrits(c, parquet)
+    attribuer_nuances_non_inscrits(c, parquet, amo)
     yield c
     c.close()
 
@@ -137,8 +208,7 @@ def test_classement_par_mandat(con: duckdb.DuckDBPyConnection) -> None:
 @pytest.mark.parametrize(
     ("elu_id", "leg", "motif"),
     [
-        ("PA3", 15, "absent(e) des candidats"),
-        ("PA4", 17, "non élu(e)"),
+        ("PA4", 17, "élection partielle (prise de fonction le 09/12/2024, 08-1)"),
         ("PA7", 14, "non élu(e)"),  # préfixe homonyme non élu : pas de faux appariement
     ],
 )
@@ -149,6 +219,22 @@ def test_nuance_non_retrouvee_reste_div(
     assert bloc_groupe == bloc_final == "DIV"
     assert source.startswith(NON_RETROUVEE)
     assert motif in source
+
+
+def test_remplacante_recoit_la_nuance_du_titulaire(con: duckdb.DuckDBPyConnection) -> None:
+    assert _mandat(con, "PA3", 15) == (
+        "DIV",
+        "EXD",
+        "nuance préfectorale FN (remplaçant(e) de Ludo Titulaire, élu(e) aux législatives "
+        "2017, 62-10) → EXD (nuances_harmonisees)",
+    )
+
+
+def test_sans_amo_motif_generique(con: duckdb.DuckDBPyConnection, parquet: Path) -> None:
+    assert attribuer_nuances_non_inscrits(con, parquet) == 3
+    source = _mandat(con, "PA3", 15)[2]
+    assert source.startswith(NON_RETROUVEE) and "absent(e) des candidats" in source
+    assert "non élu(e)" in _mandat(con, "PA4", 17)[2]
 
 
 def test_accents_perdus_et_code_outre_mer(con: duckdb.DuckDBPyConnection) -> None:
@@ -170,9 +256,9 @@ def test_elus_actuels_et_override(con: duckdb.DuckDBPyConnection) -> None:
     assert actuel("PA4") == "CENT"
 
 
-def test_idempotent(con: duckdb.DuckDBPyConnection, parquet: Path) -> None:
+def test_idempotent(con: duckdb.DuckDBPyConnection, parquet: Path, amo: Path) -> None:
     avant = con.execute("SELECT * FROM v_mandats_legislatif ORDER BY ALL").fetchall()
-    assert attribuer_nuances_non_inscrits(con, parquet) == 3
+    assert attribuer_nuances_non_inscrits(con, parquet, amo) == 4
     assert con.execute("SELECT * FROM v_mandats_legislatif ORDER BY ALL").fetchall() == avant
     assert (
         con.execute("SELECT COUNT(*) FROM leg_mandats WHERE nuance_source IS NOT NULL").fetchone()[

@@ -15,7 +15,8 @@ Sources et tables DuckDB :
   datan     → leg_elus + leg_mandats + leg_activite (chambre=AN, législatures 12-17)
   overrides → leg_blocs_override (corrections manuelles de blocs)
   nuances   → leg_mandats.nuance_* des non-inscrits AN (nuance préfectorale d'élection,
-              data/exploration/general-results.parquet ; relancé après chaque chargement datan)
+              data/exploration/general-results.parquet ; remplaçants et partielles via l'AMO30
+              de l'AN, data/raw/legislatif/, ≈ 14 Mo ; relancé après chaque chargement datan)
   all       → senat + datan + nuances + overrides
 
 Idempotent : chaque loader fait DELETE+INSERT par source ; le référentiel est rechargé
@@ -42,6 +43,7 @@ from ministere_de_l_info.etl.legislatif_groupes import populate_groupes_blocs  #
 from ministere_de_l_info.etl.loaders.legislatif_datan import load_legislatif_datan  # noqa: E402
 from ministere_de_l_info.etl.loaders.legislatif_nuances_ni import (  # noqa: E402
     attribuer_nuances_non_inscrits,
+    telecharger_amo,
 )
 from ministere_de_l_info.etl.loaders.legislatif_overrides import load_overrides  # noqa: E402
 from ministere_de_l_info.etl.loaders.legislatif_senat import load_legislatif_senat  # noqa: E402
@@ -134,7 +136,8 @@ def main() -> None:
         if args.source in ("datan", "nuances", "all"):
             if _PARQUET_CANDIDATS.exists():
                 logger.info("=== Nuances d'élection des non-inscrits AN ===")
-                attribuer_nuances_non_inscrits(con, _PARQUET_CANDIDATS)
+                amo = telecharger_amo(_RAW_DIR, force=args.force)
+                attribuer_nuances_non_inscrits(con, _PARQUET_CANDIDATS, amo)
             else:
                 logger.warning(
                     "%s absent : non-inscrits AN classés selon le groupe (DIV)", _PARQUET_CANDIDATS

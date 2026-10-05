@@ -353,3 +353,24 @@ selon la nuance attribuée par la préfecture lors de son élection, convertie e
 - **Chargement** : `scripts/load_legislatif.py --source nuances` (relancé avec `datan`
   et `all`). Résultat 2026-10-04 : 100 mandats NI, 70 nuances retrouvées, 30 non
   retrouvées (`reports/etl-non-inscrits-2026-10-04.md`).
+
+## Addendum 2026-10-06 — remplaçants et partielles (source AMO)
+
+Décisions Mathias (2026-10-06, `docs/orientations.md`) : source AMO autorisée ; un
+remplaçant reçoit la nuance préfectorale d'élection de son titulaire ; un élu de partielle
+reçoit la nuance de sa partielle si une source officielle la fournit, sinon DIV motivé.
+Ferme le point ouvert n° 4 pour cet usage.
+
+- **Source** : AMO30 « Historique des députés » (data.assemblee-nationale.fr, Licence
+  Ouverte, JSON zippé ≈ 14 Mo, cache `data/raw/legislatif/`). Lu en mémoire (table
+  temporaire) : identifiant, nom, législature, cause du mandat, prise de fonction,
+  circonscription, suppléants. Rien d'autre n'est stocké que le texte de `nuance_source`.
+- **Remplaçant** (cause « remplacement d'un député … ») : titulaire = mandat de la même
+  législature issu des élections générales dont il est suppléant ; nuance du titulaire par
+  la même règle d'appariement ; `nuance_source` = « remplaçant(e) de <Prénom Nom>, élu(e)
+  aux législatives <année>, <dép>-<circo> ».
+- **Partielle** : pas de résultats de partielles en open data pour les cas concernés
+  (data.gouv : partielles 2016 seulement) → DIV, motif « élu(e) lors d'une élection
+  partielle (prise de fonction le …) ».
+- Résultat : 26 remplaçants classés (GAU 16, DTE 4, CENT 4, EXD 2), 4 partielles en DIV
+  (`reports/etl-non-inscrits-2026-10-04.md`, mise à jour 2026-10-06).

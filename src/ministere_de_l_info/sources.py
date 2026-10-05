@@ -102,6 +102,13 @@ SOURCES: dict[str, Source] = {
         "https://www.data.gouv.fr/datasets/historique-des-deputes/",
         ("leg_elus_datan", "leg_mandats_datan"),
     ),
+    "an_amo": Source(
+        "Historique des mandats de députés (AMO30 : cause du mandat, suppléants)",
+        "Assemblée nationale (data.assemblee-nationale.fr)",
+        "Licence Ouverte (Assemblée nationale)",
+        "https://data.assemblee-nationale.fr/acteurs/historique-des-deputes",
+        ("leg_mandats_nuances_ni",),
+    ),
     "senat": Source(
         "Sénateurs (ODSEN_GENERAL)",
         "Sénat (data.senat.fr)",
