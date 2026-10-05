@@ -5,27 +5,17 @@ Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), 
 
 ## Où on en est
 
-- Phase 0 (audit) : validée. Jalon J1 (conformité) : fait, base publiée (`db-2026-10-04`, ODbL).
-- **Jalon J2 (exactitude) : code terminé et commité, PAS ENCORE RELU ni rapporté à Mathias.**
-  - Chômage RP 2015-2016 reconstitué par sexe (`68e7687`).
-  - Valeurs absentes affichées « n.d. », carte déserts médicaux à 3 états (`5e80ebd`).
-  - Non-inscrits AN classés selon leur nuance préfectorale d'élection : 69 mandats reclassés,
-    30 non retrouvés laissés en DIV (`ea2b2f7`, `1e6edd0`, rapport `reports/etl-non-inscrits-2026-10-04.md`).
-  - Sources officielles des classements, groupes historiques du Sénat (`b7c51cd`, rapport
-    `reports/verification-classements-j2-2026-10-04.md`).
-  - Base locale rechargée (Législatif, RP) ; copie avant J2 : `data/ministere.duckdb.bak-avant-j2`.
-  - Mesures : 637 tests réussis, 0 échec ; couverture 76,83 %.
+- Phase 0, J1 et J2 : terminés et relus (2026-10-05). Base publiée : `db-2026-10-04`
+  (la base locale contient en plus les corrections J2, non encore publiées).
+- En attente de Mathias : 3 questions sur les non-inscrits (remplaçants, source AMO de l'AN,
+  confirmation Ménard / Dupont-Aignan en DTE).
 
 ## Prochaines étapes, dans l'ordre
 
-1. **Relecture indépendante de J2** (agent `verificateur-code`, modèle le plus puissant) : diff
-   `94a0d15..HEAD`. Tâche critique (classement politique) : **ne pas confier à un modèle faible**.
-2. Pousser la branche, vérifier la CI du commit poussé (règle CLAUDE.md).
-3. Rapport à Mathias en langage simple, avec 3 questions fermées issues de l'agent ETL :
-   remplaçants (nuance du titulaire ?), source AMO de l'AN pour les 30 cas non résolus,
-   confirmation que Ménard et Dupont-Aignan restent DTE (application stricte de sa règle).
-4. Mettre à jour `docs/journal.md`, `docs/roadmap.md` (J2 fait), `docs/audit-2026-10-04.md` (statuts).
-5. Nettoyer les worktrees d'agents (`.claude/worktrees/agent-*`) après fusion.
+1. Réponses de Mathias aux 3 questions, puis application.
+2. J3 (lisibilité honnête) : bornes d'échelle fixes et annoncées, municipales en %, palette
+   accessible, indicateur « Bloc majoritaire » tronqué. Validation visuelle de Mathias requise.
+3. Republication de la base quand les groupes du Sénat seront connus (voir ci-dessous).
 
 ## En attente d'un événement extérieur
 

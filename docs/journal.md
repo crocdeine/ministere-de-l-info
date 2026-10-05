@@ -69,3 +69,8 @@ L'historique antérieur au 2026-10-04 est dans `reports/` (voir `reports/README.
   « relecture en cours » ; relecture complète relancée (agent verificateur-code, Claude Opus).
 - Supprimés : `j2_diff.txt` (fichier temporaire non suivi), branches locales `worktree-agent-*`
   (déjà intégrées dans la branche de travail).
+- Relecture indépendante de J2 (verificateur-code, Claude Opus) : **prête**, 0 bloquant, 0 important.
+  10 mandats NI reclassés recoupés un à un avec la source : conformes ; aucun bloc modifié par le
+  re-sourçage ; 637 tests. Points mineurs M1-M3 corrigés (absences en n.d. dans le détail par bureau
+  et le bloc dominant, test du préfixe homonyme) : 639 tests, couverture 77,14 %.
+- M4 assumé : 3 suppléantes de la XVe (démission le jour de l'entrée en fonction) restent « sans groupe ».
