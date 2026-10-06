@@ -6,7 +6,7 @@ services:
     image: ministere-de-l-info:dev
     container_name: ministere-de-l-info
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     volumes:
       # Hot reload : code source monté en lecture
       - ./src:/app/src

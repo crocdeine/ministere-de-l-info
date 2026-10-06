@@ -83,8 +83,13 @@ Ce script :
 - Installe OrbStack (containers Docker, natif Apple Silicon)
 - Crée `~/.ministere-info/` avec la configuration
 - Télécharge la base de données depuis la dernière release GitHub
-- Démarre l'application sur http://localhost:8501
+- Démarre l'application sur http://localhost:8501 (port publié sur 127.0.0.1 uniquement,
+  non joignable depuis le réseau local)
 - Configure le démarrage automatique au login macOS (LaunchAgent)
+
+Les scripts sont récupérés depuis la branche `main`. Pour auditer ou figer une version,
+remplacer `main` par un tag ou un SHA de commit dans l'URL (le compose téléchargé par
+`install.sh` reste, lui, lu sur `main`). Épinglage automatique non retenu : décision en attente.
 
 Prérequis utilisateur : macOS 13+, 4 Go libres, connexion internet.
 

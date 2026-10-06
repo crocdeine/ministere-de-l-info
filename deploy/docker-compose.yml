@@ -3,7 +3,7 @@ services:
     image: ghcr.io/crocdeine/ministere-de-l-info:latest
     container_name: ministere-info
     ports:
-      - "${APP_PORT:-8501}:8501"
+      - "127.0.0.1:${APP_PORT:-8501}:8501"
     volumes:
       - type: bind
         source: ${DB_PATH}
