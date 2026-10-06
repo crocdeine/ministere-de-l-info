@@ -41,6 +41,17 @@ la logique officielle datée de l'[ADR-0005](../../adr/0005-nuances-et-blocs-off
 
 Note sur INTA1931378J (PDF de 10 pages, archivé en Phase D3, commit `f7e9629`) : l'annexe 3 (p. 10, « Grilles de regroupement des nuances politiques par blocs de clivages ») répartit les nuances individuelles et de listes en 6 blocs (EXG, GAU, AUT, CENT, DTE, EXD). C'est la première grille officielle de blocs, antérieure à IOMA2322276J ; l'affirmation contraire de l'ADR-0005 est corrigée par l'[ADR-0010](../../adr/0010-revision-nuances-et-blocs.md) (vérification sur rendu image, 2026-09-24).
 
+## Listes de nuances archivées (texte, municipales 2008 et 2014)
+
+Pages « nuances » des archives de résultats du ministère de l'Intérieur, recopiées en
+Markdown (consultées le 2026-09-25) : aucune circulaire de nuances publiée pour ces deux
+scrutins.
+
+| Fichier | Scrutin |
+|---|---|
+| [2008-municipales_nuances_archives-interieur.md](2008-municipales_nuances_archives-interieur.md) | Municipales 2008 |
+| [2014-municipales_nuances_archives-interieur.md](2014-municipales_nuances_archives-interieur.md) | Municipales 2014 |
+
 ## Décisions du Conseil d'État (archivées en texte intégral)
 
 | Fichier | N° | Date | Objet |
@@ -66,4 +77,4 @@ Ces circulaires alimentent :
 - la table `blocs_politiques` (les 6 blocs officiels : EXG, GAU, DIV, CENT, DTE, EXD)
 - la table `candidats_presidentielle` (classement sourcé des candidats 2017/2022)
 - la table `nuances_harmonisees` (mapping nuance→bloc pour présidentielles et législatives)
-- les entrées municipales de `nuances_harmonisees` (77 entrées 2008-2026 : 67 chargées en D3.2, voir ADR-0005 § « Application aux municipales 2008-2026 », révisées et complétées par l'ADR-0010)
+- les entrées municipales de `nuances_harmonisees` (80 entrées 2008-2026 dans la base du 2026-10-06 : 15 en 2008, 17 en 2014, 23 en 2020, 25 en 2026 ; 67 chargées en D3.2, voir ADR-0005 § « Application aux municipales 2008-2026 », révisées et complétées par l'ADR-0010)
