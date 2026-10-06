@@ -99,5 +99,3 @@ with st.expander("Diagnostic technique"):
     with col3:
         st.metric("Polars", pl.__version__)
     st.success("Stack opérationnelle.")
-    result = duckdb.sql("SELECT 'France' AS pays, 67_000_000 AS habitants").to_df()
-    st.dataframe(result, width="stretch")

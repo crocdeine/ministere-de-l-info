@@ -51,7 +51,7 @@ _WARNINGS_SEUIL: dict[int, str] = {
     2020: (
         "ℹ️ **Seuil de nuançage 2020** : 3 500 habitants "
         "(circulaire INTA1931378J du 3 février 2020, après décision CE 31/01/2020 n°437675 "
-        "qui a annulé un seuil initial de 9 000 hab). "
+        "(référé) qui a suspendu un seuil initial de 9 000 hab). "
         "Les ~660 communes HdF de 1 000-3 499 hab ont des résultats bruts "
         "mais pas de classement par bloc. "
         "Les communes sans nuance apparaissent en gris hachuré sur la carte."
@@ -245,6 +245,16 @@ def _render_evolution_hdf(
         st.caption("Voix non classées (communes hors seuil) — 1er tour : " + " | ".join(parts))
 
 
+_CLE_COMMUNE = "muni_commune_code"  # commune choisie, conservée d'un scrutin à l'autre
+
+
+def _index_commune_memorisee(communes: list[tuple[str, str]]) -> int:
+    """Index (options avec « aucune sélection » en tête) de la commune mémorisée, sinon 0."""
+    code = st.session_state.get(_CLE_COMMUNE)
+    codes = [c for c, _ in communes]
+    return codes.index(code) + 1 if code in codes else 0
+
+
 def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -> None:
     communes = get_communes_hdf_muni_list(annee, tour)
     if not communes:
@@ -256,16 +266,18 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
     selected: str = st.selectbox(  # type: ignore[assignment]
         "Commune",
         options,
-        index=index_persiste(cle_drilldown, options, 0),
+        index=index_persiste(cle_drilldown, options, _index_commune_memorisee(communes)),
         key=cle_drilldown,
         help="Choisir une commune pour afficher le détail des listes.",
     )
 
     if selected == "(aucune sélection)":
+        st.session_state.pop(_CLE_COMMUNE, None)
         return
 
     code_commune = selected.rsplit("(", 1)[1].rstrip(")")
     nom_commune = selected.rsplit(" (", 1)[0]
+    st.session_state[_CLE_COMMUNE] = code_commune
 
     metrics = get_metrics_commune_muni(annee, tour, code_commune)
     st.caption(f"Commune sélectionnée : **{nom_commune}** ({code_commune})")
