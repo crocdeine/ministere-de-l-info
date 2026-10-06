@@ -84,3 +84,12 @@ def test_aucune_carte_hors_fond_ign() -> None:
         if "folium.Map(" in f.read_text(encoding="utf-8") and f.name != "_display.py"
     ]
     assert fautifs == []
+
+
+def test_commune_municipales_memorisee_entre_scrutins(monkeypatch: pytest.MonkeyPatch) -> None:
+    """La commune choisie est présélectionnée dans un autre scrutin où elle existe."""
+    from ministere_de_l_info.pages import elections_municipales as em
+
+    monkeypatch.setattr(em.st, "session_state", {"muni_commune_code": "80021"})
+    assert em._index_commune_memorisee([("80001", "Abbeville"), ("80021", "Amiens")]) == 2
+    assert em._index_commune_memorisee([("80001", "Abbeville")]) == 0

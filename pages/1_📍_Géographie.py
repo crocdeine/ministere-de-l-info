@@ -9,6 +9,7 @@ from streamlit_folium import st_folium
 
 from ministere_de_l_info._theme import render_donnees_indisponibles, render_page_header
 from ministere_de_l_info.config import get_settings
+from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz._queries import (
     get_annees_population,
     get_meta_etl,
@@ -208,7 +209,10 @@ if meta:
         pop_info = f"Population municipale {annee} (INSEE) · "
     else:
         pop_info = ""
-    st.caption(f"{row_count:,} entités · {pop_info}Géométries : data.geopf.fr")
+    geometries = (
+        mention("circos") + " (non officiel)" if niveau == "circonscription" else mention("ign")
+    )
+    st.caption(f"{row_count:,} entités · {pop_info}Géométries : {geometries}")
 else:
     st.caption("⚠️ Aucune métadonnée ETL pour ce niveau.")
 

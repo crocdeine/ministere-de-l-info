@@ -170,7 +170,7 @@ def _render_vue_hdf(
         scores_df.sort("voix", descending=True)
         .unique("code_circo", keep="first")
         .group_by("bloc")
-        .agg(pl.count("code_circo").alias("circos_gagnees"))
+        .agg(pl.count("code_circo").alias("circos_gagnees"))  # bloc arrivé en tête, pas siège gagné
     )
     recap = (
         scores_df.group_by("bloc")
@@ -184,7 +184,7 @@ def _render_vue_hdf(
         .with_columns(pl.col("bloc").replace(libelles).alias("Bloc"))
         .select(["Bloc", "voix_total", "pct_hdf", "circos_gagnees"])
         .rename(
-            {"voix_total": "Voix totales", "pct_hdf": "% HdF", "circos_gagnees": "Circos gagnées"}
+            {"voix_total": "Voix totales", "pct_hdf": "% HdF", "circos_gagnees": "Circos en tête"}
         )
     )
     st.dataframe(
