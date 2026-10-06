@@ -1,17 +1,19 @@
 # Sources de données
 
 Référence des sources utilisées, abandonnées ou envisagées. Pour le flux d'ingestion,
-voir [docs/architecture.md](architecture.md). Dernière mise à jour : 2026-09-24.
+voir [docs/architecture.md](architecture.md). Licences et mentions obligatoires :
+[docs/sources.md](sources.md) (registre dans le code : `src/ministere_de_l_info/sources.py`).
+Dernière mise à jour : 2026-10-06.
 
 | Module | Sources | Script de chargement |
 |--------|---------|----------------------|
 | Géographie | IGN ADMIN-EXPRESS-COG, INSEE Mélodi, circonscriptions data.gouv.fr | `scripts/etl_territoires.py` |
 | Élections | Données des élections agrégées (ministère de l'Intérieur, data.gouv.fr) | `scripts/load_elections_{presidentielles,legislatives,municipales}.py` |
 | Économie | Dataset OLAP INSEE Filosofi + RP (data.gouv.fr), CNAF, DREES, URSSAF, Eurostat | `scripts/load_economie.py` |
-| Législatif | Datan (data.gouv.fr), Sénat (data.senat.fr) | `scripts/load_legislatif.py` |
+| Législatif | Datan (data.gouv.fr), Sénat (data.senat.fr) ; pour les non-inscrits : Assemblée nationale (AMO30) et résultats électoraux nationaux | `scripts/load_legislatif.py` |
 
-Les volumes cités proviennent des rapports de clôture de phase (`reports/`), pas d'une
-mesure sur la base.
+Les volumes cités ont été mesurés le 2026-10-06 sur la base locale du Mac
+(`data/ministere.duckdb`, lecture seule), sauf mention « selon le rapport … ».
 
 ---
 
@@ -96,7 +98,7 @@ plus récents. À remplacer par un export officiel AN dès disponibilité.
 | Format | Parquet — à télécharger manuellement dans `data/exploration/` (les scripts ne téléchargent pas) |
 | Auth | Aucune |
 | Granularité | Bureau de vote |
-| Couverture | 56 scrutins de 1999 à 2026 (euro, pres, legi, regi, muni, dpmt, cant) |
+| Couverture | 56 scrutins de 1999 à 2026 au référentiel (euro, pres, legi, regi, muni, dpmt, cant) ; 30 chargés (pres, legi, muni) |
 | Volume | ~28 M lignes / 222 MB (deux fichiers Parquet) |
 | Filtrage | Hauts-de-France uniquement (code_region = '32') au chargement |
 | Scripts | `scripts/load_elections_presidentielles.py`, `load_elections_legislatives.py`, `load_elections_municipales.py` |
@@ -198,7 +200,7 @@ réduit le volume d'un facteur ~10.
 | Format | CSV `;`, UTF-8 |
 | Auth | Aucune |
 | Granularité | Commune × type de RSA × période (`dtreffre` AAAAMM) |
-| Couverture chargée | 2020-2024, snapshot de décembre ; 17 381 lignes HdF (rapport Phase E+) |
+| Couverture chargée | 2020-2024, snapshot de décembre ; 17 381 lignes HdF |
 | Table | `economie_social` (`nb_foyers_rsa`, `taux_foyers_rsa`) |
 | Loader | `etl/loaders/economie_cnaf.py` |
 
@@ -216,12 +218,12 @@ après 2021.
 | Format | XLSX multi-onglets (un onglet par millésime), 8 lignes d'en-tête |
 | Auth | Aucune |
 | Granularité | Commune |
-| Couverture chargée | Dernier millésime disponible : 2023 ; 3 788 lignes HdF (rapport Phase E+) |
+| Couverture chargée | Dernier millésime disponible : 2023 ; 3 788 lignes HdF |
 | Table | `economie_social` (`apl_medecins`, `desert_medical`) |
 | Loader | `etl/loaders/economie_drees.py` (pandas + openpyxl, groupe `etl`) |
 
 **Règle** : `desert_medical = TRUE` si APL < 2,5 consultations/habitant/an — 943 communes
-HdF en 2023 selon le rapport Phase E+. Upsert `ON CONFLICT` pour coexister avec les
+HdF en 2023. Upsert `ON CONFLICT` pour coexister avec les
 lignes CNAF de même clé.
 
 ---
@@ -234,7 +236,7 @@ lignes CNAF de même clé.
 | Format | CSV `;`, UTF-8, format large (`effectifs_salaries_AAAA`, `nombre_d_etablissements_AAAA`) |
 | Auth | Aucune |
 | Champ | Salariés du secteur privé |
-| Couverture chargée | 2006-2025 ; 1 157 338 lignes HdF après passage au format long (rapport Phase E+) |
+| Couverture chargée | 2006-2025 ; 1 157 338 lignes HdF après passage au format long |
 | Table | `economie_emploi_urssaf` ; vue `v_desindustrialisation_commune` |
 | Loader | `etl/loaders/economie_urssaf.py` (Polars) |
 
@@ -252,7 +254,7 @@ lignes CNAF de même clé.
 | Format | TSV SDMX (valeurs suivies de drapeaux de qualité) |
 | Auth | Aucune |
 | Granularité | NUTS2 `FRE` (Hauts-de-France) et `FR` (France) |
-| Couverture | Chômage 1999-2025, PIB 2000-2024 selon le rapport Phase E++ ; 104 lignes |
+| Couverture | Chômage 1999-2025, PIB 2000-2024 ; 104 lignes |
 | Table | `economie_contexte` ; vue `v_contexte_hdf_vs_france` |
 | Loader | `etl/loaders/economie_eurostat.py` (chargé par `--source eurostat`, hors `all`) |
 
@@ -273,7 +275,7 @@ rapport annonce un chômage depuis 1999.
 | Producteur | Datan (scores calculés par Datan à partir des données AN) |
 | Format | CSV UTF-8, séparateur virgule |
 | Auth | Aucune |
-| Couverture | Législatures 12 à 17 (2002-présent), France entière ; 2 120 députés, 1 653 lignes d'activité (rapport Phase F) |
+| Couverture | Législatures 12 à 17 (2002-présent), France entière ; 2 120 députés (577 actifs), 1 653 lignes d'activité |
 | Tables | `leg_elus` (chambre `AN`), `leg_mandats`, `leg_activite` |
 | Loader | `etl/loaders/legislatif_datan.py` |
 
@@ -292,15 +294,52 @@ rattachée à sa dernière législature (`legislatureLast`) et au groupe de cell
 | URL | `https://data.senat.fr/data/senateurs/ODSEN_GENERAL.csv` |
 | Format | CSV cp1252, séparateur virgule, 18 lignes de commentaires `%` en tête |
 | Auth | Aucune |
-| Couverture | Sénateurs actifs et anciens, France entière (y compris circonscriptions historiques, codées `XX`) ; 1 945 sénateurs (rapport Phase F) |
+| Couverture | Sénateurs actifs et anciens, France entière ; 1 203 sénateurs dont 348 actifs (le rapport Phase F en annonçait 1 945, avant les filtres de l'ADR-0011) |
 | Table | `leg_elus` (chambre `SENAT`), `leg_mandats` |
 | Loader | `etl/loaders/legislatif_senat.py` |
 
 **Limites** : pas de score d'activité ; aucune date de mandat (`date_debut_mandat` et
 `date_fin_mandat` NULL depuis l'ADR-0011) ; groupe actuel ou dernier seulement, sans
 date. Filtre 2002-présent partiel : sont écartés les anciens sénateurs des
-circonscriptions disparues (`XX`) et ceux décédés avant le 29/09/2002 ; un filtre exact
-exigerait les fichiers de mandats de data.senat.fr (non chargés).
+circonscriptions disparues (`XX`), ceux décédés avant le 29/09/2002 et, depuis
+l'addendum de l'ADR-0011 (2026-09-25), ceux dont le dernier groupe a disparu avant ce
+renouvellement (`GROUPES_SENAT_ANTERIEURS_2002`, `etl/legislatif_groupes.py`) ; un filtre
+exact exigerait les fichiers de mandats de data.senat.fr (non chargés). Les groupes
+historiques encore présents (ex. CRCE, avant CRCE-K) sont classés dans
+`leg_groupes_blocs`.
+
+**Fichiers** : cache `data/raw/legislatif/senat-odsen-general.csv` ; fichier de juin 2026
+(plus téléchargeable) conservé dans `data/exploration/ODSEN_GENERAL.csv` ; fichier du
+2026-10-04 mis de côté (`data/raw/legislatif/senat-odsen-general-2026-10-04.csv`).
+
+**Incident** : data.senat.fr a servi une page HTML avec un type `text/csv` à la place du
+fichier. Le refus de ce contenu au chargement est sur la branche `fix/senat-csv-html`,
+non fusionnée dans `main` au 2026-10-06.
+
+**Veille** : `scripts/veille_groupes_senat.py` compte les sénateurs actifs sans groupe
+après le renouvellement du 27/09/2026 (lecture seule, code de sortie 0 quand tous ont un
+groupe).
+
+---
+
+## Assemblée nationale — AMO30 et nuances des députés non inscrits
+
+| Aspect | Valeur |
+|--------|--------|
+| URL | `https://data.assemblee-nationale.fr/static/openData/repository/17/amo/tous_acteurs_mandats_organes_xi_legislature/AMO30_tous_acteurs_tous_mandats_tous_organes_historique.json.zip` |
+| Format | JSON zippé (≈ 14 Mo), lu en mémoire ; seuls identifiant, nom, législature, cause du mandat, date de prise de fonction, circonscription et suppléants sont lus |
+| Auth | Aucune |
+| Usage | Identifier les remplaçants et les élus de partielles parmi les députés non inscrits |
+| Autre entrée | `general-results.parquet` (élections agrégées, résultats par candidat), déposé à la main dans `data/exploration/` |
+| Table | `leg_mandats` (`nuance_election`, `nuance_annee`, `nuance_source`) |
+| Loader | `etl/loaders/legislatif_nuances_ni.py` (`load_legislatif.py --source nuances`) |
+
+**Règle** (orientations du 2026-10-04 et du 2026-10-06) : un député non inscrit reçoit la
+nuance préfectorale de son élection générale, retrouvée par appariement département +
+prénom + nom sur les candidats élus ; un remplaçant reçoit celle de son titulaire ; un
+élu de partielle reçoit DIV, faute de résultats publiés. Aucune nuance n'est devinée :
+en cas d'échec ou d'ambiguïté, `nuance_election` reste NULL avec un motif explicite.
+Mesure du 2026-10-06 : nuance renseignée pour 96 des 100 mandats AN non inscrits.
 
 ---
 
