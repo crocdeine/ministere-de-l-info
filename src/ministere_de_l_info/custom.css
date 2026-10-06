@@ -423,8 +423,9 @@ samp {
 
 [data-testid="stMetricValue"] {
   font-family: var(--font-display);
-  /* 20cqi : une valeur textuelle (« Extrême droite ») tient en colonne étroite */
-  font-size: min(clamp(2.25rem, 3.6vw, 3.5rem), 20cqi);
+  /* 40cqi : le chiffre reste grand (principe « le chiffre est le titre ») ; une valeur
+     textuelle longue (« Extrême droite ») passe à la ligne en colonne étroite */
+  font-size: min(clamp(2.25rem, 3.6vw, 3.5rem), 40cqi);
   font-weight: var(--fw-black);
   line-height: 0.95;
   letter-spacing: -0.04em;

@@ -97,8 +97,9 @@ def build_plotly_template() -> go.layout.Template:
             "legend": {
                 "font": {"family": _FONT_SANS, "size": 12, "color": INK},
                 "orientation": "h",
-                "yanchor": "bottom",
-                "y": 1.02,
+                # sous le tracé : ne chevauche jamais le titre
+                "yanchor": "top",
+                "y": -0.12,
                 "x": 0,
                 "title": {"text": ""},
             },
@@ -107,7 +108,7 @@ def build_plotly_template() -> go.layout.Template:
                 "bordercolor": INK,
                 "font": {"family": _FONT_SANS, "size": 13, "color": PAPER},
             },
-            "margin": {"l": 8, "r": 8, "t": 48, "b": 8},
+            "margin": {"l": 8, "r": 8, "t": 48, "b": 48},
             "bargap": 0.25,
         }
     )
