@@ -23,3 +23,11 @@ Matricule,État,Groupe politique
 
 def test_compte_actifs_sans_groupe() -> None:
     assert veille.compter(_CSV) == (3, 2)
+
+
+def test_detection_page_html() -> None:
+    """Une page HTML servie à la place du CSV est refusée (data.senat.fr, 2026-10-06)."""
+    from ministere_de_l_info.etl.loaders.legislatif_senat import est_csv_odsen
+
+    assert est_csv_odsen(b'% Requete :select senmat as "Matricule", quacod')
+    assert not est_csv_odsen(b'<!DOCTYPE html> <head><link type="text/css" />')

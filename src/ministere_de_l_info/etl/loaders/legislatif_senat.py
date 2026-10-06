@@ -211,13 +211,29 @@ def _download_cache(raw_dir: Path, force: bool = False) -> Path:
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     logger.info("Téléchargement ODSEN_GENERAL → %s", dest)
+    tmp = dest.with_suffix(".tmp")
     with httpx.stream("GET", _SENAT_CSV_URL, follow_redirects=True, timeout=120.0) as r:
         r.raise_for_status()
-        with dest.open("wb") as f:
+        with tmp.open("wb") as f:
             for chunk in r.iter_bytes(chunk_size=256 * 1024):
                 f.write(chunk)
+    # data.senat.fr a déjà servi une page HTML sous l'en-tête text/csv (2026-10-06) :
+    # le cache existant n'est remplacé que par un vrai fichier ODSEN_GENERAL.
+    if not est_csv_odsen(tmp.read_bytes()[:4096]):
+        tmp.unlink()
+        raise RuntimeError(
+            "data.senat.fr n'a pas renvoyé le fichier ODSEN_GENERAL attendu (page HTML ou "
+            "format inconnu) ; cache conservé, chargement interrompu."
+        )
+    tmp.replace(dest)
     logger.info("Téléchargé : %.1f Ko", dest.stat().st_size / 1024)
     return dest
+
+
+def est_csv_odsen(debut: bytes) -> bool:
+    """Vrai si les premiers octets sont ceux du CSV ODSEN_GENERAL (et non une page HTML)."""
+    tete = debut.lstrip().lower()
+    return not tete.startswith((b"<!doctype", b"<html")) and b"matricule" in tete
 
 
 def _parse_date(val: str | None) -> date | None:
