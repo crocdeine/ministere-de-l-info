@@ -55,11 +55,9 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
-    # Seuil mesuré le 2026-09-24 sans réseau, sans base et sans extension spatial :
-    # 39,8 % (tests network et slow exclus). Fixé un peu en dessous pour rester honnête.
-    # Objectif : le remonter (vers 60-70 %) une fois les Parquet de
-    # tests/fixtures/sample/ committés et les tests de vues/requêtes branchés dessus.
-    "--cov-fail-under=38",
+    # Seuil relevé le 2026-10-06 : la CI (sans base ni réseau) mesure 64,2 % ; avec la base
+    # locale, 77 %. Fixé à 60 % pour faire échouer toute baisse notable (J4, audit 2026-10-04).
+    "--cov-fail-under=60",
     "--cov-config=pyproject.toml",
 ]
 markers = [
