@@ -30,6 +30,21 @@ Toujours communiquer en français, ton neutre, sans blabla.
 
 Ces mises à jour ne sont PAS optionnelles : elles font partie du travail. Une session qui ne met pas à jour la mémoire est une session incomplète.
 
+**Réflexe documentation (décision Mathias, 2026-10-06)** : toute modification met à jour, **dans la même branche**, les documents qu'elle rend inexacts. Une PR qui change le comportement sans toucher la doc concernée est incomplète (case à cocher dans `.github/pull_request_template.md`).
+
+| Ce qui change | Documents à mettre à jour |
+|---|---|
+| Code, tables, vues, modules (`src/`, `scripts/`) | `docs/architecture.md` ; `docs/schema-elections.md` si élections |
+| Source de données, licence | `src/ministere_de_l_info/sources.py`, `docs/sources.md`, `docs/data-sources.md`, `LICENSE-DONNEES.md` |
+| Interface visible (pages, libellés, cartes) | `docs/guide-utilisateur.md` (+ captures dans `docs/captures/`) |
+| Classement politique (nuances, blocs, groupes) | `docs/schema-elections.md`, ADR concerné, légendes de l'interface |
+| CI, déploiement, sauvegardes | `docs/deployment.md`, `docs/architecture.md` (section CI) |
+| Décision de Mathias | `docs/orientations.md` (+ ADR si structurante) |
+| Fin de session ou de vague | `docs/journal.md`, `docs/reprise.md`, `docs/roadmap.md`, rapport dans `reports/` |
+| Erreur ou piège rencontré | `docs/lessons-learned.md` |
+
+Tout chiffre écrit dans la doc (nombre d'élus, de tests, couverture…) est mesuré et daté, jamais recopié de mémoire.
+
 **Points d'arrêt obligatoires** : quand un prompt mentionne explicitement "POINT D'ARRÊT", "ATTENDRE VALIDATION", "STOP", ou équivalent, Claude Code DOIT s'arrêter et attendre la confirmation explicite de Mathias en chat web. Un test automatisé (AppTest, pytest, Streamlit headless) ne remplace pas une validation manuelle quand elle est demandée. Les deux sont complémentaires.
 
 **Vérification CI post-push (règle obligatoire)** : après git push, identifier le run déclenché par ce push :
