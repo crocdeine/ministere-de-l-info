@@ -108,3 +108,12 @@ L'historique antérieur au 2026-10-04 est dans `reports/` (voir `reports/README.
 - Géographie (developpeur-ui) : requêtes en cache (rerun 2,49 s → 0,001 s), connexion DuckDB
   unique `open_ro`, plus de connexion permanente qui bloquait les rechargements.
 - Mesures : 652 tests, 0 échec ; couverture 77,95 % ; tests shell 55/55.
+
+## 2026-10-06 — J5 : demande de fusion, mode d'exécution sur Mac
+
+- PR #1 ouverte (`claude/exciting-dirac-8mogwe` → `main`) ; tests, lint et couverture verts ; seul le
+  typage (pyright, non bloquant) échoue : 212 erreurs (178 en septembre).
+- Décision Mathias : corriger le typage avant de fusionner ; agent architecte-restructuration lancé.
+- Mode d'exécution : analyse rendue (exécution native recommandée, déjà prévue par l'ADR-0012 et
+  jamais installée) ; installation reportée par Mathias. Disque interne plein à 97 % : le projet
+  reste sur le disque externe.

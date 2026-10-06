@@ -69,3 +69,13 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
 - **Sauvegardes** : la tâche planifiée du Mac est supprimée ; le directeur de projet en est garant
   (zip vérifié du projet à chaque grande étape ; zip de la base avant toute écriture importante ou
   publication ; registre `../ministere-de-l-info-backups/BACKUPS.md`).
+
+## Décisions du 2026-10-06 (mode d'exécution, fusion)
+
+- Docker n'est plus la manière recommandée de faire tourner l'application sur le Mac : l'exécution
+  native (ADR-0012, `deploy/native/`) est la cible. Les fichiers Docker sont conservés pour une
+  éventuelle distribution, sans maintenance active.
+- Installation native sur le Mac : **reportée** (décision Mathias) ; à proposer de nouveau plus tard,
+  avec l'option `--sans-sauvegarde` (le directeur est garant des sauvegardes).
+- Le projet reste sur le disque externe : le disque interne est plein à 97 % (6,2 Go libres).
+- Fusion dans `main` : seulement après correction des erreurs de typage (pyright à 0, rendu bloquant).
