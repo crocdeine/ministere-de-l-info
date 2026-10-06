@@ -80,3 +80,18 @@ def test_tokens_evolution_alignes_sur_palette_accessible() -> None:
     ):
         for i, couleur in enumerate(_COULEURS_EVOLUTION5, start=1):
             assert f"--choro-evo-{i}: {couleur.lower()};" in css
+
+
+def test_css_titre_sidebar_sans_coupure() -> None:
+    """Un titre de sidebar (« Paramètres ») ne se coupe jamais au milieu du mot."""
+    css = _theme._load_css()
+    bloc = css.split('[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2 {', 1)[1]
+    bloc = bloc.split("}", 1)[0]
+    assert "word-break: normal" in bloc and "font-size: var(--type-h3-size)" in bloc
+
+
+def test_css_cibles_tactiles_44px() -> None:
+    """Boutons radio, cases à cocher et menus dépliants : cible ≥ 44 px (--control-h)."""
+    css = _theme._load_css()
+    bloc = css.split('[data-testid="stExpander"] summary {', 1)[1].split("}", 1)[0]
+    assert "min-height: var(--control-h)" in bloc

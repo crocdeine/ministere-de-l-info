@@ -1,7 +1,7 @@
 # 0014 — Design system v2 : direction éditoriale
 
 Date : 2026-10-04 (appliqué sur la base J1-J4 le 2026-10-06)
-Statut : Proposé (en attente de validation visuelle par Mathias) — révise l'[ADR-0009](0009-design-system-et-navigation.md)
+Statut : Accepté (validation visuelle de Mathias le 2026-10-06) — révise l'[ADR-0009](0009-design-system-et-navigation.md)
 Décideurs : Mathias (supervision)
 
 ## Contexte

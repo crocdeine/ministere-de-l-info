@@ -788,3 +788,23 @@ hr {
 [data-testid="stMainBlockContainer"] {
   animation: mdi-fade-in var(--duration-slow) var(--ease-out);
 }
+
+/* ---- Titres dans la sidebar : taille H3, jamais de coupure au milieu d'un mot ---- */
+[data-testid="stSidebar"] [data-testid="stHeading"] h1,
+[data-testid="stSidebar"] [data-testid="stHeading"] h2,
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2 {
+  font-size: var(--type-h3-size);
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  margin-top: var(--space-6);
+}
+
+/* ---- Cibles tactiles ≥ 44 px : boutons radio, cases à cocher, menus dépliants ---- */
+[data-testid="stRadio"] label,
+[data-testid="stCheckbox"] label,
+[data-testid="stExpander"] summary {
+  min-height: var(--control-h);
+  display: flex;
+  align-items: center;
+}
