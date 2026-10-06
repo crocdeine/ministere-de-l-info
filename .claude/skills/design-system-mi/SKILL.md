@@ -1,20 +1,20 @@
 ---
 name: design-system-mi
-description: Design system v2 « direction éditoriale » de ministere-de-l-info (ADR-0007) — couleurs, typographie, espacements, composants Streamlit, template Plotly, règles de rédaction. À charger pour toute tâche d'interface, de style, de page Streamlit, de graphique Plotly, de maquette HTML ou de visuel du projet.
+description: Design system v2 « direction éditoriale » de ministere-de-l-info (ADR-0014) — couleurs, typographie, espacements, composants Streamlit, template Plotly, règles de rédaction. À charger pour toute tâche d'interface, de style, de page Streamlit, de graphique Plotly, de maquette HTML ou de visuel du projet.
 ---
 
 # Design system Ministère de l'Info — v2 « direction éditoriale »
 
 Grammaire swiss/éditoriale : noir et blanc, grotesque très gras en capitales,
 filets d'un pixel, beaucoup de blanc. Le bleu signifie, le noir structure.
-Décision : `docs/adr/0007-design-system-direction-editoriale.md`.
+Décision : `docs/adr/0014-design-system-direction-editoriale.md`.
 
 Fichiers de référence (dans ce dossier de skill) :
 
 - `tokens.css` — toutes les variables CSS (source de vérité des valeurs).
 - `tokens.json` — les mêmes valeurs, groupées (color, typography, spacing, shape, motion, dataviz).
 - `streamlit/custom.css`, `streamlit/_theme.py`, `streamlit/config.toml` — l'implémentation Streamlit de référence.
-- `reference/ADR-0007.md`, `reference/apercu-accueil.png`.
+- `reference/ADR-0014.md`, `reference/apercu-accueil.png`.
 
 ## 1. Principes (non négociables)
 
@@ -36,11 +36,14 @@ Fichiers de référence (dans ce dossier de skill) :
 | Action / sélection | `--bleu-france` | `#000091` |
 | Alerte / limite | `--rouge-marianne` | `#e1000f` |
 
-**Data-viz — ne jamais inventer d'autres couleurs** (source unique : `_blocs_politiques.py`, `viz/_display.py`) :
+**Data-viz — ne jamais inventer d'autres couleurs** (source unique : `_blocs_politiques.py`, `viz/_display.py`, `viz/maps_elections.py`) :
 
 - Nuances : EXG `#8b0000` · GAU `#e84c61` · DIV `#9e9e9e` · CENT `#f5b800` · DTE `#3b7dd8` · EXD `#1f3864` (ordre gauche → droite).
 - Choroplèthe population (YlOrRd 5) : `#ffffb2 #fecc5c #fd8d3c #f03b20 #bd0026`.
-- Choroplèthe évolution (RdYlGn 5) : `#d73027 #fc8d59 #ffffbf #91cf60 #1a9850`.
+- Choroplèthe évolution (PuOr 5, accessible daltonisme, décision J3 — `_COULEURS_EVOLUTION5`) : `#e66101 #fdb863 #f7f7f7 #b2abd2 #5e3c99`. Jamais de rouge-vert.
+- Donnée non disponible (« n.d. ») : `#5F6368` (`COULEUR_ND`), légendes `avec_nd`.
+- Classe « 0 » (indicateurs où zéro est fréquent) : `#F0EDE6` (`COULEUR_ZERO`), distincte de la 1re classe et du gris n.d.
+- Score d'un bloc : dégradé linéaire blanc → couleur du bloc sur une échelle **fixe 0-100 %** des exprimés (`ECHELLE_SCORE_MAX`), identique aux deux tours.
 
 Interdit : fond gris de page, cartes blanches avec ombre, callouts à fond coloré, barre colorée à gauche, Bleu France en aplat décoratif.
 

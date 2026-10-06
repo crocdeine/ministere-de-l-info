@@ -14,7 +14,7 @@ ministere-de-l-info/
     ├── tokens.css
     ├── tokens.json
     ├── streamlit/   (custom.css, _theme.py, config.toml)
-    └── reference/   (ADR-0007, aperçu)
+    └── reference/   (ADR-0014, aperçu)
 ```
 
 Ou demander simplement à Claude Code :
@@ -31,4 +31,4 @@ Ou demander simplement à Claude Code :
 | `tokens.css` | Toutes les variables CSS, utilisables dans n'importe quelle page HTML. |
 | `tokens.json` | Les mêmes valeurs en JSON (pour scripts, exports, autres outils). |
 | `streamlit/` | Implémentation de référence pour l'app (identique au patch). |
-| `reference/` | Décision (ADR-0007) et aperçu de l'accueil. |
+| `reference/` | Décision (ADR-0014) et aperçu de l'accueil. |

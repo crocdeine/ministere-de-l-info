@@ -212,7 +212,7 @@
   }
 }
 
-/* ---- Data-viz (inchangé — source : code de l'app) --------------------- */
+/* ---- Data-viz (source : code de l'app) --------------------- */
 
 :root {
   --nuance-exg: #8b0000;
@@ -228,11 +228,16 @@
   --choro-pop-4: #f03b20;
   --choro-pop-5: #bd0026;
 
-  --choro-evo-1: #d73027;
-  --choro-evo-2: #fc8d59;
-  --choro-evo-3: #ffffbf;
-  --choro-evo-4: #91cf60;
-  --choro-evo-5: #1a9850;
+  /* Évolution de population : PuOr 5 classes, accessible daltonisme (décision J3,
+     identique à viz/_display.py::_COULEURS_EVOLUTION5) */
+  --choro-evo-1: #e66101;
+  --choro-evo-2: #fdb863;
+  --choro-evo-3: #f7f7f7;
+  --choro-evo-4: #b2abd2;
+  --choro-evo-5: #5e3c99;
+
+  --choro-nd: #5f6368; /* donnée non disponible (viz/_display.py::COULEUR_ND) */
+  --choro-zero: #f0ede6; /* classe « 0 » distincte (viz/_display.py::COULEUR_ZERO) */
 
   --map-contour-fill: #f7f7f7;
   --map-contour-stroke: #000091;

@@ -4,7 +4,7 @@
    Source : canvas Claude Design « Ministère de l'Info — Direction
    éditoriale » (2026-10-04), inspiré d'une grammaire swiss/éditoriale
    (grotesque très gras en capitales, noir et blanc, filets d'un pixel,
-   grille asymétrique, flèche diagonale comme signe). Décision : ADR-0007.
+   grille asymétrique, flèche diagonale comme signe). Décision : ADR-0014.
 
    Remplace la v1 (DSFR-like, Spectral). Les NOMS de tokens de la v1
    sont conservés (alias) pour ne rien casser ; seules leurs valeurs
@@ -245,15 +245,20 @@
   --choro-pop-4: #f03b20;
   --choro-pop-5: #bd0026;
 
-  --choro-evo-1: #d73027;
-  --choro-evo-2: #fc8d59;
-  --choro-evo-3: #ffffbf;
-  --choro-evo-4: #91cf60;
-  --choro-evo-5: #1a9850;
+  /* Évolution de population : PuOr 5 classes, accessible daltonisme (décision J3,
+     identique à viz/_display.py::_COULEURS_EVOLUTION5) */
+  --choro-evo-1: #e66101; /* forte baisse */
+  --choro-evo-2: #fdb863;
+  --choro-evo-3: #f7f7f7; /* stable */
+  --choro-evo-4: #b2abd2;
+  --choro-evo-5: #5e3c99; /* forte hausse */
+
+  --choro-nd: #5f6368; /* donnée non disponible (viz/_display.py::COULEUR_ND) */
+  --choro-zero: #f0ede6; /* classe « 0 » distincte (viz/_display.py::COULEUR_ZERO) */
 
   --map-contour-fill: #f7f7f7;
   --map-contour-stroke: #000091;
-  --map-tile-bg: #fafafa;
+  --map-tile-bg: #fafafa; /* fond de tuile (Plan IGN atténué, ADR-0013) */
   --map-stroke-on-fill: #ffffff;
   --map-secret-fill: #cccccc;
 }
@@ -408,6 +413,7 @@ samp {
 /* ---- Métriques : le chiffre est le titre ------------------------------- */
 
 [data-testid="stMetric"] {
+  container-type: inline-size; /* taille du chiffre bornée par la largeur de colonne */
   background: transparent;
   border: none;
   border-top: var(--border-w) solid var(--rule);
@@ -417,7 +423,8 @@ samp {
 
 [data-testid="stMetricValue"] {
   font-family: var(--font-display);
-  font-size: clamp(2.25rem, 3.6vw, 3.5rem);
+  /* 20cqi : une valeur textuelle (« Extrême droite ») tient en colonne étroite */
+  font-size: min(clamp(2.25rem, 3.6vw, 3.5rem), 20cqi);
   font-weight: var(--fw-black);
   line-height: 0.95;
   letter-spacing: -0.04em;
@@ -439,6 +446,16 @@ samp {
   overflow: visible !important;
   white-space: normal !important;
   text-overflow: unset !important;
+}
+
+/* Valeur longue (ex. « Extrême droite ») : le <p> interne de stMetricValue porte
+   l'ellipsis de Streamlit ; retour à la ligne entre les mots, jamais « Extrêm… » (J2) */
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] * {
+  overflow: visible !important;
+  white-space: normal !important;
+  text-overflow: unset !important;
+  overflow-wrap: break-word;
 }
 
 [data-testid="stMetricDelta"] {

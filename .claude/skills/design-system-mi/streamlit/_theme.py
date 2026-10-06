@@ -3,7 +3,7 @@
 Le CSS (`custom.css`, à côté de ce module) contient les tokens du design
 system (couleurs, typographie, espacement, forme, mouvement, data-viz) et
 la couche de sélecteurs Streamlit qui les applique (`data-testid="..."`).
-Décision et principes : `docs/adr/0007-design-system-direction-editoriale.md`.
+Décision et principes : `docs/adr/0014-design-system-direction-editoriale.md`.
 
 Les polices Google Fonts (Hanken Grotesk, IBM Plex Mono, Material Symbols
 Outlined) sont chargées via une balise <link> HTML séparée : un `@import`

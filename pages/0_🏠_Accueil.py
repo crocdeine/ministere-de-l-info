@@ -8,7 +8,7 @@ import duckdb
 import polars as pl
 import streamlit as st
 
-from ministere_de_l_info._theme import render_page_header
+from ministere_de_l_info._theme import render_overline, render_page_header
 from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.sources import tableau_sources
 
@@ -26,16 +26,18 @@ def _dates_chargement() -> dict[str, datetime]:
 render_page_header(
     icon="flag",
     title="ministère de l'info",
-    subtitle="Exploration des données politiques, électorales et territoriales françaises.",
+    subtitle="Les données publiques françaises, de la région à la circonscription.",
+    eyebrow="Accueil",
+    display=True,
 )
 
-st.markdown("### Modules d'analyse")
+st.markdown("## Modules")
 
 _MODULES: list[dict[str, str]] = [
     {
         "page": "pages/1_📍_Géographie.py",
         "icon": "map",
-        "label": "Géographie territoriale",
+        "label": "Géographie",
         "perimetre": "France entière — recensements 2013, 2018 et 2023",
         "description": "Cartographie choroplèthe multi-niveaux (régions, départements, EPCI, communes) et démographie INSEE.",
     },
@@ -62,15 +64,16 @@ _MODULES: list[dict[str, str]] = [
     },
 ]
 
-row1 = st.columns(2)
-row2 = st.columns(2)
-for module, col in zip(_MODULES, [*row1, *row2], strict=True):
+row1 = st.columns(2, gap="large")
+row2 = st.columns(2, gap="large")
+for numero, (module, col) in enumerate(zip(_MODULES, [*row1, *row2], strict=True), start=1):
     with col, st.container(border=True):
+        render_overline(f"{numero:02d} —")
         st.page_link(module["page"], label=module["label"], icon=f":material/{module['icon']}:")
         st.caption(module["description"])
         st.markdown(f"**Périmètre** : {module['perimetre']}")
 
-st.markdown("### Sources, licences et dates")
+st.markdown("## Sources, licences et dates")
 st.caption(
     "Chaque jeu de données est réutilisé selon sa licence. « Chargées le » : date du dernier "
     "chargement dans l'outil. La base distribuée avec l'outil est placée sous licence ODbL "
@@ -86,8 +89,6 @@ st.dataframe(
         "Lien": st.column_config.LinkColumn(width="small", display_text="ouvrir"),
     },
 )
-
-st.divider()
 
 with st.expander("Diagnostic technique"):
     col1, col2, col3 = st.columns(3)
