@@ -54,3 +54,11 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
   élus, élus de partielles et remplaçants.
 - **Ménard et Dupont-Aignan** : classés Droite (DTE), application stricte de la nuance préfectorale ;
   la règle s'applique sans exception.
+
+## Décisions du 2026-10-06 (seuils des cartes, J3)
+
+- Score d'un bloc : échelle fixe **0-100 %** à tous les scrutins et tours.
+- Taux de pauvreté : classes **10 / 15 / 20 / 25 %**.
+- Niveau de vie médian : euros courants, **mention « non corrigés de l'inflation »** en légende.
+- Indicateurs à zéros fréquents (logements sociaux, emploi industriel, RSA) : **classe « 0 » distincte**.
+- Principe : classes fixes, identiques pour toutes les années ; absence de donnée toujours « n.d. ».

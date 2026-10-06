@@ -1,21 +1,22 @@
 # Point de reprise — à lire en premier par toute nouvelle session
 
-Dernière mise à jour : 2026-10-04 (fin de soirée), branche `claude/exciting-dirac-8mogwe`.
+Dernière mise à jour : 2026-10-06, branche `claude/exciting-dirac-8mogwe`.
 Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), `docs/roadmap.md`.
 
 ## Où on en est
 
-- Phase 0, J1 et J2 : terminés et relus (2026-10-05). Base publiée : `db-2026-10-04`
-  (la base locale contient en plus les corrections J2, non encore publiées).
-- En attente de Mathias : 3 questions sur les non-inscrits (remplaçants, source AMO de l'AN,
-  confirmation Ménard / Dupont-Aignan en DTE).
+- Phase 0, J1, J2, J3 : terminés et relus (2026-10-06). Base publiée : `db-2026-10-04` ; la base
+  locale contient en plus J2, AMO et nuances des non-inscrits (non publiés).
+- En attente de Mathias : contrôle visuel de J3 dans l'application.
 
 ## Prochaines étapes, dans l'ordre
 
-1. Réponses de Mathias aux 3 questions, puis application.
-2. J3 (lisibilité honnête) : bornes d'échelle fixes et annoncées, municipales en %, palette
-   accessible, indicateur « Bloc majoritaire » tronqué. Validation visuelle de Mathias requise.
+1. Retour visuel de Mathias sur J3 (cartes, évolutions en %, palette).
+2. J4 (hygiène et durcissement) : rangement de la racine (après sauvegarde zip), cache Géographie,
+   durcissement infra (ports 127.0.0.1, SHA256 obligatoire, actions épinglées), copies de base
+   en trop dans `data/`.
 3. Republication de la base quand les groupes du Sénat seront connus (voir ci-dessous).
+4. J5 : fusion dans `main` (accord de Mathias).
 
 ## En attente d'un événement extérieur
 

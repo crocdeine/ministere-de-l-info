@@ -80,3 +80,12 @@ L'historique antérieur au 2026-10-04 est dans `reports/` (voir `reports/README.
 - Mathias valide : nuance du titulaire pour les remplaçants, chargement de la source AMO de
   l'Assemblée nationale, maintien de Ménard et Dupont-Aignan en DTE (voir docs/orientations.md).
 - Lancés en parallèle : ETL AMO (ingenieur-etl) et jalon J3 lisibilité (developpeur-ui).
+- AMO (Assemblée nationale) chargé : 26 des 30 non-inscrits restants classés selon leur titulaire
+  (GAU 16, DTE 4, CENT 4, EXD 2) ; 4 élus de partielles restent « Divers » (résultats des partielles
+  non publiés en open data). Total NI : GAU 46, CENT 23, DTE 15, EXD 11, DIV 5. Copie de la base
+  avant chargement : `data/ministere.duckdb.bak-avant-amo`.
+- J3 livré (échelles fixes, % par défaut, palette sans rouge-vert, « Extrême droite » non tronqué),
+  relu (verificateur-code, Opus : prêt) ; seuils arbitrés par Mathias (voir orientations).
+- Corrigés par le directeur : sélecteur CSS de la métrique (ellipse persistante), format du tableau
+  par commune (6 décimales), évolution de population absente affichée « +0,0 % ».
+- Mesures : 650 tests réussis, 0 échec ; couverture 77,24 %.
