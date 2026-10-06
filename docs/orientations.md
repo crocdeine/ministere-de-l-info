@@ -90,3 +90,34 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
   `.claude/skills/design-system-mi`, ADR-0014 (révise l'ADR-0009). Écarts validés : palette
   d'évolution accessible conservée (J3) ; ADR renuméroté 0014 (0007 = Législatif).
 - La fusion dans `main` (PR #1) est faite le 2026-10-06 après mise à 0 des erreurs de typage.
+
+## Décision du 2026-10-06 (fusions dans main)
+
+- Le directeur **fusionne lui-même dans `main`**, une fois la CI verte, les **petites corrections de bugs
+  et la documentation** qui n'engagent aucun choix de fond. Restent soumis à l'accord explicite de
+  Mathias : nouvelles sources, classements politiques, changements visibles importants, architecture,
+  publications (releases, image Docker).
+
+## Décisions du 2026-10-06 (feuille de route fonctionnelle — « oui à tout »)
+
+Voir `reports/synthese-brainstorm-fonctionnalites-2026-10-06.md`.
+1. Feuille de route en 4 vagues : A socle (fiche territoire, URL partageables, recherche, Méthodologie,
+   exports) ; B données (France entière, européennes/régionales/départementales, candidatures, Filosofi
+   officiel INSEE) ; C analyses (abstention, évolutions, comparaisons, triangulaires, fiche élu, parité) ;
+   D Parlement et argent public (votes nominatifs AN puis Sénat, CNCCFP, OFGL). Construites dans la
+   nouvelle interface web.
+2. Six garde-fous communs (méthode affichée, ruptures signalées, incertitude visible, corrélation ≠
+   causalité, aucun motif prêté, vocabulaire neutre ; ni pronostic ni ciblage).
+3. Élections France entière : oui. 4. Européennes, régionales, départementales : oui, classées selon
+   l'ADR-0010 (reconstruction documentée). 5. Filosofi : source officielle INSEE (Mélodi) à la place du
+   fichier republié. 6. Reports de voix : descriptif seulement. 7. Simulation d'un autre mode de
+   scrutin : écartée. 8. « Top 20 » nominatif Datan remplacé par une distribution sans noms et une
+   recherche individuelle. 9. CNCCFP sans licence déclarée : réutilisation au titre du code des
+   relations entre le public et l'administration, source mentionnée, note juridique dans `docs/sources.md`.
+
+## Décisions du 2026-10-06 (application Mac, disque)
+
+- **Pas de compte développeur Apple** : l'application Mac reste non signée (ouverture par clic droit
+  › Ouvrir la première fois). À reconsidérer seulement si la diffusion l'exige.
+- Caches de développement sur le disque externe : `UV_CACHE_DIR` (uv) et Rust
+  (`RUSTUP_HOME`, `CARGO_HOME`) sous `/Volumes/le gros stockage/outils/`, déclarés dans `~/.zshenv`.
