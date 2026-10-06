@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Carte, type Mode } from "./Carte";
+import { COULEUR_EGALITE, Carte, type Mode } from "./Carte";
 import { chargerDonnees, type Donnees, entier, libelleTour, pct, type Source } from "./donnees";
 import { Evolution } from "./Evolution";
 
@@ -196,6 +196,10 @@ export function App() {
                   </li>
                 ))}
                 <li>
+                  <span className="carre" style={{ background: COULEUR_EGALITE }} />
+                  Égalité entre blocs en tête
+                </li>
+                <li>
                   <span className="carre" style={{ background: meta.couleur_nd }} />
                   n.d. (donnée non disponible)
                 </li>
@@ -225,7 +229,7 @@ export function App() {
             )}
             <SourceLegende
               sources={[meta.sources.elections, meta.sources.ign]}
-              classement={`${classement} ${meta.fond_carte.attribution}. En cas d'égalité de voix entre blocs, la couleur est celle du premier bloc dans l'ordre gauche-droite ; l'infobulle signale l'égalité.`}
+              classement={`${classement} ${meta.fond_carte.attribution}. En cas d'égalité de voix entre les blocs arrivés en tête, la commune est en blanc (aucun bloc favorisé).`}
             />
           </section>
         </>

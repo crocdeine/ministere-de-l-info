@@ -90,3 +90,12 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
   `.claude/skills/design-system-mi`, ADR-0014 (révise l'ADR-0009). Écarts validés : palette
   d'évolution accessible conservée (J3) ; ADR renuméroté 0014 (0007 = Législatif).
 - La fusion dans `main` (PR #1) est faite le 2026-10-06 après mise à 0 des erreurs de typage.
+
+## Décisions du 2026-10-06 (maquette web)
+
+- **Égalité de voix entre blocs en tête** : couleur neutre (blanc), aucun bloc favorisé ; l'infobulle
+  et la légende l'indiquent (avant : premier bloc dans l'ordre gauche-droite, biais systématique).
+- **Étape suivante** : emballer la page de la maquette en application Mac (Tauri) pour valider toute
+  la chaîne, avant de porter les autres pages.
+- Choix techniques du directeur : données précalculées (JSON) pour l'instant, moteur DuckDB embarqué
+  seulement pour le détail par bureau de vote ; axe du graphique d'évolution de 0 au maximum observé.

@@ -25,6 +25,9 @@ const SOURCE = "communes";
 maplibregl.setWorkerUrl(urlWorker);
 
 /** Valeur d'un token CSS du design system (une seule source pour les couleurs d'interface). */
+export const EGALITE = "EGALITE";
+export const COULEUR_EGALITE = "#ffffff";
+
 function token(nom: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(nom).trim();
 }
@@ -33,7 +36,8 @@ function couleurRemplissage(d: Donnees, mode: Mode, bloc: string): ExpressionSpe
   const nd = d.meta.couleur_nd;
   if (mode === "dominant") {
     const paires = d.meta.blocs.flatMap((b) => [b.code, b.couleur]);
-    return ["match", ["coalesce", ["feature-state", "dom"], ""], ...paires, nd] as unknown as ExpressionSpecification;
+    // Égalité de voix en tête : couleur neutre (aucun bloc favorisé), décision Mathias 2026-10-06
+    return ["match", ["coalesce", ["feature-state", "dom"], ""], ...paires, EGALITE, COULEUR_EGALITE, nd] as unknown as ExpressionSpecification;
   }
   const couleur = d.meta.blocs.find((b) => b.code === bloc)?.couleur ?? nd;
   // Échelle FIXE 0-100 % des exprimés, identique pour tous les scrutins et les deux tours.
@@ -163,7 +167,10 @@ export function Carte({ donnees, scrutin, mode, bloc }: Props) {
       const dom = blocDominant(scrutin, i, donnees.meta.blocs);
       m.setFeatureState(
         { source: SOURCE, id: code },
-        { dom: dom?.code ?? null, pct: mode === "score" ? scoreBloc(scrutin, i, bloc) : null },
+        {
+          dom: dom ? (dom.egalite ? EGALITE : dom.code) : null,
+          pct: mode === "score" ? scoreBloc(scrutin, i, bloc) : null,
+        },
       );
     });
     m.setPaintProperty("communes-fond", "fill-color", couleurRemplissage(donnees, mode, bloc));
@@ -184,8 +191,7 @@ export function Carte({ donnees, scrutin, mode, bloc }: Props) {
         <span className="mono">{info.code}</span>
         {mode === "dominant" ? (
           <span>
-            Bloc dominant : {dom ? libelle(dom.code) : "n.d."}
-            {dom?.egalite ? " (égalité)" : ""}
+            Bloc dominant : {dom ? (dom.egalite ? "égalité entre blocs en tête" : libelle(dom.code)) : "n.d."}
             {dom ? ` — ${pct(scoreBloc(scrutin, info.i, dom.code))}` : ""}
           </span>
         ) : (
