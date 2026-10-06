@@ -268,6 +268,7 @@ printf '%s  data/ministere.duckdb.gz\n' "$GZ2" > "$api/releases/assets/22"
 cp "$WORK/v1.gz" "$api/releases/assets/11"
 printf '%s  data/ministere.duckdb\n' "$DB1" > "$api/releases/assets/12"
 printf '%s\n' "$(printf '%064d' 7)" > "$api/releases/assets/32"
+: > "$api/releases/assets/33"
 A="https://api.github.com/repos/$REPO/releases/assets"
 python3 - "$api" "$A" <<'PY'
 import json, sys
@@ -283,6 +284,10 @@ json.dump(releases, open(f"{api}/releases?per_page=30", "w"))
 for r in releases:
     json.dump(r, open(f"{api}/releases/tags/{r['tag_name']}", "w"))
 json.dump(rel("v-corrompue", 21, 32), open(f"{api}/releases/tags/v-corrompue", "w"))
+sans = rel("v-sans-sha", 21, 22)
+sans["assets"] = sans["assets"][:1]
+json.dump(sans, open(f"{api}/releases/tags/v-sans-sha", "w"))
+json.dump(rel("v-sha-vide", 21, 33), open(f"{api}/releases/tags/v-sha-vide", "w"))
 PY
 run_dl() { bash "$DL/scripts/download_db.sh" "$@" > "$WORK/dl.log" 2>&1; }
 check "D1 sans argument : réussi" run_dl
@@ -294,6 +299,12 @@ bash "$DL/scripts/download_db.sh" v-corrompue > "$WORK/dl.log" 2>&1
 check "D3 empreinte invalide : code 4" test $? -eq 4
 check "D3 base existante conservée" test "$(sha "$DL/data/ministere.duckdb")" = "$DB1"
 check "D3 pas de dossier temporaire résiduel" test -z "$(find "$DL/data" -name '.telechargement.*')"
+bash "$DL/scripts/download_db.sh" v-sans-sha > "$WORK/dl.log" 2>&1
+check "D4 .sha256 absent : code 4" test $? -eq 4
+check "D4 base existante conservée" test "$(sha "$DL/data/ministere.duckdb")" = "$DB1"
+bash "$DL/scripts/download_db.sh" v-sha-vide > "$WORK/dl.log" 2>&1
+check "D5 .sha256 vide : code 4" test $? -eq 4
+check "D5 base existante conservée" test "$(sha "$DL/data/ministere.duckdb")" = "$DB1"
 
 echo ""
 echo "Résultat : $PASS réussis, $FAIL échoués"

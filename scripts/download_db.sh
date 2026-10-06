@@ -129,30 +129,32 @@ gzip -t "$GZ_FILE" || {
 log "Décompression..."
 gunzip -c "$GZ_FILE" > "$WORK_DIR/ministere.duckdb"
 
-# Vérifier l'empreinte si disponible
-if [ -n "$SHA_URL" ]; then
-    log "Vérification SHA256..."
-    EXPECTED_SHA=$(curl -fsSL \
-        -H "$AUTH_HEADER" \
-        -H "Accept: application/octet-stream" \
-        "$SHA_URL" | awk 'NR==1 {print tolower($1)}')
+# Empreinte SHA256 obligatoire : sans .sha256 exploitable, on n'installe rien
+if [ -z "$SHA_URL" ]; then
+    echo "ERREUR : pas de fichier .sha256 dans la release $TAG, installation refusée" >&2
+    echo "La base existante $DB_FILE n'a pas été modifiée." >&2
+    exit 4
+fi
+log "Vérification SHA256..."
+EXPECTED_SHA=$(curl -fsSL \
+    -H "$AUTH_HEADER" \
+    -H "Accept: application/octet-stream" \
+    "$SHA_URL" | awk 'NR==1 {print tolower($1)}')
 
-    if [ -z "$EXPECTED_SHA" ]; then
-        log "Avertissement : fichier .sha256 vide, vérification ignorée"
-    else
-        GZ_SHA=$(sha256_of "$GZ_FILE")
-        if [ "$EXPECTED_SHA" = "$GZ_SHA" ]; then
-            log "SHA256 OK (archive)"
-        elif [ "$EXPECTED_SHA" = "$(sha256_of "$WORK_DIR/ministere.duckdb")" ]; then
-            log "SHA256 OK (base décompressée, format historique)"
-        else
-            echo "ERREUR : SHA256 invalide (publié : $EXPECTED_SHA, archive : $GZ_SHA)" >&2
-            echo "La base existante $DB_FILE n'a pas été modifiée." >&2
-            exit 4
-        fi
-    fi
+if [ -z "$EXPECTED_SHA" ]; then
+    echo "ERREUR : fichier .sha256 vide ou illisible (release $TAG), installation refusée" >&2
+    echo "La base existante $DB_FILE n'a pas été modifiée." >&2
+    exit 4
+fi
+GZ_SHA=$(sha256_of "$GZ_FILE")
+if [ "$EXPECTED_SHA" = "$GZ_SHA" ]; then
+    log "SHA256 OK (archive)"
+elif [ "$EXPECTED_SHA" = "$(sha256_of "$WORK_DIR/ministere.duckdb")" ]; then
+    log "SHA256 OK (base décompressée, format historique)"
 else
-    log "Avertissement : pas de fichier .sha256 dans la release, vérification ignorée"
+    echo "ERREUR : SHA256 invalide (publié : $EXPECTED_SHA, archive : $GZ_SHA)" >&2
+    echo "La base existante $DB_FILE n'a pas été modifiée." >&2
+    exit 4
 fi
 
 mv -f "$WORK_DIR/ministere.duckdb" "$DB_FILE"
