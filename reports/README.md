@@ -23,6 +23,10 @@ sommaire (`grep -n '^## ' <fichier>`) avant d'ouvrir une section.
 
 | Fichier | Objet | Taille |
 |---|---|---|
+| [synthese-brainstorm-fonctionnalites-2026-10-06.md](synthese-brainstorm-fonctionnalites-2026-10-06.md) | Synthèse de l'équipe de réflexion : feuille de route A-D, garde-fous, 9 décisions | 5 Ko |
+| [brainstorm-revue-fonctionnalites-2026-10-06.md](brainstorm-revue-fonctionnalites-2026-10-06.md) | Revue des fonctionnalités en place, compléments | — |
+| [brainstorm-analyses-politiques-2026-10-06.md](brainstorm-analyses-politiques-2026-10-06.md) | Nouvelles analyses politiques, garde-fous | — |
+| [brainstorm-sources-2026-10-06.md](brainstorm-sources-2026-10-06.md) | Nouvelles sources de données, licences | — |
 | [ui-design-system-v2-2026-10-06.md](ui-design-system-v2-2026-10-06.md) | Design system v2 « direction éditoriale » appliqué sur J1-J4 (ADR-0014, PuOr conservée), points à valider à l'œil | 6 Ko |
 | [session-2026-10-04_design-system-v2.md](session-2026-10-04_design-system-v2.md) | Patch v2 d'origine — remplacé par `ui-design-system-v2-2026-10-06.md` | 2 Ko |
 | [qualite-typage-2026-10-06.md](qualite-typage-2026-10-06.md) | Pyright 212 → 0 erreur, job CI bloquant, liste des ignores | 4 Ko |
