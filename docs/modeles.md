@@ -3,7 +3,7 @@
 | Usage | Modèle | Exemples |
 |---|---|---|
 | Architecture, arbitrages, relecture critique, neutralité, conformité juridique, validation finale des données | **Claude Opus** (le plus puissant) | directeur, audit de neutralité, audit des licences |
-| Implémentation courante | **Claude Sonnet** | `developpeur-ui`, `ingenieur-infra`, `documentaliste`, `outilleur-claude`, `verificateur-code` |
+| Implémentation courante | **Claude Sonnet** | `developpeur-ui`, `ingenieur-infra`, `documentaliste`, `outilleur-claude` (champ `model: sonnet` de `.claude/agents/`, relevé le 2026-10-07) ; les autres agents, dont `verificateur-code`, n'ont pas de champ `model` et héritent du modèle de la session |
 | Tâches répétitives (recherches simples, reformatage, inventaires) | **Claude Haiku** | balayages de fichiers |
 | Repli hors Claude via omniroute | selon fournisseurs connectés | uniquement tâches non critiques ; jamais de secrets |
 
