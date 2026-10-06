@@ -121,3 +121,7 @@ web/node_modules/
 web/dist/
 # Données générées par scripts/export_web.py
 web/public/data/
+# Application Mac (Tauri) : compilation et code généré
+web/src-tauri/target/
+web/src-tauri/gen/
+*.dmg
