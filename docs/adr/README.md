@@ -23,7 +23,7 @@ décision est révisée, un nouvel ADR est créé avec le statut "Remplace 000X"
 | [0011](0011-legislatif-groupes-par-legislature.md) | Législatif — classement des groupes par législature et modèle de mandats | Accepté (décision Mathias 2026-09-24) |
 | [0012](0012-execution-native-mac.md) | Exécution native sur le Mac mini (uv + LaunchAgent), Docker en repli | Accepté (décision Mathias 2026-09-24) |
 | [0013](0013-licences-et-mentions-des-sources.md) | Licences du projet et mentions des sources | Accepté (décision Mathias 2026-10-04) |
-| [0014](0014-design-system-direction-editoriale.md) | Design system v2 — direction éditoriale | Accepté (2026-10-06) |
+| [0014](0014-design-system-direction-editoriale.md) | Design system v2 — direction éditoriale | Accepté (2026-10-06) — révise 0009 |
 
 ## Format
 
