@@ -28,7 +28,10 @@ Les rôles demandés sont tenus par les agents déjà définis dans `.claude/age
 3. **Aucun agent ne valide son propre travail** : un second agent (en général `verificateur-code`) relit le
    diff, relance ruff et pytest, et rapporte les constats.
 4. Le directeur relit, vérifie lui-même les points incertains (commande ou `fichier:ligne`), fusionne dans
-   la branche de travail. Fusion dans `main`, push et publication : seulement avec l'accord de Mathias.
+   la branche de travail. Depuis le 2026-10-06 (`docs/orientations.md`), le directeur fusionne lui-même
+   dans `main`, CI verte, les petites corrections de bugs et la documentation ; nouvelles sources,
+   classements politiques, changements visibles importants, architecture et publications restent
+   soumis à l'accord de Mathias.
 5. Les questions de fond (classement politique, périmètre, source, architecture) remontent à Mathias sous
    forme de questions fermées, regroupées.
 6. Chaque vague se termine par un rapport dans `reports/` et une entrée dans `docs/journal.md`.
