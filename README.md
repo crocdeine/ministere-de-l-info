@@ -1,204 +1,132 @@
-# 🇫🇷 Ministère de l'Info
+# Ministère de l'Info
 
 [![CI](https://github.com/crocdeine/ministere-de-l-info/actions/workflows/ci.yml/badge.svg)](https://github.com/crocdeine/ministere-de-l-info/actions/workflows/ci.yml)
 
-Application de data-visualisation politique, électorale et territoriale française.
+Un outil de cartes et de graphiques pour comprendre les territoires, les élections et le Parlement en France, à partir des seules données publiques officielles.
 
-## Description
+Il s'adresse à toute personne qui veut lire des résultats électoraux ou des indicateurs locaux sans manipuler de fichiers bruts : citoyens, journalistes, étudiants, élus et collaborateurs. L'application tourne sur l'ordinateur de l'utilisateur, sans compte ni service en ligne.
 
-Ministère de l'Info est une application web locale conçue pour explorer les données publiques françaises : géographie administrative, démographie, élections, composition et activité du Parlement, indicateurs économiques et sociaux. Elle s'appuie exclusivement sur des sources officielles ou publiques (IGN, INSEE, ministère de l'Intérieur via data.gouv.fr, Assemblée nationale via Datan, Sénat, CNAF, DREES, URSSAF, Eurostat). L'application tourne entièrement en local, sans dépendance à un service cloud.
+## Ce que l'outil permet de faire
 
-## Stack technique
+| Module | Contenu | Périmètre |
+|---|---|---|
+| Géographie | Régions, départements, intercommunalités, communes, arrondissements, circonscriptions ; populations 2013, 2018 et 2023 | France |
+| Élections | Présidentielles 2002-2022, législatives 2002-2024, municipales 2008-2026 ; cartes par bloc politique, évolution dans le temps, détail jusqu'au bureau de vote | Hauts-de-France |
+| Législatif | Députés (législatures 12 à 17) et sénateurs : composition politique, liste des élus, activité des députés, évolution par législature | France, filtre par département |
+| Économie | Revenus et pauvreté, chômage, logements sociaux, RSA, accès aux médecins, emploi salarié, comparaison Hauts-de-France / France ; croisement avec les résultats électoraux | Hauts-de-France |
 
-| Composant | Technologie |
-|-----------|------------|
-| Langage | Python 3.12 |
-| Interface web | Streamlit ≥ 1.57 (navigation `st.navigation()`) |
-| Base analytique | DuckDB ≥ 1.5 + extension spatial |
-| Traitement données | Polars (Pandas en fallback) |
-| Cartographie | Folium · streamlit-folium (GeoPandas côté ETL) |
-| Graphiques | Plotly Express |
-| Gestion paquets | uv |
+Mode d'emploi page par page : [guide utilisateur](docs/guide-utilisateur.md).
 
-## Modules
+## Principes
 
-| Module | Contenu | Périmètre | Statut |
-|--------|---------|-----------|--------|
-| 🏠 Accueil | Hub de navigation vers les 4 modules | — | ✅ |
-| 📍 Géographie | Régions, départements, EPCI, communes, arrondissements municipaux, circonscriptions ; populations 2013/2018/2023 | France | ✅ |
-| 🗳️ Élections | Présidentielles 2002-2022, législatives 2002-2024, municipales 2008-2026 ; cartes par bloc, évolution, drill-down jusqu'au bureau de vote | Hauts-de-France | ✅ `v0.4-elections-complet` |
-| 🏛️ Législatif | Députés (législatures 12 à 17) et sénateurs : composition politique, liste des élus, scores d'activité (AN), évolution par législature | France (filtre HdF ou département) | ✅ `v0.5-economie-legislatif` |
-| 📊 Économie | Revenus et pauvreté (Filosofi), chômage, CSP et logements sociaux (RP), RSA (CNAF), accès aux médecins (DREES), emploi salarié privé (URSSAF), contexte HdF vs France (Eurostat) ; croisement avec les présidentielles | Hauts-de-France | ✅ `v0.5-economie-legislatif` |
+- **Neutralité.** L'outil informe, il ne plaide pas. Les titres ne nomment pas de parti et ne présupposent pas de conclusion.
+- **Sources officielles citées.** L'Accueil récapitule les sources, licences et dates ; les légendes des cartes et graphiques rappellent la source affichée.
+- **Classements politiques documentés.** Les candidats sont regroupés en six blocs (extrême gauche, gauche, divers, centre, droite, extrême droite). Seules les municipales 2020 et 2026 disposent d'une grille officielle du ministère de l'Intérieur, appliquée telle quelle. Pour les autres scrutins, le classement est une reconstruction du projet, justifiée et sourcée ([ADR-0010](docs/adr/0010-revision-nuances-et-blocs.md), [ADR-0013](docs/adr/0013-licences-et-mentions-des-sources.md)). Elle n'est jamais présentée comme officielle.
+- **Pas de donnée personnelle superflue.** Seules les informations publiques nécessaires sur les élus et candidats sont conservées ; la date de naissance des élus a été retirée de la base.
 
-Classement politique : 6 blocs officiels du ministère de l'Intérieur (EXG, GAU, DIV,
-CENT, DTE, EXD), selon la grille en vigueur à la date du scrutin — voir
-[ADR-0005](docs/adr/0005-nuances-et-blocs-officiels.md).
+## Aperçu
 
-Le chantier design system (tokens CSS, navigation `st.navigation()`, août 2026) est sur
-`main` mais n'est inclus dans aucune release à ce jour.
+![Accueil](docs/captures/design-v2/accueil.jpg)
 
-## Données chargées
+![Élections](docs/captures/design-v2/elections.jpg)
 
-Une base DuckDB unique (`data/ministere.duckdb`, ~900 Mo, non versionnée). Volumes
-indicatifs repris des rapports de clôture de phase (`reports/`).
+![Législatif](docs/captures/design-v2/legislatif.jpg)
 
-| Module | Tables principales | Volume |
-|--------|--------------------|--------|
-| Géographie | `geographies_*` (6 niveaux), `populations` | 18 régions, 101 départements, 1 265 EPCI, 34 877 communes, 45 arrondissements, 559 circonscriptions ; populations de 34 858 communes |
-| Élections | `resultats_participation`, `resultats_candidats`, `nuances_harmonisees`, `candidats_presidentielle`, `blocs_politiques` | 30 scrutins, 162 469 lignes participation, 1 093 836 lignes candidats, 216 nuances mappées |
-| Économie | `economie_filosofi`, `economie_rp`, `economie_social`, `economie_emploi_urssaf`, `economie_contexte` | 17 582 · 26 538 · RSA 17 381 + APL 3 788 · 1 157 338 · 104 lignes |
-| Législatif | `leg_elus`, `leg_activite`, `leg_blocs_override` | 4 065 élus (2 120 AN + 1 945 Sénat), 1 653 lignes d'activité, 2 overrides |
+## Données et licences
 
-## Installation
+| Données | Producteur | Licence |
+|---|---|---|
+| Contours administratifs | IGN | Licence Ouverte 2.0 |
+| Populations, revenus, recensement | INSEE | Licence Ouverte 2.0 |
+| Résultats électoraux | Ministère de l'Intérieur, via data.gouv.fr | Licence Ouverte 2.0 |
+| Députés et activité | Datan, d'après l'Assemblée nationale ; Assemblée nationale | Licence Ouverte 1.0 ; Licence Ouverte |
+| Sénateurs | Sénat | Licence data.senat.fr (Licence Ouverte) |
+| RSA ; accès aux médecins | CNAF ; DREES | Licence Ouverte 2.0 |
+| Emploi salarié | URSSAF | ODbL 1.0 |
+| Chômage et PIB régionaux | Eurostat | CC BY 4.0 |
 
-Prérequis : Python 3.12 et [uv](https://docs.astral.sh/uv/).
+Liste complète, intermédiaires et état de vérification : [docs/sources.md](docs/sources.md).
+
+- **Code** : licence MIT ([LICENSE](LICENSE)).
+- **Base de données** : licence ODbL 1.0 ([LICENSE-DONNEES.md](LICENSE-DONNEES.md)), imposée par les données URSSAF.
+- **Téléchargement de la base** : [releases GitHub](https://github.com/crocdeine/ministere-de-l-info/releases), dernière base publiée : [`db-2026-10-04`](https://github.com/crocdeine/ministere-de-l-info/releases/tag/db-2026-10-04) (fichier `ministere.duckdb.gz`, environ 630 Mo).
+
+## Installation et lancement
+
+Prérequis : Python 3.12 et [uv](https://docs.astral.sh/uv/) (gestionnaire de paquets du projet ; pip et poetry ne sont pas utilisés).
 
 ```bash
 git clone https://github.com/crocdeine/ministere-de-l-info.git
 cd ministere-de-l-info
-uv sync --all-groups        # le groupe "etl" (geopandas, openpyxl) sert aux scripts ETL
-uv run pre-commit install
+uv sync
 ```
 
-## Obtenir la base de données
-
-**Option A — télécharger la base publiée** (recommandé). La release
-[`v0.5-economie-legislatif`](https://github.com/crocdeine/ministere-de-l-info/releases/tag/v0.5-economie-legislatif)
-contient `ministere.duckdb.gz` (~635 Mo compressés), à décompresser dans `data/`.
-`scripts/download_db.sh [tag]` automatise le téléchargement (requiert `GITHUB_TOKEN`).
-Sans argument, ce script prend la dernière release dont le tag commence par `db-`
-(`db-2026-05`, antérieure aux modules Élections, Économie et Législatif) : passer le tag
-explicitement.
-
-**Option B — reconstruire par ETL** depuis les sources publiques :
+Base de données : télécharger `ministere.duckdb.gz` depuis la release `db-2026-10-04`, puis la décompresser dans `data/` :
 
 ```bash
-# 1. Géographie + populations
-uv run python scripts/etl_territoires.py --millesimes 2023 --yes
+gunzip -c ministere.duckdb.gz > data/ministere.duckdb
+```
 
-# 2. Élections : schéma, puis les trois types de scrutin
-#    Prérequis : les deux Parquet du dataset « Données des élections agrégées »
-#    (data.gouv.fr) placés manuellement dans data/exploration/
-#    (general-results.parquet, candidats-results.parquet) — les scripts ne les téléchargent pas
+Le script `scripts/download_db.sh` automatise cette étape (jeton `GITHUB_TOKEN` requis). <details>
+<summary>Reconstruire la base à partir des sources publiques</summary>
+
+Les deux fichiers Parquet du jeu « Données des élections agrégées » (data.gouv.fr) doivent d'abord être placés à la main dans `data/exploration/` ([détail](docs/data-sources.md)). La géographie se charge en premier.
+
+```bash
+uv sync --group etl
+uv run python scripts/etl_territoires.py --millesimes 2023 --yes
 uv run python scripts/init_elections_schema.py
 uv run python scripts/load_elections_presidentielles.py
 uv run python scripts/load_elections_legislatives.py
 uv run python scripts/load_elections_municipales.py
-
-# 3. Économie : Filosofi, RP, CNAF, URSSAF, DREES ; Eurostat n'est pas inclus dans "all"
 uv run python scripts/load_economie.py
 uv run python scripts/load_economie.py --source eurostat
-
-# 4. Législatif : Sénat, Datan, overrides
 uv run python scripts/load_legislatif.py
 ```
 
-> `--yes` bypasse la confirmation interactive pour le téléchargement des ~35 000
-> communes. Les modules Élections et Économie s'appuient sur les tables géographiques :
-> charger la géographie en premier.
+</details>
 
-## Lancement
+Lancement :
 
 ```bash
 uv run streamlit run app.py
-# → http://localhost:8501
 ```
 
-`app.py` est un routeur (`st.navigation()`) : il configure l'application puis affiche
-la page choisie dans la barre latérale (Accueil, Géographie, Élections, Législatif,
-Économie). Mode d'emploi : [`docs/guide-utilisateur.md`](docs/guide-utilisateur.md).
+L'application s'ouvre à l'adresse `http://localhost:8501`. Installation permanente sur Mac (démarrage automatique) : [`deploy/native/`](deploy/native/README.md) et [docs/deployment.md](docs/deployment.md).
 
-## Déploiement
+## Limites connues
 
-- **Installation utilisateur (macOS + OrbStack)** : image Docker publiée sur
-  `ghcr.io/crocdeine/ministere-de-l-info`, base téléchargée depuis la release GitHub.
-  Script d'installation et procédure mainteneur : [`deploy/README-deploy.md`](deploy/README-deploy.md).
-- **Self-hosted depuis les sources** (Docker Compose dev/prod, backups, dépannage) :
-  [`docs/deployment.md`](docs/deployment.md).
+- Élections et Économie couvrent les Hauts-de-France uniquement.
+- Pas de scores d'activité pour le Sénat, ni de votes nominatifs.
+- Municipales 2008 : le Nord est presque absent du fichier source (avertissement affiché).
+- Contours des circonscriptions : source non officielle (publiée par un particulier sur data.gouv.fr).
 
-```bash
-docker build -t ministere-info:latest .
-docker compose -f docker-compose.prod.yml up -d
-curl http://localhost:8501/_stcore/health
-```
+## État du projet
 
-## Architecture
+- **Prototype fonctionnel** : les quatre modules sont opérationnels dans une application [Streamlit](https://streamlit.io/).
+- **Version de production en préparation** : une interface web emballée en application Mac. Aucune date n'est fixée.
+- Étapes et chantiers : [feuille de route](docs/roadmap.md).
 
-```
-ministere-de-l-info/
-├── app.py                        # Routeur st.navigation() : config, logging, CSS, 5 st.Page
-├── pages/                        # Points d'entrée des pages
-│   ├── 0_🏠_Accueil.py
-│   ├── 1_📍_Géographie.py
-│   ├── 2_🗳️_Élections.py
-│   ├── 3_🏛️_Législatif.py
-│   └── 4_📊_Économie.py
-├── src/ministere_de_l_info/
-│   ├── _theme.py                 # inject_css(), render_page_header()
-│   ├── _blocs_politiques.py      # Ordre, libellés, couleurs des 6 blocs
-│   ├── custom.css                # Tokens du design system + sélecteurs Streamlit
-│   ├── data_sources/             # Connecteurs géographie (IGN, INSEE, circonscriptions)
-│   ├── etl/                      # Schémas DuckDB (géo, élections, économie, législatif) + loaders/
-│   ├── pages/                    # render() des pages Élections, Législatif, Économie
-│   └── viz/                      # Cartes Folium et requêtes @st.cache_data
-├── scripts/                      # ETL en ligne de commande, migrations, scripts de base (backup, publication, téléchargement)
-├── deploy/                       # Dockerfile de l'image publiée, install.sh, update.sh
-├── docs/                         # Architecture, sources, schéma électoral, ADR, guide utilisateur
-├── reports/                      # Rapports de session et de clôture de phase
-├── data/                         # Base DuckDB + caches bruts (non versionné)
-└── tests/                        # Suite pytest
-```
+## Qualité
 
-Détail : [`docs/architecture.md`](docs/architecture.md).
-
-## Tests
-
-```bash
-uv run pytest            # 381 tests collectés ; le marqueur "slow" est exclu par défaut
-uv run pytest -m slow    # 13 tests Streamlit (serveur headless et AppTest)
-```
-
-Les tests d'intégration sont ignorés (`skip`) si `data/ministere.duckdb` est absente.
-Certains tests appellent les API publiques (IGN, INSEE, data.gouv.fr) et échouent sans
-accès réseau.
-
-### Pre-commit hooks
-
-Le projet utilise pre-commit pour automatiser lint et format avant chaque commit.
-
-```bash
-uv run pre-commit install          # après clone
-uv run pre-commit run --all-files  # lancement manuel
-```
+- Tests automatisés (pytest) : 545 fonctions de test dans `tests/`. Les tests qui demandent la base locale, le réseau ou un serveur Streamlit sont ignorés par défaut ou en l'absence de base.
+- Intégration continue (GitHub Actions) à chaque envoi : lint et format (ruff), tests avec couverture minimale de 60 % (le build échoue en dessous), typage vérifié par pyright (mode `basic`, 0 erreur exigée).
+- Contrôle automatique des secrets avant chaque commit (pre-commit).
 
 ## Documentation
 
 | Document | Contenu |
-|----------|---------|
-| [`docs/architecture.md`](docs/architecture.md) | Structure du code, flux ETL, schéma DuckDB, CI, tests |
-| [`docs/data-sources.md`](docs/data-sources.md) | Toutes les sources, formats, limitations |
-| [`docs/schema-elections.md`](docs/schema-elections.md) | Tables et vues électorales, pièges des Parquet |
-| [`docs/guide-utilisateur.md`](docs/guide-utilisateur.md) | Utilisation de l'application, page par page |
-| [`docs/deployment.md`](docs/deployment.md) | Docker, backups, publication de la base |
-| [`docs/adr/`](docs/adr/README.md) | Décisions d'architecture (ADR 0001 à 0009) |
-| [`docs/lessons-learned.md`](docs/lessons-learned.md) | Leçons techniques par thème |
-| [`docs/sources-officielles/nuances/`](docs/sources-officielles/nuances/index.md) | Circulaires de nuançage et décisions du Conseil d'État |
-
-## Limitations connues
-
-| Limitation | Cause | Contournement |
-|------------|-------|---------------|
-| Mayotte absente des vues population | Données INSEE séparées de DS_POPULATIONS_HISTORIQUES | Chargement manuel via source alternative |
-| `comptee_a_part` et `totale` NULL | PCAP non disponible dans la source actuelle | TODO v2 |
-| Données circonscriptions : source non officielle | API data.gouv.fr / jerome-desboeufs | Attendre export officiel AN |
-| 11 EPT du Grand Paris sans département | Champ multi-valeur WFS non filtrable | Mapping manuel à prévoir |
-| Municipales 2008 : Nord quasi absent | Fichier source data.gouv.fr incomplet (2 communes du 59) | Avertissement affiché dans l'UI |
-| Pas de clic sur la carte pour le détail | streamlit-folium ne renvoie pas les propriétés de l'entité | Sélection par liste déroulante |
-| Législatif : pas de scores Sénat ni de votes nominatifs | Datan ne couvre que l'AN ; XML AN non parsé | — |
-| Économie : croisement électoral exploitable pour 2022 uniquement | Filosofi disponible à partir de 2017 (jointure année n-1) | — |
+|---|---|
+| [Guide utilisateur](docs/guide-utilisateur.md) | Utilisation de l'application, page par page |
+| [Architecture](docs/architecture.md) | Organisation du code, chargement des données, base DuckDB |
+| [Sources et licences](docs/sources.md) | Registre de conformité des sources |
+| [Sources, détail technique](docs/data-sources.md) | Formats, adresses, limites connues |
+| [Schéma électoral](docs/schema-elections.md) | Tables et vues des élections, classements en blocs |
+| [Décisions d'architecture (ADR)](docs/adr/README.md) | Choix structurants et leurs raisons |
+| [Circulaires de nuances](docs/sources-officielles/nuances/index.md) | Textes officiels archivés du ministère de l'Intérieur |
+| [Déploiement](docs/deployment.md) | Exécution sur Mac, sauvegardes, dépannage |
+| [Feuille de route](docs/roadmap.md) | Jalons faits et à venir |
 
 ## Crédits
 
-- **Auteur** : Mathias
-- **Sources** : IGN ADMIN-EXPRESS-COG · INSEE (Mélodi, Filosofi, RP) · ministère de l'Intérieur / data.gouv.fr · Datan · Sénat (data.senat.fr) · CNAF · DREES · URSSAF · Eurostat
-- **Licence** : code sous MIT (`LICENSE`) ; base de données sous ODbL 1.0, avec la liste des sources et de leurs licences (`LICENSE-DONNEES.md`, détail dans `docs/sources.md`)
+Projet personnel de Mathias ([crocdeine](https://github.com/crocdeine)). Données : IGN, INSEE, ministère de l'Intérieur, Assemblée nationale, Datan, Sénat, CNAF, DREES, URSSAF, Eurostat.
