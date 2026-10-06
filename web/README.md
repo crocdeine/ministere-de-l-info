@@ -28,3 +28,21 @@ npm run preview    # sert web/dist/ sur http://localhost:4173
   (uniquement des `var(--…)`). Polices embarquées (Fontsource), aucun CDN.
 - Seul appel réseau à l'exécution : tuiles du fond Plan IGN (Géoplateforme) ; la carte des
   communes s'affiche sans elles.
+
+## Application Mac (Tauri)
+
+POC : la même page emballée en application macOS (Tauri v2, WebView système, aucune commande
+Rust). Données embarquées dans le binaire ; seul accès réseau autorisé (CSP) : tuiles Plan IGN
+sur `data.geopf.fr`, facultatives (les communes s'affichent hors ligne).
+
+Prérequis : Rust (rustup), Xcode Command Line Tools, Node ; données exportées (étape 1).
+
+```bash
+npm run tauri:dev     # fenêtre de développement sur le serveur Vite (rechargement à chaud)
+npm run tauri:build   # build Vite puis .app et .dmg non signés (arm64)
+open "src-tauri/target/release/bundle/macos/Ministère de l'Info.app"
+```
+
+Le `.dmg` est dans `src-tauri/target/release/bundle/dmg/`. Le dossier `target/` pèse ~0,8 Go :
+le placer sur un disque externe via `CARGO_TARGET_DIR` si besoin. Application non signée :
+une copie téléchargée est bloquée par Gatekeeper (Réglages Système > Confidentialité et sécurité > « Ouvrir quand même »).
