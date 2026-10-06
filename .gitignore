@@ -45,6 +45,9 @@ data/interim/
 data/processed/
 data/external/
 data/backups/
+data/exploration/
+# Copies de sécurité de la base (900 Mo chacune) : jamais dans git
+data/*.duckdb*
 *.parquet
 *.duckdb
 *.duckdb.wal
