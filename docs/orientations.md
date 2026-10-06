@@ -97,3 +97,20 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
   et la documentation** qui n'engagent aucun choix de fond. Restent soumis à l'accord explicite de
   Mathias : nouvelles sources, classements politiques, changements visibles importants, architecture,
   publications (releases, image Docker).
+
+## Décisions du 2026-10-06 (feuille de route fonctionnelle — « oui à tout »)
+
+Voir `reports/synthese-brainstorm-fonctionnalites-2026-10-06.md`.
+1. Feuille de route en 4 vagues : A socle (fiche territoire, URL partageables, recherche, Méthodologie,
+   exports) ; B données (France entière, européennes/régionales/départementales, candidatures, Filosofi
+   officiel INSEE) ; C analyses (abstention, évolutions, comparaisons, triangulaires, fiche élu, parité) ;
+   D Parlement et argent public (votes nominatifs AN puis Sénat, CNCCFP, OFGL). Construites dans la
+   nouvelle interface web.
+2. Six garde-fous communs (méthode affichée, ruptures signalées, incertitude visible, corrélation ≠
+   causalité, aucun motif prêté, vocabulaire neutre ; ni pronostic ni ciblage).
+3. Élections France entière : oui. 4. Européennes, régionales, départementales : oui, classées selon
+   l'ADR-0010 (reconstruction documentée). 5. Filosofi : source officielle INSEE (Mélodi) à la place du
+   fichier republié. 6. Reports de voix : descriptif seulement. 7. Simulation d'un autre mode de
+   scrutin : écartée. 8. « Top 20 » nominatif Datan remplacé par une distribution sans noms et une
+   recherche individuelle. 9. CNCCFP sans licence déclarée : réutilisation au titre du code des
+   relations entre le public et l'administration, source mentionnée, note juridique dans `docs/sources.md`.
