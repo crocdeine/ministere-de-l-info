@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
-import duckdb
 import streamlit as st
 from streamlit_folium import st_folium
 
 from ministere_de_l_info._theme import render_donnees_indisponibles, render_page_header
 from ministere_de_l_info.config import get_settings
-from ministere_de_l_info.viz._queries import get_tableau_territoires
-from ministere_de_l_info.viz.maps import make_choropleth
+from ministere_de_l_info.viz._queries import (
+    get_annees_population,
+    get_meta_etl,
+    get_referentiel_geo,
+    get_tableau_territoires_cache,
+)
+from ministere_de_l_info.viz.maps import get_carte_cache
 
 render_page_header(
     icon="map",
@@ -57,14 +61,6 @@ _FILTRE_REGION_COL: dict[str, str] = {
 }
 
 
-@st.cache_resource
-def _get_con() -> duckdb.DuckDBPyConnection:
-    """Connexion DuckDB partagée en lecture seule."""
-    con = duckdb.connect(str(_DB_PATH), read_only=True)
-    con.execute("LOAD spatial;")
-    return con
-
-
 if not _DB_PATH.exists():
     render_donnees_indisponibles(
         "géographiques",
@@ -77,8 +73,6 @@ if not _DB_PATH.exists():
     )
     st.stop()
 
-con = _get_con()
-
 # ── Sidebar : paramètres ──────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -90,12 +84,7 @@ with st.sidebar:
         format_func=lambda x: _NIVEAU_LABELS[x],
     )
 
-    annees_dispo = [
-        r[0]
-        for r in con.execute(
-            "SELECT DISTINCT annee FROM populations ORDER BY annee DESC"
-        ).fetchall()
-    ]
+    annees_dispo = get_annees_population()
     if not annees_dispo:
         st.warning("Aucune donnée population — carte en mode contours.")
         annee = 2023
@@ -131,9 +120,7 @@ with st.sidebar:
     # Filtre département (contextuel)
     filtre_departement: str | None = None
     if niveau in _FILTRE_DEPT_COL:
-        depts = con.execute(
-            "SELECT code_insee, nom FROM geographies_departements ORDER BY code_insee"
-        ).fetchall()
+        depts = get_referentiel_geo("departement")
         dept_labels = {d[0]: f"{d[0]} — {d[1]}" for d in depts}
 
         if niveau == "commune":
@@ -154,9 +141,7 @@ with st.sidebar:
     # Filtre région (contextuel)
     filtre_region: str | None = None
     if niveau in _FILTRE_REGION_COL:
-        regions = con.execute(
-            "SELECT code_insee, nom FROM geographies_regions ORDER BY nom"
-        ).fetchall()
+        regions = get_referentiel_geo("region")
         region_labels = {r[0]: r[1] for r in regions}
         choix = st.selectbox(
             "Région (optionnelle)",
@@ -181,8 +166,7 @@ else:
     titre_carte = "Contours territoriaux"
 
 try:
-    carte = make_choropleth(
-        con,
+    carte = get_carte_cache(
         niveau=niveau,
         annee=annee,
         annee_ref=annee_ref if _mode_evolution else None,
@@ -204,10 +188,7 @@ except Exception as e:
 
 # ── Métadonnée ───────────────────────────────────────────────────────────────
 
-meta = con.execute(
-    "SELECT loaded_at, source_version, row_count FROM _etl_metadata WHERE table_name = ?",
-    [_TABLE_META[niveau]],
-).fetchone()
+meta = get_meta_etl(_TABLE_META[niveau])
 
 if meta:
     loaded_at, source, row_count = meta
@@ -225,8 +206,7 @@ else:
 
 st.divider()
 
-tableau = get_tableau_territoires(
-    con,
+tableau = get_tableau_territoires_cache(
     niveau,
     annee,
     annee_ref=annee_ref if niveau in _VUE_POP else None,

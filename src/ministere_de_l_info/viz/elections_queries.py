@@ -10,6 +10,7 @@ import streamlit as st
 
 from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.etl.schema_elections import _CIRCO21_CODES
+from ministere_de_l_info.viz._queries import open_ro
 
 DB_PATH: Path = get_settings().db_path
 
@@ -43,9 +44,7 @@ def format_pct_fr(valeur: float | None, decimales: int = 1) -> str:
 
 
 def _open_ro() -> duckdb.DuckDBPyConnection:
-    con = duckdb.connect(str(DB_PATH), read_only=True)
-    con.execute("LOAD spatial")
-    return con
+    return open_ro(DB_PATH)
 
 
 def _opt_int(v: object) -> int | None:

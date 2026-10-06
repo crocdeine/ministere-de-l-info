@@ -29,6 +29,7 @@ import polars as pl
 import streamlit as st
 
 from ministere_de_l_info.config import get_settings
+from ministere_de_l_info.viz._queries import open_ro
 
 DB_PATH: Path = get_settings().db_path
 
@@ -58,9 +59,7 @@ _INDICATEURS_CONTEXTE = frozenset({"tx_chomage_bit", "pib_eur_hab"})
 
 
 def _open_ro() -> duckdb.DuckDBPyConnection:
-    con = duckdb.connect(str(DB_PATH), read_only=True)
-    con.execute("LOAD spatial")
-    return con
+    return open_ro(DB_PATH)
 
 
 def is_base_disponible() -> bool:

@@ -10,7 +10,9 @@ import branca.colormap as cm
 import duckdb
 import folium
 import folium.features
+import streamlit as st
 
+from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.sources import LO2, mention
 from ministere_de_l_info.viz._config import (
     _CENTRE_FRANCE,
@@ -42,6 +44,7 @@ from ministere_de_l_info.viz._queries import (
     _fit_bounds_for_filter,
     _get_geometry_column,
     _resolve_mode,
+    open_ro,
 )
 
 logger = logging.getLogger(__name__)
@@ -276,3 +279,31 @@ def make_choropleth(
     )
 
     return m
+
+
+# ponytail: Map partagée entre sessions (cache_resource, 32 entrées max) ; st_folium ne la modifie pas.
+@st.cache_resource(max_entries=32, show_spinner="Construction de la carte…")
+def get_carte_cache(
+    niveau: str,
+    annee: int,
+    annee_ref: int | None,
+    filtre_departement: str | None,
+    filtre_region: str | None,
+    titre: str,
+    mode: Literal["choropleth", "contours", "auto"],
+) -> folium.Map:
+    """`make_choropleth` en cache (connexion courte) ; les exceptions ne sont pas mises en cache."""
+    con = open_ro(get_settings().db_path)
+    try:
+        return make_choropleth(
+            con,
+            niveau=niveau,
+            annee=annee,
+            annee_ref=annee_ref,
+            filtre_departement=filtre_departement,
+            filtre_region=filtre_region,
+            titre=titre,
+            mode=mode,
+        )
+    finally:
+        con.close()

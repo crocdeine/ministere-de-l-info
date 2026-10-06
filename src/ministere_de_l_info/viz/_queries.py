@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 import duckdb
 import polars as pl
+import streamlit as st
 
+from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.viz._config import (
     _CLE_JOIN,
     _COLONNE_CODE,
@@ -19,6 +22,18 @@ from ministere_de_l_info.viz._config import (
     _TABLE_PAR_NIVEAU,
     _VUE_PAR_NIVEAU,
 )
+
+
+def open_ro(db_path: Path, *, spatial: bool = True) -> duckdb.DuckDBPyConnection:
+    """Connexion DuckDB en lecture seule, à fermer par l'appelant (`finally: con.close()`).
+
+    Source unique pour tous les modules `viz/*_queries.py`. `spatial=True` charge
+    l'extension nécessaire à `ST_AsGeoJSON` / `ST_XMin`.
+    """
+    con = duckdb.connect(str(db_path), read_only=True)
+    if spatial:
+        con.execute("LOAD spatial")
+    return con
 
 
 def _get_geometry_column(niveau: str, *, zoomed: bool) -> str:
@@ -311,3 +326,63 @@ def get_tableau_territoires(
         params = geo_params
 
     return con.execute(sql, params).pl()
+
+
+# ── Lectures mises en cache (page Géographie) : clés = paramètres, connexion courte ──
+
+
+@st.cache_data(ttl=3600)
+def get_annees_population() -> list[int]:
+    """Millésimes de population disponibles (décroissants)."""
+    con = open_ro(get_settings().db_path)
+    try:
+        sql = "SELECT DISTINCT annee FROM populations ORDER BY annee DESC"
+        return [r[0] for r in con.execute(sql).fetchall()]
+    finally:
+        con.close()
+
+
+@st.cache_data(ttl=3600)
+def get_referentiel_geo(niveau: Literal["departement", "region"]) -> list[tuple[str, str]]:
+    """Couples (code, nom) des départements (par code) ou des régions (par nom)."""
+    table, ordre = {
+        "departement": ("geographies_departements", "code_insee"),
+        "region": ("geographies_regions", "nom"),
+    }[niveau]
+    con = open_ro(get_settings().db_path)
+    try:
+        sql = f"SELECT code_insee, nom FROM {table} ORDER BY {ordre}"  # noqa: S608
+        return [(r[0], r[1]) for r in con.execute(sql).fetchall()]
+    finally:
+        con.close()
+
+
+@st.cache_data(ttl=3600)
+def get_meta_etl(table_name: str) -> tuple | None:
+    """(loaded_at, source_version, row_count) de `_etl_metadata`, ou None."""
+    con = open_ro(get_settings().db_path)
+    try:
+        return con.execute(
+            "SELECT loaded_at, source_version, row_count FROM _etl_metadata WHERE table_name = ?",
+            [table_name],
+        ).fetchone()
+    finally:
+        con.close()
+
+
+@st.cache_data(ttl=3600, show_spinner="Chargement du tableau…")
+def get_tableau_territoires_cache(
+    niveau: str,
+    annee: int,
+    annee_ref: int | None = None,
+    filtre_departement: str | None = None,
+    filtre_region: str | None = None,
+) -> pl.DataFrame:
+    """Version mise en cache de `get_tableau_territoires` (connexion propre)."""
+    con = open_ro(get_settings().db_path)
+    try:
+        return get_tableau_territoires(
+            con, niveau, annee, annee_ref, filtre_departement, filtre_region
+        )
+    finally:
+        con.close()

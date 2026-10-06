@@ -29,6 +29,7 @@ import polars as pl
 import streamlit as st
 
 from ministere_de_l_info.config import get_settings
+from ministere_de_l_info.viz._queries import open_ro
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ _INDICATEURS_ACTIVITE_VALIDES = frozenset(
 
 
 def _open_ro() -> duckdb.DuckDBPyConnection:
-    return duckdb.connect(str(DB_PATH), read_only=True)
+    return open_ro(DB_PATH, spatial=False)
 
 
 def _dept_clause(
