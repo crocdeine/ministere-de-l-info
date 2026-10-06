@@ -4,7 +4,7 @@
 
 Un outil de cartes et de graphiques pour comprendre les territoires, les élections et le Parlement en France, à partir des seules données publiques officielles.
 
-Il s'adresse à toute personne qui veut lire des résultats électoraux ou des indicateurs locaux sans manipuler de fichiers bruts : citoyens, journalistes, étudiants, élus et collaborateurs. L'application tourne sur l'ordinateur de l'utilisateur, sans compte ni service en ligne.
+Il sert à l'analyse politique et territoriale : lire des résultats électoraux ou des indicateurs locaux sans manipuler de fichiers bruts. Projet personnel, diffusé à un cercle restreint de lecteurs. L'application tourne sur l'ordinateur de l'utilisateur, sans compte ni service en ligne.
 
 ## Ce que l'outil permet de faire
 
@@ -67,7 +67,9 @@ Base de données : télécharger `ministere.duckdb.gz` depuis la release `db-20
 gunzip -c ministere.duckdb.gz > data/ministere.duckdb
 ```
 
-Le script `scripts/download_db.sh` automatise cette étape (jeton `GITHUB_TOKEN` requis). <details>
+Le script `scripts/download_db.sh` automatise cette étape (jeton `GITHUB_TOKEN` requis).
+
+<details>
 <summary>Reconstruire la base à partir des sources publiques</summary>
 
 Les deux fichiers Parquet du jeu « Données des élections agrégées » (data.gouv.fr) doivent d'abord être placés à la main dans `data/exploration/` ([détail](docs/data-sources.md)). La géographie se charge en premier.
@@ -109,7 +111,7 @@ L'application s'ouvre à l'adresse `http://localhost:8501`. Installation permane
 
 ## Qualité
 
-- Tests automatisés (pytest) : 545 fonctions de test dans `tests/`. Les tests qui demandent la base locale, le réseau ou un serveur Streamlit sont ignorés par défaut ou en l'absence de base.
+- Tests automatisés (pytest) : 664 tests réussis avec la base locale (mesure du 2026-10-06). Sans la base, en intégration continue, les tests qui en dépendent sont ignorés ; ceux qui demandent le réseau sont exclus par défaut.
 - Intégration continue (GitHub Actions) à chaque envoi : lint et format (ruff), tests avec couverture minimale de 60 % (le build échoue en dessous), typage vérifié par pyright (mode `basic`, 0 erreur exigée).
 - Contrôle automatique des secrets avant chaque commit (pre-commit).
 
