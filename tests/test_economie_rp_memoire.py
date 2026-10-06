@@ -9,10 +9,12 @@ détecté, que le filtre HdF s'applique et que le manque de clef est signalé.
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 from ministere_de_l_info.etl.loaders.economie_rp import load_economie_rp
 from ministere_de_l_info.etl.schema_economie import create_economie_schema
@@ -26,7 +28,7 @@ def _lignes() -> list[tuple[str, int, str, str, float | None]]:
     for annee in (2016, 2017):
         for i, code in enumerate(_COMMUNES):
             base = 1000.0 * (i + 1)
-            emploi = [
+            emploi: list[tuple[str, float | None]] = [
                 ("actifs_15_64_ans_c", base),
                 ("actifs_15_64_ans_p", base),
                 ("actifs_ouvriers_15_64_ans_c", base * 0.2),
@@ -61,7 +63,7 @@ def raw_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     c = duckdb.connect()
     c.execute(
         "CREATE TABLE _etl_metadata (table_name VARCHAR, loaded_at TIMESTAMP, "
@@ -111,7 +113,7 @@ def test_chomage_total_reconstitue_par_sexe(con: duckdb.DuckDBPyConnection, tmp_
     src.execute(f"COPY olap TO '{chemin}' (FORMAT PARQUET)")
     src.close()
     load_economie_rp(con, tmp_path)
-    tx, secret = con.execute("SELECT tx_chomage_dec, secret FROM economie_rp").fetchone()
+    tx, secret = ligne(con.execute("SELECT tx_chomage_dec, secret FROM economie_rp"))
     assert tx == pytest.approx(12.0)
     assert secret is False
 
@@ -124,10 +126,12 @@ def test_secret_communal_conserve(con: duckdb.DuckDBPyConnection, raw_dir: Path)
         ).fetchall()
     )
     assert rows == {"59350": False, "80001": True, "80021": False}
-    tx = con.execute(
-        "SELECT tx_chomage_dec FROM economie_rp "
-        "WHERE annee_millesime = 2017 AND code_commune = '80021'"
-    ).fetchone()[0]
+    tx = ligne(
+        con.execute(
+            "SELECT tx_chomage_dec FROM economie_rp "
+            "WHERE annee_millesime = 2017 AND code_commune = '80021'"
+        )
+    )[0]
     assert tx == pytest.approx(12.0)
 
 

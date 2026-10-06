@@ -10,6 +10,7 @@ Exécutables en CI sans la base réelle ni l'extension spatial :
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
@@ -63,7 +64,7 @@ class TestParticipationAgregee:
 
 
 @pytest.fixture
-def con_geo() -> duckdb.DuckDBPyConnection:
+def con_geo() -> Iterator[duckdb.DuckDBPyConnection]:
     con = duckdb.connect()
     con.execute(
         "CREATE TABLE geographies_departements (code_insee VARCHAR, nom VARCHAR, code_region VARCHAR)"

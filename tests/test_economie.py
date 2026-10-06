@@ -10,10 +10,12 @@ Prérequis :
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
@@ -22,11 +24,11 @@ DB_PATH = _ROOT / "data" / "ministere.duckdb"
 
 
 @pytest.fixture(scope="module")
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     if not DB_PATH.exists():
         pytest.skip("DB absente. Lancer : uv run python scripts/load_economie.py")
     c = duckdb.connect(str(DB_PATH), read_only=True)
-    n = c.execute("SELECT COUNT(*) FROM economie_filosofi").fetchone()[0]
+    n = ligne(c.execute("SELECT COUNT(*) FROM economie_filosofi"))[0]
     if n == 0:
         pytest.skip(
             "Données économiques non chargées. Lancer : uv run python scripts/load_economie.py"
@@ -37,21 +39,21 @@ def con() -> duckdb.DuckDBPyConnection:
 
 def test_economie_data_loaded(con):
     """Les 2 tables économiques contiennent des données."""
-    n_f = con.execute("SELECT COUNT(*) FROM economie_filosofi").fetchone()[0]
-    n_r = con.execute("SELECT COUNT(*) FROM economie_rp").fetchone()[0]
+    n_f = ligne(con.execute("SELECT COUNT(*) FROM economie_filosofi"))[0]
+    n_r = ligne(con.execute("SELECT COUNT(*) FROM economie_rp"))[0]
     assert n_f > 0, "economie_filosofi est vide"
     assert n_r > 0, "economie_rp est vide"
 
 
 def test_economie_filosofi_count(con):
     """Au moins 3 000 communes HdF avec données Filosofi pour 2021."""
-    n = con.execute("SELECT COUNT(*) FROM economie_filosofi WHERE annee = 2021").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM economie_filosofi WHERE annee = 2021"))[0]
     assert n > 3000, f"Attendu >3000 communes pour Filosofi 2021, trouvé {n}"
 
 
 def test_economie_rp_count(con):
     """Au moins 3 000 communes HdF avec données RP pour 2020."""
-    n = con.execute("SELECT COUNT(*) FROM economie_rp WHERE annee_millesime = 2020").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM economie_rp WHERE annee_millesime = 2020"))[0]
     assert n > 3000, f"Attendu >3000 communes pour RP 2020, trouvé {n}"
 
 
@@ -154,9 +156,9 @@ def test_code_commune_varchar(con):
 @pytest.fixture(scope="module")
 def con_social(con) -> duckdb.DuckDBPyConnection:
     """Fixture : passe si economie_social contient des données RSA (CNAF chargé)."""
-    n = con.execute(
-        "SELECT COUNT(*) FROM economie_social WHERE nb_foyers_rsa IS NOT NULL"
-    ).fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM economie_social WHERE nb_foyers_rsa IS NOT NULL"))[
+        0
+    ]
     if n == 0:
         pytest.skip(
             "Données CNAF non chargées. Lancer : uv run python scripts/load_economie.py --source cnaf"
@@ -167,7 +169,7 @@ def con_social(con) -> duckdb.DuckDBPyConnection:
 @pytest.fixture(scope="module")
 def con_urssaf(con) -> duckdb.DuckDBPyConnection:
     """Fixture : passe si economie_emploi_urssaf contient des données."""
-    n = con.execute("SELECT COUNT(*) FROM economie_emploi_urssaf").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM economie_emploi_urssaf"))[0]
     if n == 0:
         pytest.skip(
             "Données URSSAF non chargées. Lancer : uv run python scripts/load_economie.py --source urssaf"
@@ -177,9 +179,9 @@ def con_urssaf(con) -> duckdb.DuckDBPyConnection:
 
 def test_cnaf_data_loaded(con_social):
     """economie_social contient des données RSA."""
-    n = con_social.execute(
-        "SELECT COUNT(*) FROM economie_social WHERE nb_foyers_rsa IS NOT NULL"
-    ).fetchone()[0]
+    n = ligne(
+        con_social.execute("SELECT COUNT(*) FROM economie_social WHERE nb_foyers_rsa IS NOT NULL")
+    )[0]
     assert n > 1000, f"Trop peu de communes avec données RSA : {n}"
 
 
@@ -196,24 +198,26 @@ def test_cnaf_lille(con_social):
 
 def test_urssaf_data_loaded(con_urssaf):
     """economie_emploi_urssaf contient des données."""
-    n = con_urssaf.execute("SELECT COUNT(*) FROM economie_emploi_urssaf").fetchone()[0]
+    n = ligne(con_urssaf.execute("SELECT COUNT(*) FROM economie_emploi_urssaf"))[0]
     assert n > 100_000, f"Trop peu de lignes URSSAF HdF : {n:,}"
 
 
 def test_urssaf_industrie_hdf(con_urssaf):
     """Des lignes GS1 Industrie existent pour HdF avec des effectifs > 0."""
-    n = con_urssaf.execute(
-        "SELECT COUNT(*) FROM economie_emploi_urssaf "
-        "WHERE secteur_gs LIKE '%Industrie%' AND nb_salaries > 0"
-    ).fetchone()[0]
+    n = ligne(
+        con_urssaf.execute(
+            "SELECT COUNT(*) FROM economie_emploi_urssaf "
+            "WHERE secteur_gs LIKE '%Industrie%' AND nb_salaries > 0"
+        )
+    )[0]
     assert n > 0, "Aucune ligne secteur Industrie avec salariés > 0 — vérifier secteur_gs"
 
 
 def test_drees_apl_loaded(con_social):
     """economie_social contient des données APL (DREES chargé)."""
-    n = con_social.execute(
-        "SELECT COUNT(*) FROM economie_social WHERE apl_medecins IS NOT NULL"
-    ).fetchone()[0]
+    n = ligne(
+        con_social.execute("SELECT COUNT(*) FROM economie_social WHERE apl_medecins IS NOT NULL")
+    )[0]
     if n == 0:
         pytest.skip(
             "Données DREES non chargées. Lancer : uv run python scripts/load_economie.py --source drees"
@@ -223,9 +227,9 @@ def test_drees_apl_loaded(con_social):
 
 def test_drees_desert_medical(con_social):
     """Des communes HdF ont desert_medical = TRUE (APL < 2.5)."""
-    n = con_social.execute(
-        "SELECT COUNT(*) FROM economie_social WHERE desert_medical = TRUE"
-    ).fetchone()[0]
+    n = ligne(
+        con_social.execute("SELECT COUNT(*) FROM economie_social WHERE desert_medical = TRUE")
+    )[0]
     if n == 0:
         pytest.skip("Données DREES non chargées — test ignoré.")
     assert n > 50, f"Trop peu de déserts médicaux HdF : {n} (attendu >50)"
@@ -251,14 +255,16 @@ def test_vue_desindustrialisation(con_urssaf):
 @pytest.fixture(scope="module")
 def con_contexte(con) -> duckdb.DuckDBPyConnection:
     """Fixture : passe si economie_contexte existe et contient des données Eurostat."""
-    table_exists = con.execute(
-        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'economie_contexte'"
-    ).fetchone()[0]
+    table_exists = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'economie_contexte'"
+        )
+    )[0]
     if not table_exists:
         pytest.skip(
             "Table economie_contexte absente — relancer load_economie.py pour créer le schéma."
         )
-    n = con.execute("SELECT COUNT(*) FROM economie_contexte").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM economie_contexte"))[0]
     if n == 0:
         pytest.skip(
             "Données Eurostat non chargées. "

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 _DB_PATH = Path(__file__).parent.parent / "data" / "ministere.duckdb"
 
@@ -177,7 +178,7 @@ def test_tableau_region_millesimes(con, annee):
         """,
         [annee],
     ).fetchall()
-    n_pop = con.execute("SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]).fetchone()[0]
+    n_pop = ligne(con.execute("SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]))[0]
     if n_pop == 0:
         pytest.skip(f"Millésime {annee} non chargé")
     assert len(rows) == 18

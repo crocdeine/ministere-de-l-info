@@ -131,7 +131,7 @@ exclude = [".claude", ".venv", "data", "notebooks", "**/__pycache__"]
 venvPath = "."
 venv = ".venv"
 executionEnvironments = [
-    { root = "tests", extraPaths = ["tests", "src"] },
+    { root = "tests", extraPaths = ["tests", "src", "."] },
     { root = "scripts", extraPaths = ["src"] },
     { root = "." },
 ]

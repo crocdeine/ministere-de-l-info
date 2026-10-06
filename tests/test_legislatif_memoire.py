@@ -22,6 +22,7 @@ from types import ModuleType
 import duckdb
 import pytest
 import streamlit as st
+from _helpers import ligne
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -377,10 +378,10 @@ class TestReferentiel:
         create_legislatif_schema(c)
         n1 = populate_groupes_blocs(c)
         n2 = populate_groupes_blocs(c)  # idempotent
-        assert n1 == n2 == c.execute("SELECT COUNT(*) FROM leg_groupes_blocs").fetchone()[0]
-        vides = c.execute(
-            "SELECT COUNT(*) FROM leg_groupes_blocs WHERE TRIM(source_bloc) = ''"
-        ).fetchone()[0]
+        assert n1 == n2 == ligne(c.execute("SELECT COUNT(*) FROM leg_groupes_blocs"))[0]
+        vides = ligne(
+            c.execute("SELECT COUNT(*) FROM leg_groupes_blocs WHERE TRIM(source_bloc) = ''")
+        )[0]
         assert vides == 0
         c.close()
 
@@ -425,10 +426,12 @@ class TestChargement:
         assert "Groupe inventé" in messages
 
     def test_un_mandat_par_depute_datan(self, con: duckdb.DuckDBPyConnection) -> None:
-        n_elus, n_mandats = con.execute(
-            "SELECT (SELECT COUNT(*) FROM leg_elus WHERE chambre = 'AN'), "
-            "(SELECT COUNT(*) FROM leg_mandats WHERE chambre = 'AN')"
-        ).fetchone()
+        n_elus, n_mandats = ligne(
+            con.execute(
+                "SELECT (SELECT COUNT(*) FROM leg_elus WHERE chambre = 'AN'), "
+                "(SELECT COUNT(*) FROM leg_mandats WHERE chambre = 'AN')"
+            )
+        )
         assert n_elus == n_mandats == len(_DEPUTES)
         granularites = con.execute(
             "SELECT DISTINCT granularite FROM leg_mandats WHERE chambre = 'AN'"
@@ -448,11 +451,9 @@ class TestChargement:
         ]
 
     def test_dates_de_fin_non_inventees(self, con: duckdb.DuckDBPyConnection) -> None:
-        n = con.execute(
-            "SELECT COUNT(*) FROM leg_elus WHERE date_fin_mandat IS NOT NULL"
-        ).fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(*) FROM leg_elus WHERE date_fin_mandat IS NOT NULL"))[0]
         assert n == 0
-        n = con.execute("SELECT COUNT(*) FROM leg_mandats WHERE date_fin IS NOT NULL").fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(*) FROM leg_mandats WHERE date_fin IS NOT NULL"))[0]
         assert n == 0
 
     def test_senat_filtre_anterieurs_2002(self, con: duckdb.DuckDBPyConnection) -> None:
@@ -462,9 +463,9 @@ class TestChargement:
         assert not {"H001", "H002", "H003", "H004"} & ids
         assert {"A001", "A002", "A003", "A004", "A005"} <= ids
         assert len(ids) == len(_SENATEURS) - 4
-        n_mandats = con.execute(
-            "SELECT COUNT(*) FROM leg_mandats WHERE chambre = 'SENAT'"
-        ).fetchone()[0]
+        n_mandats = ligne(con.execute("SELECT COUNT(*) FROM leg_mandats WHERE chambre = 'SENAT'"))[
+            0
+        ]
         assert n_mandats == len(ids)
 
     def test_senat_groupes_anterieurs_2002_logges_en_info(
@@ -527,25 +528,27 @@ class TestChargement:
         _creer_meta(c)
         create_legislatif_schema(c)
         load_legislatif_senat(c, raw_dir, inclure_anterieurs_2002=True)
-        n = c.execute("SELECT COUNT(*) FROM leg_elus WHERE chambre = 'SENAT'").fetchone()[0]
+        n = ligne(c.execute("SELECT COUNT(*) FROM leg_elus WHERE chambre = 'SENAT'"))[0]
         c.close()
         assert n == len(_SENATEURS)
 
     def test_rechargement_idempotent(self, con: duckdb.DuckDBPyConnection, raw_dir: Path) -> None:
-        avant = con.execute("SELECT COUNT(*) FROM leg_mandats").fetchone()[0]
+        avant = ligne(con.execute("SELECT COUNT(*) FROM leg_mandats"))[0]
         _charger(con, raw_dir)
-        assert con.execute("SELECT COUNT(*) FROM leg_mandats").fetchone()[0] == avant
+        assert ligne(con.execute("SELECT COUNT(*) FROM leg_mandats"))[0] == avant
 
     def test_vue_elus_actuels_et_alias(self, con: duckdb.DuckDBPyConnection) -> None:
-        n = con.execute("SELECT COUNT(*) FROM v_elus_actuels").fetchone()[0]
-        n_alias = con.execute("SELECT COUNT(*) FROM v_elus_hdf_actuels").fetchone()[0]
-        n_actifs = con.execute("SELECT COUNT(*) FROM leg_elus WHERE est_actif").fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(*) FROM v_elus_actuels"))[0]
+        n_alias = ligne(con.execute("SELECT COUNT(*) FROM v_elus_hdf_actuels"))[0]
+        n_actifs = ligne(con.execute("SELECT COUNT(*) FROM leg_elus WHERE est_actif"))[0]
         assert n == n_alias == n_actifs
         # Nationale : des élus hors HdF sont présents (nom exact de la vue)
-        hors_hdf = con.execute(
-            "SELECT COUNT(*) FROM v_elus_actuels "
-            "WHERE code_departement NOT IN ('02', '59', '60', '62', '80')"
-        ).fetchone()[0]
+        hors_hdf = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM v_elus_actuels "
+                "WHERE code_departement NOT IN ('02', '59', '60', '62', '80')"
+            )
+        )[0]
         assert hors_hdf > 0
 
     def test_override_prime_sur_groupe(self, con: duckdb.DuckDBPyConnection) -> None:
@@ -556,8 +559,8 @@ class TestChargement:
         assert rows == [("21069M", "DIV", "EXD"), ("21085M", "DIV", "EXD")]
 
     def test_vue_sans_doublon(self, con: duckdb.DuckDBPyConnection) -> None:
-        n_vue = con.execute("SELECT COUNT(*) FROM v_mandats_legislatif").fetchone()[0]
-        n_table = con.execute("SELECT COUNT(*) FROM leg_mandats").fetchone()[0]
+        n_vue = ligne(con.execute("SELECT COUNT(*) FROM v_mandats_legislatif"))[0]
+        n_table = ligne(con.execute("SELECT COUNT(*) FROM leg_mandats"))[0]
         assert n_vue == n_table
 
     def test_composition_legislature(self, con: duckdb.DuckDBPyConnection) -> None:
@@ -692,12 +695,10 @@ class TestMigration0008:
         blocs = dict(c.execute("SELECT id, bloc_politique FROM leg_elus").fetchall())
         assert blocs == {"PA1": "GAU", "PA2": "GAU", "S1": "GAU", "S2": "DTE"}
         assert (
-            c.execute("SELECT COUNT(*) FROM leg_elus WHERE date_fin_mandat IS NOT NULL").fetchone()[
-                0
-            ]
+            ligne(c.execute("SELECT COUNT(*) FROM leg_elus WHERE date_fin_mandat IS NOT NULL"))[0]
             == 0
         )
-        assert c.execute("SELECT COUNT(*) FROM v_elus_hdf_actuels").fetchone()[0] == 2
+        assert ligne(c.execute("SELECT COUNT(*) FROM v_elus_hdf_actuels"))[0] == 2
         c.close()
 
 

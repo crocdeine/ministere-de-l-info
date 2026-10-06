@@ -9,6 +9,7 @@ from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 from ministere_de_l_info.etl.legislatif_groupes import populate_groupes_blocs
 from ministere_de_l_info.etl.loaders.legislatif_nuances_ni import (
@@ -182,11 +183,14 @@ def con(parquet: Path, amo: Path) -> Iterator[duckdb.DuckDBPyConnection]:
 
 
 def _mandat(con: duckdb.DuckDBPyConnection, elu_id: str, leg: int) -> tuple[str, str, str]:
-    return con.execute(
-        "SELECT bloc_groupe, bloc_final, source_bloc FROM v_mandats_legislatif "
-        "WHERE elu_id = ? AND legislature = ?",
-        [elu_id, leg],
-    ).fetchone()
+    bloc_groupe, bloc_final, source = ligne(
+        con.execute(
+            "SELECT bloc_groupe, bloc_final, source_bloc FROM v_mandats_legislatif "
+            "WHERE elu_id = ? AND legislature = ?",
+            [elu_id, leg],
+        )
+    )
+    return bloc_groupe, bloc_final, source
 
 
 def test_ni_elue_sous_nuance_fn_classee_exd(con: duckdb.DuckDBPyConnection) -> None:
@@ -246,9 +250,7 @@ def test_accents_perdus_et_code_outre_mer(con: duckdb.DuckDBPyConnection) -> Non
 
 def test_elus_actuels_et_override(con: duckdb.DuckDBPyConnection) -> None:
     def actuel(elu_id: str) -> str:
-        return con.execute(
-            "SELECT bloc_final FROM v_elus_actuels WHERE id = ?", [elu_id]
-        ).fetchone()[0]
+        return ligne(con.execute("SELECT bloc_final FROM v_elus_actuels WHERE id = ?", [elu_id]))[0]
 
     assert actuel("PA4") == "DIV"
     assert actuel("PA6") == "DTE"
@@ -261,8 +263,6 @@ def test_idempotent(con: duckdb.DuckDBPyConnection, parquet: Path, amo: Path) ->
     assert attribuer_nuances_non_inscrits(con, parquet, amo) == 4
     assert con.execute("SELECT * FROM v_mandats_legislatif ORDER BY ALL").fetchall() == avant
     assert (
-        con.execute("SELECT COUNT(*) FROM leg_mandats WHERE nuance_source IS NOT NULL").fetchone()[
-            0
-        ]
+        ligne(con.execute("SELECT COUNT(*) FROM leg_mandats WHERE nuance_source IS NOT NULL"))[0]
         == 6  # 5 NI + PA7 (préfixe homonyme non élu, motif tracé)
     )

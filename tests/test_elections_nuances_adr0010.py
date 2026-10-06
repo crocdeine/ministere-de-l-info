@@ -208,8 +208,9 @@ class TestLot1GrillesOfficielles:
         )
         con.execute("DELETE FROM nuances_harmonisees WHERE nuance = 'LUD' AND annee = 2026")
         populate_nuances_municipales(con)
-        assert _bloc(con, "LCOM", 2026)[0] == "GAU"
-        assert _bloc(con, "LUD", 2026)[0] == "DTE"
+        lcom, lud = _bloc(con, "LCOM", 2026), _bloc(con, "LUD", 2026)
+        assert lcom is not None and lcom[0] == "GAU"
+        assert lud is not None and lud[0] == "DTE"
 
 
 # ── Lot 2 — libellés officiels 2008 et 2014 (archives du ministère) ──────────

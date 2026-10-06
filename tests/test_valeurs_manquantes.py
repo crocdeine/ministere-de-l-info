@@ -42,7 +42,9 @@ def test_metrics_commune_sans_participation_donne_none(monkeypatch: pytest.Monke
         "tour INT, code_commune VARCHAR, bloc VARCHAR, voix INT)"
     )
     monkeypatch.setattr(elections_queries, "_open_ro", lambda: con)
-    m = elections_queries.get_metrics_commune_pres.__wrapped__(2022, 1, "99999")
+    m = elections_queries.get_metrics_commune_pres.__wrapped__(  # pyright: ignore[reportAttributeAccessIssue] # stub Streamlit : CachedFunc sans __wrapped__
+        2022, 1, "99999"
+    )
     assert m["inscrits"] is None
     assert m["votants"] is None
     assert m["exprimes"] is None

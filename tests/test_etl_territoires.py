@@ -7,10 +7,12 @@ Prérequis : lancer au moins une fois :
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -36,7 +38,7 @@ _CODES_REGION_TOUS = _CODES_REGION_METRO | _CODES_REGION_DROM
 
 
 @pytest.fixture(scope="module")
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     if not DB_PATH.exists():
         pytest.skip("ministere.duckdb introuvable — lancer etl_territoires.py d'abord")
     c = duckdb.connect(str(DB_PATH), read_only=True)
@@ -50,7 +52,7 @@ def con() -> duckdb.DuckDBPyConnection:
 
 def test_regions_count(con: duckdb.DuckDBPyConnection) -> None:
     """13 (métro seule) ou 18 (avec DROM) régions chargées."""
-    n = con.execute("SELECT COUNT(*) FROM geographies_regions").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM geographies_regions"))[0]
     assert 13 <= n <= 20, f"Nombre de régions hors fourchette [13-20] : {n}"
 
 
@@ -79,7 +81,7 @@ def test_regions_metadata(con: duckdb.DuckDBPyConnection) -> None:
         "SELECT row_count FROM _etl_metadata WHERE table_name = 'geographies_regions'"
     ).fetchone()
     assert row is not None, "Entrée manquante dans _etl_metadata pour geographies_regions"
-    count_table = con.execute("SELECT COUNT(*) FROM geographies_regions").fetchone()[0]
+    count_table = ligne(con.execute("SELECT COUNT(*) FROM geographies_regions"))[0]
     assert row[0] == count_table, (
         f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
     )
@@ -93,7 +95,7 @@ _CODES_DEPT_ABSENTS = {"975"}  # Saint-Pierre-et-Miquelon — COM, pas dans ADMI
 
 def test_departements_count(con: duckdb.DuckDBPyConnection) -> None:
     """Exactement 101 départements chargés (96 métro + 5 DROM)."""
-    n = con.execute("SELECT COUNT(*) FROM geographies_departements").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM geographies_departements"))[0]
     assert n == 101, f"Attendu exactement 101 départements, obtenu {n}"
 
 
@@ -136,7 +138,7 @@ _TOLERANCE_TYPES = 10
 
 def test_epci_count(con: duckdb.DuckDBPyConnection) -> None:
     """Entre 1 250 et 1 290 EPCI chargés."""
-    n = con.execute("SELECT COUNT(*) FROM geographies_epci").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM geographies_epci"))[0]
     assert 1250 <= n <= 1290, f"Nombre d'EPCI hors fourchette [1250-1290] : {n}"
 
 
@@ -151,7 +153,7 @@ def test_epci_siren_format(con: duckdb.DuckDBPyConnection) -> None:
 
 def test_epci_no_null_types(con: duckdb.DuckDBPyConnection) -> None:
     """Aucun type_epci NULL — toutes les valeurs 'nature' WFS sont mappées."""
-    n = con.execute("SELECT COUNT(*) FROM geographies_epci WHERE type_epci IS NULL").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM geographies_epci WHERE type_epci IS NULL"))[0]
     assert n == 0, f"{n} EPCI avec type_epci NULL — une valeur 'nature' WFS non mappée est apparue"
 
 
@@ -186,7 +188,7 @@ def test_epci_metadata(con: duckdb.DuckDBPyConnection) -> None:
         "SELECT row_count FROM _etl_metadata WHERE table_name = 'geographies_epci'"
     ).fetchone()
     assert row is not None, "Entrée manquante dans _etl_metadata pour geographies_epci"
-    count_table = con.execute("SELECT COUNT(*) FROM geographies_epci").fetchone()[0]
+    count_table = ligne(con.execute("SELECT COUNT(*) FROM geographies_epci"))[0]
     assert row[0] == count_table, (
         f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
     )
@@ -213,7 +215,7 @@ def arm_skip(con: duckdb.DuckDBPyConnection) -> None:
 
 def test_arm_count(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
     """Exactement 45 ARM chargés (Paris 20 + Lyon 9 + Marseille 16)."""
-    n = con.execute("SELECT COUNT(*) FROM geographies_arrondissements_municipaux").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM geographies_arrondissements_municipaux"))[0]
     assert n == 45, f"Attendu exactement 45 ARM, obtenu {n}"
 
 
@@ -261,9 +263,11 @@ def test_arm_communes_meres(con: duckdb.DuckDBPyConnection, arm_skip: None) -> N
 
 def test_arm_no_null_commune_mere(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
     """Aucun code_commune_mere NULL."""
-    n = con.execute(
-        "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere IS NULL"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere IS NULL"
+        )
+    )[0]
     assert n == 0, f"{n} ARM avec code_commune_mere NULL"
 
 
@@ -295,7 +299,7 @@ def test_arm_metadata(con: duckdb.DuckDBPyConnection, arm_skip: None) -> None:
 @pytest.fixture(scope="module")
 def pop_skip(con: duckdb.DuckDBPyConnection) -> None:
     """Passe les tests populations si le millésime 2023 n'a pas encore été chargé."""
-    n = con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023"))[0]
     if n == 0:
         pytest.skip(
             "populations 2023 introuvables — "
@@ -305,7 +309,7 @@ def pop_skip(con: duckdb.DuckDBPyConnection) -> None:
 
 def test_populations_count(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
     """Au moins 34 000 communes chargées pour le millésime 2023."""
-    n = con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023"))[0]
     assert n >= 34000, f"Populations 2023 : {n} lignes (attendu ≥ 34 000)"
 
 
@@ -328,12 +332,14 @@ def test_populations_plm(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None
 
 def test_populations_nulls(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
     """comptee_a_part et totale sont 100 % NULL (PCAP absent de DS_POPULATIONS_HISTORIQUES)."""
-    non_null_ca = con.execute(
-        "SELECT COUNT(*) FROM populations WHERE annee = 2023 AND comptee_a_part IS NOT NULL"
-    ).fetchone()[0]
-    non_null_tot = con.execute(
-        "SELECT COUNT(*) FROM populations WHERE annee = 2023 AND totale IS NOT NULL"
-    ).fetchone()[0]
+    non_null_ca = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM populations WHERE annee = 2023 AND comptee_a_part IS NOT NULL"
+        )
+    )[0]
+    non_null_tot = ligne(
+        con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023 AND totale IS NOT NULL")
+    )[0]
     assert non_null_ca == 0, (
         f"{non_null_ca} lignes avec comptee_a_part non NULL — PCAP ne devrait pas être chargé"
     )
@@ -344,7 +350,7 @@ def test_populations_nulls(con: duckdb.DuckDBPyConnection, pop_skip: None) -> No
 
 def test_view_population_commune_existe(con: duckdb.DuckDBPyConnection, pop_skip: None) -> None:
     """v_population_commune est présente et retourne des lignes pour 2023."""
-    n = con.execute("SELECT COUNT(*) FROM v_population_commune WHERE annee = 2023").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM v_population_commune WHERE annee = 2023"))[0]
     assert n > 0, "v_population_commune vide pour 2023"
 
 
@@ -371,7 +377,7 @@ def test_populations_metadata(con: duckdb.DuckDBPyConnection, pop_skip: None) ->
         "SELECT row_count FROM _etl_metadata WHERE table_name = 'populations_2023'"
     ).fetchone()
     assert row is not None, "Entrée manquante dans _etl_metadata pour populations_2023"
-    count_table = con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023").fetchone()[0]
+    count_table = ligne(con.execute("SELECT COUNT(*) FROM populations WHERE annee = 2023"))[0]
     assert row[0] == count_table, (
         f"row_count _etl_metadata ({row[0]}) ≠ COUNT(*) table ({count_table})"
     )

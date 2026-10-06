@@ -15,6 +15,7 @@ from types import ModuleType
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -55,9 +56,11 @@ def con() -> Iterator[duckdb.DuckDBPyConnection]:
 
 
 def _n_muni(con: duckdb.DuckDBPyConnection) -> int:
-    return con.execute(
-        "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee IN (2008, 2014, 2020, 2026)"
-    ).fetchone()[0]
+    return ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee IN (2008, 2014, 2020, 2026)"
+        )
+    )[0]
 
 
 # ── C2 — populate_elections_referentiels ne doit pas perdre les nuances municipales ──
@@ -65,7 +68,7 @@ def _n_muni(con: duckdb.DuckDBPyConnection) -> int:
 
 class TestC2ReferentielsConserventMunicipales:
     def test_referentiel_contient_les_trois_jeux(self, con: duckdb.DuckDBPyConnection) -> None:
-        n_total = con.execute("SELECT COUNT(*) FROM nuances_harmonisees").fetchone()[0]
+        n_total = ligne(con.execute("SELECT COUNT(*) FROM nuances_harmonisees"))[0]
         assert n_total == len(_NUANCES_PRES) + len(_NUANCES_LEGI) + len(_NUANCES_MUNI)
         assert _n_muni(con) == _N_MUNI
 
@@ -95,9 +98,9 @@ class TestC2ReferentielsConserventMunicipales:
         assert not annees_muni & annees_pres_legi
 
     def test_codes_sans_mapping_absents(self, con: duckdb.DuckDBPyConnection) -> None:
-        n = con.execute(
-            "SELECT COUNT(*) FROM nuances_harmonisees WHERE nuance IN ('NC', 'LNC')"
-        ).fetchone()[0]
+        n = ligne(
+            con.execute("SELECT COUNT(*) FROM nuances_harmonisees WHERE nuance IN ('NC', 'LNC')")
+        )[0]
         assert n == 0
 
     def test_script_loader_reutilise_la_liste_centrale(self) -> None:
@@ -116,9 +119,11 @@ def _bloc(con: duckdb.DuckDBPyConnection, nuance: str, annee: int) -> tuple | No
 
 
 def _n_hors_muni(con: duckdb.DuckDBPyConnection) -> int:
-    return con.execute(
-        "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee NOT IN (2008, 2014, 2020, 2026)"
-    ).fetchone()[0]
+    return ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee NOT IN (2008, 2014, 2020, 2026)"
+        )
+    )[0]
 
 
 class TestC3NuancesMunicipalesCorrectrices:
@@ -317,12 +322,14 @@ class TestC1VueListesUneLigneParListe:
         par ses descripteurs (libellé, tête de liste)."""
         rows = _listes(con_listes, 2008, "59599")
         assert [(r[0], r[3]) for r in rows] == [("ALPHA", 350), ("BETA", 300), ("GAMMA", 250)]
-        n_panneau = con_listes.execute(
-            "SELECT COUNT(no_panneau) FROM v_listes_commune_muni WHERE annee = 2008"
-        ).fetchone()[0]
+        n_panneau = ligne(
+            con_listes.execute(
+                "SELECT COUNT(no_panneau) FROM v_listes_commune_muni WHERE annee = 2008"
+            )
+        )[0]
         assert n_panneau == 0
 
     def test_total_voix_conserve(self, con_listes: duckdb.DuckDBPyConnection) -> None:
-        total_vue = con_listes.execute("SELECT SUM(voix) FROM v_listes_commune_muni").fetchone()[0]
+        total_vue = ligne(con_listes.execute("SELECT SUM(voix) FROM v_listes_commune_muni"))[0]
         total_table = sum(t[-1] for t in _CANDIDATS_MUNI)
         assert total_vue == total_table
