@@ -1,24 +1,47 @@
 #!/usr/bin/env bash
 #
-# Prépare la DB DuckDB pour publication sur GitHub Releases.
-# Compresse data/ministere.duckdb, génère le SHA256, affiche la commande gh.
+# Prépare la DB DuckDB pour publication sur une release GitHub.
+# Compresse data/ministere.duckdb, génère l'empreinte SHA256, affiche la commande gh.
 #
-# Usage : ./scripts/publish_db.sh
+# Usage : ./scripts/publish_db.sh [tag-de-release]
+#   ex.  : ./scripts/publish_db.sh v0.6-description
 #
-# Le script N'exécute PAS gh release create — la publication reste manuelle.
-# Format du tag : db-YYYY-MM (ex: db-2026-05)
+# Le script N'exécute PAS gh — la publication reste manuelle.
+#
+# Convention d'empreinte (partagée avec deploy/install.sh, deploy/update.sh,
+# scripts/download_db.sh — voir deploy/README-deploy.md) :
+#   ministere.duckdb.gz.sha256 = SHA256 du fichier COMPRESSÉ, au format
+#   « <hash>  ministere.duckdb.gz » (nom de fichier sans chemin, vérifiable
+#   par `shasum -a 256 -c ministere.duckdb.gz.sha256` dans le dossier de l'archive).
 
 set -euo pipefail
 
 REPO="crocdeine/ministere-de-l-info"
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DATA_DIR="$REPO_DIR/data"
-DB_FILE="$DATA_DIR/ministere.duckdb"
-GZ_FILE="$DATA_DIR/ministere.duckdb.gz"
-SHA_FILE="$DATA_DIR/ministere.duckdb.gz.sha256"
-MAX_SIZE_BYTES=$((2 * 1024 * 1024 * 1024))  # 2 GB = limite GitHub Releases
+DB_NAME="ministere.duckdb"
+GZ_NAME="$DB_NAME.gz"
+SHA_NAME="$GZ_NAME.sha256"
+DB_FILE="$DATA_DIR/$DB_NAME"
+GZ_FILE="$DATA_DIR/$GZ_NAME"
+SHA_FILE="$DATA_DIR/$SHA_NAME"
+MAX_SIZE_BYTES=$((2 * 1024 * 1024 * 1024))  # 2 Go = limite d'un asset de release GitHub
+TAG="${1:-<tag-de-release>}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+file_size() {
+    # macOS : stat -f%z ; Linux : stat -c%s
+    stat -f%z "$1" 2>/dev/null || stat -c%s "$1"
+}
 
 # Vérifier que la DB source existe
 if [ ! -f "$DB_FILE" ]; then
@@ -30,68 +53,56 @@ fi
 DB_SIZE=$(du -h "$DB_FILE" | cut -f1)
 log "DB source : $DB_FILE ($DB_SIZE)"
 
-# Compresser
+# Compresser (-n : sans nom ni horodatage dans l'en-tête → archive reproductible)
 log "Compression gzip..."
-gzip -kf "$DB_FILE"
+gzip -n -c "$DB_FILE" > "$GZ_FILE.tmp"
+mv -f "$GZ_FILE.tmp" "$GZ_FILE"
 
 GZ_SIZE=$(du -h "$GZ_FILE" | cut -f1)
 log "Compressé : $GZ_FILE ($GZ_SIZE)"
 
-# Ratio de compression
-if command -v python3 &>/dev/null; then
-    python3 -c "
-import os
-orig = os.path.getsize('$DB_FILE')
-comp = os.path.getsize('$GZ_FILE')
-ratio = orig / comp
-print(f'Ratio de compression : {ratio:.1f}x ({orig // 1024 // 1024} MB → {comp // 1024 // 1024} MB)')
-"
-fi
+ORIG_BYTES=$(file_size "$DB_FILE")
+GZ_BYTES=$(file_size "$GZ_FILE")
+log "Taille : $((ORIG_BYTES / 1024 / 1024)) Mo → $((GZ_BYTES / 1024 / 1024)) Mo"
 
-# Vérifier la limite GitHub Releases (2 GB)
-if command -v stat &>/dev/null; then
-    # macOS: stat -f%z, Linux: stat -c%s
-    GZ_BYTES=$(stat -f%z "$GZ_FILE" 2>/dev/null || stat -c%s "$GZ_FILE")
-    if [ "$GZ_BYTES" -gt "$MAX_SIZE_BYTES" ]; then
-        echo "ERREUR : fichier compressé ($GZ_BYTES bytes) dépasse la limite GitHub (2 GB)" >&2
-        rm -f "$GZ_FILE"
-        exit 2
-    fi
-    log "Taille OK (< 2 GB limite GitHub Releases)"
+# Vérifier la limite GitHub Releases (2 Go)
+if [ "$GZ_BYTES" -gt "$MAX_SIZE_BYTES" ]; then
+    echo "ERREUR : fichier compressé ($GZ_BYTES octets) dépasse la limite GitHub (2 Go)" >&2
+    rm -f "$GZ_FILE"
+    exit 2
 fi
+log "Taille OK (< 2 Go, limite GitHub Releases)"
 
-# Générer le SHA256
-log "Génération SHA256..."
-if command -v sha256sum &>/dev/null; then
-    sha256sum "$GZ_FILE" > "$SHA_FILE"
-else
-    shasum -a 256 "$GZ_FILE" > "$SHA_FILE"
-fi
-SHA=$(awk '{print $1}' "$SHA_FILE")
+# Générer l'empreinte du fichier COMPRESSÉ, nom de fichier sans chemin
+log "Génération SHA256 (archive compressée)..."
+SHA=$(sha256_of "$GZ_FILE")
+printf '%s  %s\n' "$SHA" "$GZ_NAME" > "$SHA_FILE"
 log "SHA256 : $SHA"
 log "Fichier checksum : $SHA_FILE"
 
-# Tag suggéré
-TAG="db-$(date '+%Y-%m')"
+# Auto-vérification : l'archive se décompresse et restitue la base à l'identique
+log "Auto-vérification (intégrité gzip + contenu)..."
+gzip -t "$GZ_FILE"
+if [ "$(gunzip -c "$GZ_FILE" | sha256_of /dev/stdin)" != "$(sha256_of "$DB_FILE")" ]; then
+    echo "ERREUR : l'archive ne restitue pas la base à l'identique" >&2
+    exit 3
+fi
+log "Auto-vérification OK"
 
-# Afficher la commande à exécuter
 echo ""
 echo "========================================================"
-echo " Commande gh release create à exécuter manuellement :"
+echo " Commande à exécuter manuellement (release existante) :"
 echo "========================================================"
 echo ""
-echo "gh release create $TAG \\"
-echo "  --repo $REPO \\"
-echo "  --title 'DB $TAG — $(date '+%Y-%m-%d')' \\"
-echo "  --notes 'Base DuckDB : régions, départements, EPCI, communes, arrondissements, circonscriptions, populations 2013/2018/2023' \\"
-echo "  '$GZ_FILE#ministere.duckdb.gz' \\"
-echo "  '$SHA_FILE#ministere.duckdb.gz.sha256'"
+echo "gh release upload $TAG \\"
+echo "  --repo $REPO --clobber \\"
+echo "  '$GZ_FILE' \\"
+echo "  '$SHA_FILE'"
 echo ""
-echo "Fichiers créés :"
-echo "  $GZ_FILE"
-echo "  $SHA_FILE"
+echo "Vérification après publication (le digest GitHub de l'asset .gz doit valoir sha256:$SHA) :"
+echo "  gh release view $TAG --repo $REPO --json assets"
 echo ""
 echo "Nettoyer après publication :"
-echo "  rm -f $GZ_FILE $SHA_FILE"
+echo "  rm -f '$GZ_FILE' '$SHA_FILE'"
 
 exit 0

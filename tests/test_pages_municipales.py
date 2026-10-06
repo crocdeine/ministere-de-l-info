@@ -10,11 +10,13 @@ Prérequis : DB chargée (load_elections_municipales.py + 0007_add_municipales_v
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import polars as pl
 import pytest
+from _helpers import ligne
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
@@ -39,13 +41,13 @@ _PETITE_COMMUNE_2026 = "59001"  # Abancourt — population << 3500 hab
 
 
 @pytest.fixture(scope="module")
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     if not DB_PATH.exists():
         pytest.skip("DB absente. Lancer load_elections_municipales.py")
     c = duckdb.connect(str(DB_PATH), read_only=True)
-    n = c.execute(
-        "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%'"
-    ).fetchone()[0]
+    n = ligne(
+        c.execute("SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%'")
+    )[0]
     if n == 0:
         pytest.skip("Municipales non chargées. Lancer load_elections_municipales.py")
     yield c
@@ -58,9 +60,11 @@ def db_ready() -> bool:
         pytest.skip("DB absente")
     con = duckdb.connect(str(DB_PATH), read_only=True)
     try:
-        n = con.execute(
-            "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%'"
-        ).fetchone()[0]
+        n = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%'"
+            )
+        )[0]
         if n == 0:
             pytest.skip("Municipales non chargées")
         return True
@@ -75,32 +79,34 @@ class TestVuesSQL:
     """Vérifications directes sur les 3 vues créées en D3.2."""
 
     def test_v_scores_commune_muni_non_vide(self, con):
-        n = con.execute("SELECT COUNT(*) FROM v_scores_commune_muni").fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(*) FROM v_scores_commune_muni"))[0]
         assert n > 0
 
     def test_v_scores_commune_muni_bloc_null_present(self, con):
-        n = con.execute("SELECT COUNT(*) FROM v_scores_commune_muni WHERE bloc IS NULL").fetchone()[
-            0
-        ]
+        n = ligne(con.execute("SELECT COUNT(*) FROM v_scores_commune_muni WHERE bloc IS NULL"))[0]
         assert n > 0, "Aucune ligne avec bloc NULL — LEFT JOIN probablement rompu"
 
     def test_v_evolution_blocs_hdf_muni_huit_scrutins(self, con):
-        n = con.execute(
-            "SELECT COUNT(DISTINCT annee || '_t' || CAST(tour AS VARCHAR)) "
-            "FROM v_evolution_blocs_hdf_muni"
-        ).fetchone()[0]
+        n = ligne(
+            con.execute(
+                "SELECT COUNT(DISTINCT annee || '_t' || CAST(tour AS VARCHAR)) "
+                "FROM v_evolution_blocs_hdf_muni"
+            )
+        )[0]
         assert n == 8, f"Attendu 8 scrutins dans v_evolution, trouvé {n}"
 
     def test_v_listes_commune_muni_non_vide(self, con):
-        n = con.execute("SELECT COUNT(*) FROM v_listes_commune_muni").fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(*) FROM v_listes_commune_muni"))[0]
         assert n > 0
 
     def test_pct_exprimes_null_pour_bloc_null(self, con):
         """Cohérence D3.2 : pct_exprimes = NULL quand bloc = NULL."""
-        n = con.execute(
-            "SELECT COUNT(*) FROM v_scores_commune_muni "
-            "WHERE bloc IS NULL AND pct_exprimes IS NOT NULL"
-        ).fetchone()[0]
+        n = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM v_scores_commune_muni "
+                "WHERE bloc IS NULL AND pct_exprimes IS NOT NULL"
+            )
+        )[0]
         assert n == 0, f"{n} lignes avec bloc NULL et pct non NULL — incohérence"
 
     def test_documentation_lacune_source_2008(self, con):
@@ -110,12 +116,14 @@ class TestVuesSQL:
         de la source data.gouv.fr pour les municipales 2008. Voir ADR-0005
         § "Limitation de la source data.gouv.fr 2008".
         """
-        n_communes_59 = con.execute("""
+        n_communes_59 = ligne(
+            con.execute("""
             SELECT COUNT(DISTINCT code_commune)
             FROM resultats_candidats
             WHERE id_election = '2008_muni_t1'
             AND code_departement = '59'
-        """).fetchone()[0]
+        """)
+        )[0]
         # Seules Seclin (59560) et Pérenchies (59457) sont dans le Parquet 2008
         assert n_communes_59 == 2, (
             f"Lacune source 2008 dept 59 : attendu 2, trouvé {n_communes_59}. "

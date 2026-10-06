@@ -7,9 +7,14 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._blocs_politiques import couleurs_traits, legende_classement_blocs
+from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
+from ministere_de_l_info.sources import mention
+from ministere_de_l_info.viz._display import fmt_nd
 from ministere_de_l_info.viz.elections_queries import (
     _BLOCS_ORDERED,
     DB_PATH,
+    format_pct_fr,
     get_blocs_meta,
     get_bounds,
     get_bv_details_pres,
@@ -20,6 +25,7 @@ from ministere_de_l_info.viz.elections_queries import (
     get_participation_communes,
     get_scores_communes,
     is_data_loaded,
+    taux_participation_agrege,
 )
 from ministere_de_l_info.viz.maps_elections import (
     make_choropleth_elections_bloc_dominant,
@@ -28,8 +34,8 @@ from ministere_de_l_info.viz.maps_elections import (
 
 _ANNEES: list[int] = [2002, 2007, 2012, 2017, 2022]
 _ZONES: dict[str, str] = {
-    "circo21": "Circo 21 — Valenciennes (20 communes)",
-    "hdf": "Hauts-de-France entière ⚠️ lent",
+    "circo21": "21e circonscription du Nord — Valenciennes (20 communes)",
+    "hdf": "Hauts-de-France entière (chargement plus long)",
 }
 _MODES_CARTE: list[str] = ["Bloc dominant", "Score d'un bloc"]
 
@@ -38,16 +44,14 @@ def render() -> None:
     """Vue Streamlit pour les présidentielles HdF 2002-2022."""
     # DB path vérifiée dans l'entrée page — ici on vérifie uniquement les données
     if not DB_PATH.exists():
-        st.error(
-            "Base de données absente. Lancez d'abord :\n\n"
-            "```bash\nuv run python scripts/init_elections_schema.py\n```"
-        )
+        render_donnees_indisponibles("électorales", base_absente=True)
         return
 
     if not is_data_loaded():
-        st.warning(
-            "Données électorales non chargées. Lancez :\n\n"
-            "```bash\nuv run python scripts/load_elections_presidentielles.py\n```"
+        render_donnees_indisponibles(
+            "des présidentielles",
+            base_absente=False,
+            commande_dev="uv run python scripts/load_elections_presidentielles.py",
         )
         return
 
@@ -57,13 +61,23 @@ def render() -> None:
     bloc_codes: list[str] = [b[0] for b in blocs_meta]
 
     # ── Sélecteurs ──────────────────────────────────────────────────────────────
+    # `index=` explicite partout (en plus de `key=`) : évite qu'un widget recréé
+    # après réouverture de l'onglet (onglets paresseux) affiche transitoirement
+    # son option par défaut alors que la donnée utilisée reste correcte (cf.
+    # `_theme.index_persiste`).
     c1, c2, c3, c4 = st.columns([2, 1, 2, 2])
     with c1:
-        annee: int = st.selectbox("Année", _ANNEES, index=len(_ANNEES) - 1, key="pres_annee")  # type: ignore[assignment]
+        annee: int = st.selectbox(  # type: ignore[assignment]
+            "Année",
+            _ANNEES,
+            index=index_persiste("pres_annee", _ANNEES, len(_ANNEES) - 1),
+            key="pres_annee",
+        )
     with c2:
         tour: int = st.radio(  # type: ignore[assignment]
             "Tour",
             [1, 2],
+            index=index_persiste("pres_tour", [1, 2]),
             format_func=lambda x: "1er" if x == 1 else "2e",
             horizontal=True,
             key="pres_tour",
@@ -72,16 +86,23 @@ def render() -> None:
         zone: str = st.radio(  # type: ignore[assignment]
             "Zone",
             list(_ZONES),
+            index=index_persiste("pres_zone", list(_ZONES)),
             format_func=lambda x: _ZONES[x],
             key="pres_zone",
         )
     with c4:
-        mode_carte: str = st.radio("Mode de carte", _MODES_CARTE, key="pres_mode_carte")  # type: ignore[assignment]
+        mode_carte: str = st.radio(  # type: ignore[assignment]
+            "Mode de carte",
+            _MODES_CARTE,
+            index=index_persiste("pres_mode_carte", _MODES_CARTE),
+            key="pres_mode_carte",
+        )
         bloc_sel: str = bloc_codes[3]
         if mode_carte == "Score d'un bloc":
             bloc_sel = st.selectbox(  # type: ignore[assignment]
                 "Bloc",
                 bloc_codes,
+                index=index_persiste("pres_bloc_sel", bloc_codes, 3),
                 format_func=lambda x: f"{x} — {libelles[x]}",
                 key="pres_bloc_sel",
             )
@@ -103,7 +124,7 @@ def render() -> None:
     # ── Métriques ────────────────────────────────────────────────────────────────
     n_communes = scores_df["code_commune"].n_unique()
     inscrits_tot = int(part_df["inscrits"].sum()) if not part_df.is_empty() else 0
-    taux_moy = float(part_df["taux_participation_pct"].mean()) if not part_df.is_empty() else 0.0
+    taux_zone = taux_participation_agrege(part_df)
     bloc_zone = (
         scores_df.group_by("bloc")
         .agg(pl.sum("voix").alias("voix_total"))
@@ -112,16 +133,16 @@ def render() -> None:
     )
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Communes", f"{n_communes:,}")
+    m1.metric("Communes", f"{n_communes:,}".replace(",", " "))
     m2.metric("Inscrits", f"{inscrits_tot:,}".replace(",", " "))
-    m3.metric("Participation", f"{taux_moy:.1f} %")
+    m3.metric(
+        "Participation",
+        format_pct_fr(taux_zone),
+        help="Total des votants divisé par le total des inscrits de la zone.",
+    )
     m4.metric("Bloc majoritaire", libelles.get(bloc_zone, "—"))
 
-    st.caption(
-        "Source : data.gouv.fr — Données des élections agrégées. "
-        "Classement des blocs : nomenclature officielle Ministère de l'Intérieur "
-        "(voir docs/sources-officielles/nuances/)."
-    )
+    st.caption(f"Source : {mention('elections')}. " + legende_classement_blocs("pres", annee))
 
     # ── Carte ───────────────────────────────────────────────────────────────────
     st.subheader(f"Carte — {annee}, {'1er' if tour == 1 else '2e'} tour")
@@ -142,7 +163,7 @@ def render() -> None:
                 bounds,
                 f"Score {bloc_sel}",
             )
-        st_folium(carte, width="100%", height=600, returned_objects=[])
+        st_folium(carte, width="100%", height=600, returned_objects=[])  # pyright: ignore[reportArgumentType] # stub streamlit-folium : width typé int, '100%' accepté
     except Exception as exc:
         st.error(f"Erreur carte : {exc}")
 
@@ -155,13 +176,15 @@ def render() -> None:
         tour_evol: int = st.radio(  # type: ignore[assignment]
             "Tour (évolution)",
             [1, 2],
+            index=index_persiste("pres_tour_evol", [1, 2]),
             format_func=lambda x: "1er" if x == 1 else "2e",
             horizontal=True,
             key="pres_tour_evol",
         )
         mode_evol: str = st.radio(  # type: ignore[assignment]
             "Unité",
-            ["Voix totales", "Part des exprimés (%)"],
+            ["Part des exprimés (%)", "Voix totales"],
+            index=index_persiste("pres_mode_evol", ["Part des exprimés (%)", "Voix totales"]),
             horizontal=False,
             key="pres_mode_evol",
         )
@@ -186,7 +209,7 @@ def render() -> None:
         x="annee",
         y=y_col,
         color="bloc",
-        color_discrete_map=couleurs,
+        color_discrete_map=couleurs_traits(couleurs),
         category_orders={"bloc": bloc_codes},
         markers=True,
         labels={"annee": "Année", y_col: y_label, "bloc": "Bloc"},
@@ -197,7 +220,9 @@ def render() -> None:
         height=380,
         margin={"t": 30, "b": 30},
     )
-    fig.update_traces(hovertemplate="<b>%{x}</b><br>%{y:,.0f}<extra>%{fullData.name}</extra>")
+    fig.update_layout(separators=", ")
+    fmt_y = "%{y:.1f} %" if y_col == "pct" else "%{y:,.0f} voix"
+    fig.update_traces(hovertemplate=f"<b>%{{x}}</b><br>{fmt_y}<extra>%{{fullData.name}}</extra>")
     with ev_right:
         st.plotly_chart(fig, width="stretch")
 
@@ -227,7 +252,8 @@ def render() -> None:
             how="left",
         )
         .join(dominant_df, on="code_commune", how="left")
-        .fill_null(0)
+        # voix de bloc absentes = 0 ; inscrits/exprimés/taux absents restent NULL (n.d.)
+        .with_columns(pl.col(c).fill_null(0) for c in bloc_codes if c in pivot.columns)
     )
 
     blocs_disponibles = sorted(
@@ -264,7 +290,14 @@ def render() -> None:
         .sort("Commune")
     )
 
-    st.dataframe(table_display, width="stretch", hide_index=True, height=400)
+    st.dataframe(
+        table_display.to_pandas().style.format(
+            {"Particip. %": "{:.1f}"}, precision=0, thousands=" ", na_rep="n.d."
+        ),
+        width="stretch",
+        hide_index=True,
+        height=400,
+    )
 
     csv_bytes = table_display.write_csv().encode("utf-8")
     st.download_button(
@@ -277,7 +310,7 @@ def render() -> None:
 
     # ── Section drill-down BV ────────────────────────────────────────────────────
     st.divider()
-    st.subheader("🔍 Détail par bureau de vote")
+    st.subheader("Détail par bureau de vote")
 
     communes_list = get_communes_hdf_pres(annee, tour)
     commune_options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes_list]
@@ -285,7 +318,7 @@ def render() -> None:
     commune_selected: str = st.selectbox(  # type: ignore[assignment]
         "Commune",
         commune_options,
-        index=0,
+        index=index_persiste("pres_drilldown_commune", commune_options, 0),
         key="pres_drilldown_commune",
         help="Choisir une commune pour afficher le détail par bureau de vote.",
     )
@@ -298,10 +331,10 @@ def render() -> None:
         st.caption(f"Commune sélectionnée : **{nom_commune}** ({code_commune})")
 
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Inscrits", f"{metrics['inscrits']:,}".replace(",", " "))
-        m2.metric("Votants", f"{metrics['votants']:,}".replace(",", " "))
-        m3.metric("Participation", f"{metrics['taux_participation_pct']:.1f} %")
-        m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "—"))
+        m1.metric("Inscrits", fmt_nd(metrics["inscrits"]))
+        m2.metric("Votants", fmt_nd(metrics["votants"]))
+        m3.metric("Participation", fmt_nd(metrics["taux_participation_pct"], ".1f", " %"))
+        m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "n.d."))
 
         bv_df = get_bv_details_pres(annee, tour, code_commune)
         if bv_df.is_empty():
@@ -331,7 +364,7 @@ def render() -> None:
             for col in ["Inscrits", "Votants", "Exprimés"] + list(_BLOCS_ORDERED):
                 fmt[col] = "{:,}"
             st.dataframe(
-                bv_display.to_pandas().style.format(fmt),
+                bv_display.to_pandas().style.format(fmt, na_rep="n.d."),  # pyright: ignore[reportArgumentType] # stub pandas : ExtFormatter n'admet pas les formats str
                 width="stretch",
                 hide_index=True,
                 height=400,

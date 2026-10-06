@@ -7,6 +7,7 @@ from pathlib import Path
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.data_sources.geo import fetch_admin_express
 from ministere_de_l_info.etl._common import upsert_metadata
 
@@ -82,10 +83,10 @@ def load_communes(
                 END AS geometry_simplified_communal
             FROM ST_Read('{path_sql}')
         """)
-        running = con.execute("SELECT COUNT(*) FROM geographies_communes").fetchone()[0]
+        running = ligne_unique(con.execute("SELECT COUNT(*) FROM geographies_communes"))[0]
         logger.info("Batch %s inséré — %d communes cumulées", batch_path.name, running)
 
-    count = con.execute("SELECT COUNT(*) FROM geographies_communes").fetchone()[0]
+    count = ligne_unique(con.execute("SELECT COUNT(*) FROM geographies_communes"))[0]
     if not (34000 <= count <= 36000):
         raise RuntimeError(
             f"Nombre de communes hors fourchette [34000-36000] : {count}. "

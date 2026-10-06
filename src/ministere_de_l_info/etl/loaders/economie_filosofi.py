@@ -24,6 +24,7 @@ from pathlib import Path
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ def load_economie_filosofi(
         HAVING code_com IS NOT NULL
     """)
 
-    count = con.execute("SELECT COUNT(*) FROM economie_filosofi").fetchone()[0]
+    count = ligne_unique(con.execute("SELECT COUNT(*) FROM economie_filosofi"))[0]
     logger.info("economie_filosofi : %d lignes au total.", count)
 
     rows_by_year = con.execute(

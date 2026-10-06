@@ -15,6 +15,7 @@ from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
@@ -32,7 +33,7 @@ def con() -> duckdb.DuckDBPyConnection:
     tables = [r[0] for r in c.execute("SHOW TABLES").fetchall()]
     if "leg_elus" not in tables:
         pytest.skip("Table leg_elus absente.")
-    n = c.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'").fetchone()[0]
+    n = ligne(c.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'"))[0]
     if n == 0:
         pytest.skip(
             "Sénat non chargé. Lancer : uv run python scripts/load_legislatif.py --source senat"
@@ -46,34 +47,38 @@ def con() -> duckdb.DuckDBPyConnection:
 
 
 def test_senat_data_loaded(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'"))[0]
     assert n > 0, "Aucun sénateur chargé"
 
 
 def test_senat_national_total(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'"))[0]
     assert n > 500, f"Attendu >500 sénateurs (actifs + anciens), trouvé {n}"
 
 
 def test_senat_actifs_national(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND est_actif = TRUE"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND est_actif = TRUE")
+    )[0]
     assert n >= 300, f"Attendu ≥300 sénateurs actifs (France entière), trouvé {n}"
 
 
 def test_senat_28_actifs_hdf(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND est_actif = TRUE "
-        f"AND code_departement IN {_DEPTS_HDF!r}"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND est_actif = TRUE "
+            f"AND code_departement IN {_DEPTS_HDF!r}"
+        )
+    )[0]
     assert n == 28, f"Attendu 28 sénateurs actifs HdF, trouvé {n}"
 
 
 def test_senat_anciens_inclus(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND est_actif = FALSE"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND est_actif = FALSE"
+        )
+    )[0]
     assert n >= 100, f"Attendu ≥100 anciens sénateurs, trouvé {n}"
 
 
@@ -106,16 +111,20 @@ def test_mapping_blocs_senat(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_senat_chambre_value(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND chambre != 'SENAT'"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND chambre != 'SENAT'"
+        )
+    )[0]
     assert n == 0, f"{n} lignes Sénat avec chambre != 'SENAT'"
 
 
 def test_senat_no_num_circo(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND num_circo IS NOT NULL"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND num_circo IS NOT NULL"
+        )
+    )[0]
     assert n == 0, f"Sénat ne doit pas avoir num_circo, trouvé {n} lignes"
 
 
@@ -125,7 +134,7 @@ def test_senat_no_num_circo(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_datan_data_loaded(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'datan'").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'datan'"))[0]
     if n == 0:
         pytest.skip(
             "Datan non chargé. Lancer : uv run python scripts/load_legislatif.py --source datan"
@@ -134,9 +143,9 @@ def test_datan_data_loaded(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_datan_577_actifs(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'datan' AND est_actif = TRUE"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'datan' AND est_actif = TRUE")
+    )[0]
     if n == 0:
         pytest.skip("Datan non chargé")
     assert n == 577, f"Attendu 577 actifs (17e), trouvé {n}"
@@ -171,27 +180,31 @@ def test_datan_blocs_valides(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_datan_chambre_value(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'datan' AND chambre != 'AN'"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'datan' AND chambre != 'AN'")
+    )[0]
     assert n == 0, f"{n} lignes Datan avec chambre != 'AN'"
 
 
 def test_datan_scores_presents(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_activite WHERE source = 'datan' "
-        "AND score_participation IS NOT NULL"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM leg_activite WHERE source = 'datan' "
+            "AND score_participation IS NOT NULL"
+        )
+    )[0]
     if n == 0:
         pytest.skip("Datan non chargé ou scores absents")
     assert n > 500, f"Attendu >500 scores participation, trouvé {n}"
 
 
 def test_datan_filtre_hdf_applicable(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'datan' AND est_actif = TRUE "
-        f"AND code_departement IN {_DEPTS_HDF!r}"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM leg_elus WHERE source = 'datan' AND est_actif = TRUE "
+            f"AND code_departement IN {_DEPTS_HDF!r}"
+        )
+    )[0]
     if n == 0:
         pytest.skip("Datan non chargé")
     # HdF = 5 dpts × 10-12 circonscriptions chacun = ~57 actifs attendus
@@ -204,7 +217,7 @@ def test_datan_filtre_hdf_applicable(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_overrides_appliques(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute("SELECT COUNT(*) FROM leg_blocs_override").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM leg_blocs_override"))[0]
     assert n >= 2, f"Attendu ≥2 overrides (Hochart + Szczurek), trouvé {n}"
 
 
@@ -219,18 +232,93 @@ def test_overrides_hochart_szczurek(con: duckdb.DuckDBPyConnection) -> None:
     assert "21069M" in matricules, "Override Szczurek (21069M) manquant"
 
 
-def test_vue_elus_hdf_actuels(con: duckdb.DuckDBPyConnection) -> None:
-    n = con.execute("SELECT COUNT(*) FROM v_elus_hdf_actuels").fetchone()[0]
-    assert n >= 28, f"Vue v_elus_hdf_actuels : attendu ≥28, trouvé {n}"
+def test_vue_elus_actuels(con: duckdb.DuckDBPyConnection) -> None:
+    n = ligne(con.execute("SELECT COUNT(*) FROM v_elus_actuels"))[0]
+    assert n >= 900, f"Vue v_elus_actuels (nationale) : attendu ≥900, trouvé {n}"
+    n_alias = ligne(con.execute("SELECT COUNT(*) FROM v_elus_hdf_actuels"))[0]
+    assert n_alias == n, "L'alias v_elus_hdf_actuels doit renvoyer v_elus_actuels"
+
+
+def _exige_leg_mandats(con: duckdb.DuckDBPyConnection) -> None:
+    tables = {r[0] for r in con.execute("SHOW TABLES").fetchall()}
+    if "leg_mandats" not in tables:
+        pytest.skip("leg_mandats absente : appliquer la migration 0008 ou recharger (ADR-0011)")
+
+
+def test_aucun_mandat_non_classe(con: duckdb.DuckDBPyConnection) -> None:
+    """ADR-0011 : tout mandat du périmètre doit avoir un groupe classé.
+
+    Hors contrôle (addendum 2026-09-25) : mandats « sans groupe » (groupe NULL dans la
+    source) et groupes du Sénat disparus avant 2002 (normalement écartés au chargement).
+    Tout autre groupe sans bloc — y compris un groupe inconnu futur — fait échouer le test.
+    """
+    from ministere_de_l_info.etl.legislatif_groupes import est_groupe_senat_anterieur_2002
+
+    _exige_leg_mandats(con)
+    rows = con.execute(
+        "SELECT chambre, groupe_sigle, legislature, COUNT(*) FROM v_mandats_legislatif "
+        "WHERE bloc_groupe IS NULL AND NULLIF(groupe_sigle, '') IS NOT NULL "
+        "GROUP BY ALL ORDER BY 4 DESC"
+    ).fetchall()
+    dans_perimetre = [
+        r for r in rows if not (r[0] == "SENAT" and est_groupe_senat_anterieur_2002(r[1]))
+    ]
+    assert dans_perimetre == [], (
+        f"Groupes non classés (compléter etl/legislatif_groupes.py) : {dans_perimetre}"
+    )
+
+
+def test_senat_groupes_anterieurs_2002_exclus(con: duckdb.DuckDBPyConnection) -> None:
+    """Addendum ADR-0011 : aucun mandat Sénat dans un groupe disparu avant 2002."""
+    from ministere_de_l_info.etl.legislatif_groupes import est_groupe_senat_anterieur_2002
+
+    _exige_leg_mandats(con)
+    rows = con.execute(
+        "SELECT groupe_sigle, COUNT(*) FROM leg_mandats "
+        "WHERE chambre = 'SENAT' AND groupe_sigle IS NOT NULL GROUP BY 1"
+    ).fetchall()
+    anterieurs = [(g, n) for g, n in rows if est_groupe_senat_anterieur_2002(g)]
+    assert anterieurs == [], (
+        "Sénateurs hors périmètre encore chargés, recharger : "
+        f"uv run python scripts/load_legislatif.py --source senat ({anterieurs})"
+    )
+
+
+def test_mandats_sans_groupe_comptes(con: duckdb.DuckDBPyConnection) -> None:
+    """Mandats « sans groupe » : comptés, jamais dotés d'un bloc de groupe, aucun actif."""
+    _exige_leg_mandats(con)
+    rows = con.execute(
+        "SELECT chambre, legislature, bool_or(est_actif), bool_or(bloc_groupe IS NOT NULL), "
+        "COUNT(*) FROM v_mandats_legislatif WHERE NULLIF(groupe_sigle, '') IS NULL GROUP BY ALL"
+    ).fetchall()
+    for chambre, legislature, actif, avec_bloc, n in rows:
+        assert not avec_bloc, f"{chambre} lég. {legislature} : bloc sur un mandat sans groupe"
+        assert not actif, f"{chambre} lég. {legislature} : {n} élu(s) actif(s) sans groupe"
+
+
+def test_lfi_gauche_par_legislature(con: duckdb.DuckDBPyConnection) -> None:
+    """ADR-0011 / ADR-0005 n° 3 : FI (15), LFI-NUPES (16), LFI-NFP (17) = GAU."""
+    _exige_leg_mandats(con)
+    rows = con.execute(
+        "SELECT DISTINCT bloc_groupe FROM v_mandats_legislatif "
+        "WHERE chambre = 'AN' AND groupe_sigle IN ('FI', 'LFI-NUPES', 'LFI-NFP')"
+    ).fetchall()
+    assert rows == [("GAU",)], f"Blocs LFI inattendus : {rows}"
+
+
+def test_dates_fin_non_inventees(con: duckdb.DuckDBPyConnection) -> None:
+    """ADR-0011 : plus de date de fin égale à la date du chargement (Sénat) ou à dateMaj."""
+    _exige_leg_mandats(con)
+    n = ligne(con.execute("SELECT COUNT(*) FROM leg_elus WHERE date_fin_mandat IS NOT NULL"))[0]
+    assert n == 0
 
 
 def test_vue_bloc_final_override(con: duckdb.DuckDBPyConnection) -> None:
     rows = con.execute(
-        "SELECT id, bloc_politique, bloc_final FROM v_elus_hdf_actuels "
-        "WHERE id IN ('21085M', '21069M')"
+        "SELECT id, bloc_politique, bloc_final FROM v_elus_actuels WHERE id IN ('21085M', '21069M')"
     ).fetchall()
     if not rows:
-        pytest.skip("Hochart/Szczurek absents de v_elus_hdf_actuels (peut-être non actifs)")
+        pytest.skip("Hochart/Szczurek absents de v_elus_actuels (peut-être non actifs)")
     for elu_id, bloc_politique, bloc_final in rows:
         assert bloc_final == "EXD", f"{elu_id} : bloc_final attendu EXD, trouvé {bloc_final}"
         assert bloc_politique == "DIV", (
@@ -239,10 +327,12 @@ def test_vue_bloc_final_override(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_pk_unicite(con: duckdb.DuckDBPyConnection) -> None:
-    n_doublons = con.execute(
-        "SELECT COUNT(*) FROM ("
-        "SELECT id, chambre, COUNT(*) AS c FROM leg_elus GROUP BY id, chambre HAVING c > 1)"
-    ).fetchone()[0]
+    n_doublons = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM ("
+            "SELECT id, chambre, COUNT(*) AS c FROM leg_elus GROUP BY id, chambre HAVING c > 1)"
+        )
+    )[0]
     assert n_doublons == 0, f"{n_doublons} doublons (id, chambre) dans leg_elus"
 
 
@@ -264,7 +354,7 @@ def test_schema_score_columns_exist(con: duckdb.DuckDBPyConnection) -> None:
 
 def test_get_elus_actuels_toutes_chambres(con: duckdb.DuckDBPyConnection) -> None:
     """Tous les élus actifs (AN + Sénat) retournés sans filtre."""
-    n = con.execute("SELECT COUNT(*) FROM leg_elus WHERE est_actif = TRUE").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM leg_elus WHERE est_actif = TRUE"))[0]
     # Requête directe SQL — vérifie cohérence avec données attendues
     assert n >= 900, f"Attendu ≥900 élus actifs (577 AN + 348 Sénat), trouvé {n}"
     # Vérifie les deux chambres présentes
@@ -280,10 +370,12 @@ def test_get_elus_actuels_toutes_chambres(con: duckdb.DuckDBPyConnection) -> Non
 
 def test_get_elus_actuels_filtre_hdf(con: duckdb.DuckDBPyConnection) -> None:
     """Filtre HdF retourne un sous-ensemble cohérent (AN + Sénat)."""
-    n = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE est_actif = TRUE "
-        f"AND code_departement IN {_DEPTS_HDF!r}"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute(
+            "SELECT COUNT(*) FROM leg_elus WHERE est_actif = TRUE "
+            f"AND code_departement IN {_DEPTS_HDF!r}"
+        )
+    )[0]
     # HdF : ~57 AN + 28 Sénat = ~85
     assert 70 <= n <= 100, f"Attendu 70-100 élus actifs HdF, trouvé {n}"
 
@@ -338,7 +430,7 @@ def test_get_classement_activite_an(con: duckdb.DuckDBPyConnection) -> None:
 
 def test_get_classement_activite_senat_vide(con: duckdb.DuckDBPyConnection) -> None:
     """Sénat n'a pas de scores Datan — résultat vide sans erreur."""
-    n = con.execute("SELECT COUNT(*) FROM leg_activite WHERE chambre = 'SENAT'").fetchone()[0]
+    n = ligne(con.execute("SELECT COUNT(*) FROM leg_activite WHERE chambre = 'SENAT'"))[0]
     assert n == 0, f"Attendu 0 scores Sénat, trouvé {n} (source Datan = AN uniquement)"
 
 

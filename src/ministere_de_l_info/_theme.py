@@ -14,7 +14,9 @@ séparée : un `@import` CSS placé dans un bloc injecté dynamiquement par
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import streamlit as st
 
@@ -57,6 +59,99 @@ def inject_css() -> None:
         unsafe_allow_html=True,
     )
     st.markdown(f"<style>{_load_css()}</style>", unsafe_allow_html=True)
+
+
+def conserver_selections(cle_onglets: str, prefixes_par_onglet: dict[str, tuple[str, ...]]) -> None:
+    """Conserve les sélections des onglets fermés (onglets paresseux).
+
+    Avec `st.tabs(key=cle_onglets, on_change="rerun")`, les widgets d'un onglet
+    fermé ne sont pas rendus : Streamlit efface alors leur état et l'utilisateur
+    retrouve les valeurs par défaut en revenant sur l'onglet. Réaffecter la clé à
+    elle-même avant tout widget interrompt ce nettoyage (procédé documenté par
+    Streamlit, « Widget behavior »).
+
+    `prefixes_par_onglet` associe chaque libellé d'onglet aux préfixes des clés de
+    ses widgets ; l'onglet par défaut est le premier. Seules les clés des onglets
+    fermés sont réaffectées : l'onglet ouvert rend ses widgets normalement (pas
+    d'avertissement « default value + Session State API »). Les boutons de
+    téléchargement sont exclus : leur état ne peut pas être écrit.
+    """
+    onglet_ouvert = st.session_state.get(cle_onglets, next(iter(prefixes_par_onglet)))
+    prefixes_fermes = tuple(
+        p
+        for onglet, prefixes in prefixes_par_onglet.items()
+        if onglet != onglet_ouvert
+        for p in prefixes
+    )
+    if not prefixes_fermes:
+        return
+    for cle in list(st.session_state.keys()):
+        if not isinstance(cle, str) or not cle.startswith(prefixes_fermes):
+            continue
+        if "download" in cle or "_dl_" in cle:
+            continue
+        st.session_state[cle] = st.session_state[cle]
+
+
+def index_persiste(cle: str, options: Sequence[Any], defaut: int = 0) -> int:
+    """Index à passer explicitement à un widget `radio`/`selectbox` conservé
+    par `conserver_selections()`, en plus de son `key`.
+
+    Contexte (onglets paresseux `st.tabs(on_change="rerun")`) : quand un onglet
+    fermé rouvre, Streamlit recrée le widget. `conserver_selections()` garantit
+    que la valeur reste correcte côté `st.session_state` (et donc pour la
+    donnée affichée), mais un widget recréé sans `index`/`value` explicite peut
+    afficher transitoirement son option par défaut côté navigateur avant de se
+    resynchroniser — d'où un bouton visuellement désynchronisé de la donnée
+    réellement utilisée. Passer un `index` calculé depuis la valeur conservée
+    supprime cette fenêtre de désynchronisation.
+
+    Retourne l'index de la valeur actuellement en session_state dans
+    `options`, ou `defaut` si absente/inconnue (premier rendu).
+    """
+    valeur = st.session_state.get(cle)
+    options_list = list(options)
+    if valeur in options_list:
+        return options_list.index(valeur)
+    return defaut
+
+
+def render_donnees_indisponibles(
+    module: str,
+    *,
+    base_absente: bool,
+    commande_dev: str | None = None,
+) -> None:
+    """Message commun « données indisponibles », lisible par un non-développeur.
+
+    `base_absente=True` : le fichier DuckDB n'existe pas (ou ne s'ouvre pas).
+    `base_absente=False` : la base existe mais ne contient pas les données du module.
+    La consigne principale vise l'utilisateur de l'application installée
+    (`install.sh` / `update.sh`) ; la commande de chargement pour les développeurs
+    est repliée dans un expander.
+    """
+    if base_absente:
+        st.warning(
+            f"**Données {module} non disponibles : la base de données est introuvable.**\n\n"
+            "Si vous utilisez l'application installée, lancez la mise à jour "
+            "(script `update.sh`), qui télécharge la dernière base publiée. "
+            "Lors d'une première installation, relancez `install.sh`.",
+            icon=":material/database:",
+        )
+        commande = commande_dev or "./scripts/download_db.sh"
+    else:
+        st.warning(
+            f"**Données {module} non disponibles dans la base installée.**\n\n"
+            "La base de données est présente mais ne contient pas encore ces données. "
+            "Lancez la mise à jour (script `update.sh`) pour récupérer la dernière "
+            "base publiée.",
+            icon=":material/database:",
+        )
+        commande = commande_dev
+    if commande:
+        with st.expander("Informations pour les développeurs"):
+            st.caption("Depuis le dépôt de code, la commande suivante charge ces données :")
+            st.code(commande, language="bash")
 
 
 def render_page_header(icon: str, title: str, subtitle: str | None = None) -> None:

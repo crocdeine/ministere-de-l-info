@@ -29,6 +29,7 @@ import duckdb
 import httpx
 import pandas as pd
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ def _download_cache(url: str, dest: Path, force: bool = False) -> Path:
     return dest
 
 
-def _parse_value(val: str) -> float | None:
+def _parse_value(val: object) -> float | None:
     """Convertit une valeur TSV Eurostat en float. ':' ou vide → None."""
     s = str(val).strip()
     if not s or s.startswith(":"):
@@ -130,7 +131,7 @@ def load_economie_chomage_eurostat(
     cache_path = _download_cache(_URL_CHOMAGE, raw_dir / "economie" / _CACHE_CHOMAGE, force=force)
     df = _parse_eurostat_tsv(cache_path)
 
-    col0 = df.columns[0]
+    col0 = str(df.columns[0])
     dim_str = col0.split("\\")[0]
     dims = [d.strip() for d in dim_str.split(",")]
     annee_cols = [c for c in df.columns if c != col0]
@@ -179,9 +180,9 @@ def load_economie_chomage_eurostat(
         """,
         rows,
     )
-    n = con.execute(
-        "SELECT COUNT(*) FROM economie_contexte WHERE indicateur = 'tx_chomage_bit'"
-    ).fetchone()[0]
+    n = ligne_unique(
+        con.execute("SELECT COUNT(*) FROM economie_contexte WHERE indicateur = 'tx_chomage_bit'")
+    )[0]
     logger.info("economie_contexte — tx_chomage_bit : %d lignes.", n)
     upsert_metadata(con, "economie_contexte", n, "eurostat/lfst_r_lfu3rt")
 
@@ -198,7 +199,7 @@ def load_economie_pib_eurostat(
     cache_path = _download_cache(_URL_PIB, raw_dir / "economie" / _CACHE_PIB, force=force)
     df = _parse_eurostat_tsv(cache_path)
 
-    col0 = df.columns[0]
+    col0 = str(df.columns[0])
     dim_str = col0.split("\\")[0]
     dims = [d.strip() for d in dim_str.split(",")]
     annee_cols = [c for c in df.columns if c != col0]
@@ -240,6 +241,6 @@ def load_economie_pib_eurostat(
         """,
         rows,
     )
-    n = con.execute("SELECT COUNT(*) FROM economie_contexte").fetchone()[0]
+    n = ligne_unique(con.execute("SELECT COUNT(*) FROM economie_contexte"))[0]
     logger.info("economie_contexte — total : %d lignes.", n)
     upsert_metadata(con, "economie_contexte", n, "eurostat/lfst+nama")

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.data_sources.insee_populations import fetch_populations
 from ministere_de_l_info.etl._common import upsert_metadata
 
@@ -27,9 +28,9 @@ def load_populations(
     Avec force=True : DELETE WHERE annee=X AND source=_SOURCE + re-INSERT.
     """
     for annee in millesimes:
-        existing = con.execute(
-            "SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]
-        ).fetchone()[0]
+        existing = ligne_unique(
+            con.execute("SELECT COUNT(*) FROM populations WHERE annee = ?", [annee])
+        )[0]
 
         if existing > 0 and not force:
             logger.info(
@@ -56,9 +57,9 @@ def load_populations(
         """)
         con.unregister("_pop_temp")
 
-        count = con.execute("SELECT COUNT(*) FROM populations WHERE annee = ?", [annee]).fetchone()[
-            0
-        ]
+        count = ligne_unique(
+            con.execute("SELECT COUNT(*) FROM populations WHERE annee = ?", [annee])
+        )[0]
         logger.info("Populations %d chargées : %d communes.", annee, count)
 
         upsert_metadata(con, f"populations_{annee}", count, _SOURCE)

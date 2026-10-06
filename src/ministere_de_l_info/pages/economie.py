@@ -1,8 +1,8 @@
 """Page Économie — module render() (Phase E4 + E+).
 
 Répond aux questions éditoriales de l'ADR-0006 :
-1. Les communes les plus pauvres votent-elles RN ?
-2. La désindustrialisation prédit-elle le vote EXD ?
+1. Le niveau de pauvreté d'une commune est-il associé à son vote par bloc ?
+2. La part de l'emploi industriel est-elle associée au vote par bloc ?
 3. La part d'ouvriers/employés détermine-t-elle la couleur politique ?
 4. Les communes pauvres s'abstiennent-elles ou votent-elles contestataire ?
 """
@@ -12,7 +12,9 @@ from __future__ import annotations
 import json
 import logging
 
+import branca.colormap as cm
 import folium
+import folium.features
 import plotly.express as px
 import polars as pl
 import streamlit as st
@@ -21,9 +23,29 @@ from streamlit_folium import st_folium
 from ministere_de_l_info._blocs_politiques import BLOCS_ORDERED as _BLOCS_ORDERED
 from ministere_de_l_info._blocs_politiques import COULEURS_BLOCS as _COULEURS_BLOCS
 from ministere_de_l_info._blocs_politiques import LIBELLES_BLOCS as _LIBELLES_BLOCS
-from ministere_de_l_info._theme import render_page_header
+from ministere_de_l_info._theme import (
+    conserver_selections,
+    index_persiste,
+    render_donnees_indisponibles,
+    render_page_header,
+)
+from ministere_de_l_info.sources import mention
+from ministere_de_l_info.viz._display import (
+    _COULEURS_YLORD5,
+    COULEUR_ND,
+    COULEUR_ZERO,
+    INDICATEURS_CLASSE_ZERO,
+    NOTE_CLASSES_FIXES,
+    _build_legend_html,
+    _fmt_fr,
+    ajouter_html,
+    bornes_fixes,
+    nouvelle_carte,
+)
 from ministere_de_l_info.viz.economie_queries import (
+    annees_croisement_exploitables,
     get_annees_par_indicateur,
+    get_annees_presidentielles,
     get_communes_industrie_hdf,
     get_contexte_hdf_vs_france,
     get_croisement_eco_elections,
@@ -33,18 +55,39 @@ from ministere_de_l_info.viz.economie_queries import (
     get_evolution_rsa_hdf,
     get_indicateurs,
     get_scores_commune,
+    is_base_disponible,
     is_contexte_loaded,
     is_data_loaded,
 )
 
 logger = logging.getLogger(__name__)
 
-_ANNEES_PRES = [2002, 2007, 2012, 2017, 2022]
+# Agrégats HdF : le libellé dit comment la valeur est calculée (audit I4).
 _INDIC_EVOL: dict[str, str] = {
-    "taux_pauvrete_moyen": "Taux de pauvreté moyen (%)",
-    "niveau_vie_median_hdf": "Niveau de vie médian HdF (€)",
-    "tx_chomage_moyen": "Taux de chômage moyen (%)",
+    "taux_pauvrete_moyen": "Taux de pauvreté — moyenne des communes, non pondérée (%)",
+    "niveau_vie_median_communes": "Niveau de vie — médiane des médianes communales (€)",
+    "tx_chomage_pondere": "Taux de chômage (RP) — pondéré par les actifs (%)",
 }
+
+# Libellés lisibles des colonnes du détail commune (au lieu des noms techniques).
+_LIBELLES_COLONNES_ECO: dict[str, str] = {
+    "annee": "Année",
+    "taux_pauvrete": "Taux de pauvreté (%)",
+    "niveau_vie_median": "Niveau de vie médian (€)",
+    "tx_chomage_dec": "Taux de chômage RP (%)",
+    "part_ouvriers_employes": "Part ouvriers + employés (%)",
+    "part_emploi_industriel": "Part emploi industriel (%)",
+    "part_logements_sociaux": "Part logements sociaux (%)",
+}
+
+# Libellé d'onglet → préfixes des clés de ses widgets (conservation des sélections)
+_PREFIXES_ONGLETS: dict[str, tuple[str, ...]] = {
+    "Carte des indicateurs": ("eco_indicateur", "eco_annee", "eco_drilldown"),
+    "Évolution HdF": ("eco_evol_", "eco_ctx_"),
+    "Économie × Élections": ("eco_crois_",),
+    "Emploi industriel et accès aux médecins": ("industrie_",),
+}
+_ONGLETS: list[str] = list(_PREFIXES_ONGLETS)
 
 _FILOSOFI_INDICS = {"taux_pauvrete", "niveau_vie_median"}
 
@@ -58,26 +101,81 @@ _INDICATEURS_CROISEMENT: dict[str, str] = {
 }
 
 
+SEUIL_DESERT_APL = 2.5
+_ETATS_DESERT: dict[str, tuple[str, str]] = {
+    "desert": ("#C62828", "Sous le seuil (APL < 2,5)"),
+    "hors_desert": ("#DDE6EE", "Au-dessus du seuil (APL ≥ 2,5)"),
+    "sans_donnee": ("#5F6368", "Sans donnée (n.d.)"),
+}
+
+
+def _etat_desert(valeur: float | None) -> str:
+    """Catégorie d'une commune : désert, hors désert ou sans donnée (NULL/NaN)."""
+    if valeur is None or valeur != valeur:
+        return "sans_donnee"
+    return "desert" if valeur < SEUIL_DESERT_APL else "hors_desert"
+
+
 def _make_desert_map(df: pl.DataFrame) -> folium.Map:
-    """Carte déserts médicaux — rouge si APL < 2,5, gris sinon (choroplèthe binaire)."""
-    return _make_choropleth(
-        df.with_columns(
-            pl.when(pl.col("valeur").is_not_null() & (pl.col("valeur") < 2.5))
-            .then(pl.lit(1.0))
-            .otherwise(pl.lit(None, dtype=pl.Float64))
-            .alias("valeur"),
-            pl.lit(False).alias("secret"),
+    """Carte déserts médicaux à 3 états distincts (désert / hors désert / sans donnée)."""
+    m = nouvelle_carte([50.3, 2.9], 8)
+    features = []
+    for row in df.iter_rows(named=True):
+        if not row["geojson"]:
+            continue
+        try:
+            geom = json.loads(row["geojson"])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        val = None if row["secret"] else row["valeur"]
+        etat = _etat_desert(val)
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "nom": row["nom_commune"],
+                    "etat": etat,
+                    "apl_str": "n.d." if etat == "sans_donnee" else f"{val:.2f}".replace(".", ","),
+                    "etat_str": _ETATS_DESERT[etat][1],
+                },
+                "geometry": geom,
+            }
+        )
+    folium.GeoJson(
+        {"type": "FeatureCollection", "features": features},
+        style_function=lambda f: {
+            "fillColor": _ETATS_DESERT[f["properties"]["etat"]][0],
+            "fillOpacity": 0.85,
+            "color": "#8A8F98",
+            "weight": 0.3,
+        },
+        tooltip=folium.features.GeoJsonTooltip(
+            fields=["nom", "apl_str", "etat_str"],
+            aliases=["Commune", "APL (consult./hab./an)", "État"],
         ),
-        "Désert médical (APL < 2,5)",
+    ).add_to(m)
+    items = "".join(
+        f'<div><span style="display:inline-block;width:14px;height:14px;background:{c};'
+        f'border:1px solid #8A8F98;margin-right:6px;vertical-align:middle"></span>{lib}</div>'
+        for c, lib in _ETATS_DESERT.values()
     )
+    ajouter_html(
+        m,
+        folium.Element(
+            '<div style="position:fixed;bottom:24px;right:12px;z-index:9999;background:#fff;'
+            'padding:8px 10px;border:1px solid #8A8F98;font:12px sans-serif;color:#1a1a1a">'
+            f"<b>Désert médical</b>{items}</div>"
+        ),
+    )
+    return m
 
 
-def _make_choropleth(df: pl.DataFrame, libelle: str) -> folium.Map:
+def _make_choropleth(df: pl.DataFrame, libelle: str, indicateur: str) -> folium.Map:
     """Construit une carte choroplèthe Folium pour un indicateur économique.
 
     Les communes sans données (secret INSEE ou valeur manquante) sont affichées en gris.
     """
-    m = folium.Map(location=[50.3, 2.9], zoom_start=8)
+    m = nouvelle_carte([50.3, 2.9], 8)
 
     features = []
     for row in df.iter_rows(named=True):
@@ -107,28 +205,59 @@ def _make_choropleth(df: pl.DataFrame, libelle: str) -> folium.Map:
 
     geo_json = {"type": "FeatureCollection", "features": features}
 
-    # NULL pour les communes avec secret statistique → nan_fill_color gris
-    data_pd = (
-        df.with_columns(
-            pl.when(pl.col("secret")).then(None).otherwise(pl.col("valeur")).alias("valeur_plot")
-        )
-        .select(["code_commune", "valeur_plot"])
-        .to_pandas()
+    # Classes fixes par indicateur (identiques pour toutes les années) ; communes sous secret
+    # statistique ou sans valeur : gris.
+    breaks = bornes_fixes(indicateur)
+    colormap = cm.StepColormap(
+        colors=_COULEURS_YLORD5, index=breaks, vmin=breaks[0], vmax=breaks[-1]
     )
+    valeurs = {
+        r["code_commune"]: None if r["secret"] or r["valeur"] != r["valeur"] else r["valeur"]
+        for r in df.iter_rows(named=True)
+    }
+    a_des_valeurs = any(v is not None for v in valeurs.values())
 
-    choropleth = folium.Choropleth(
-        geo_data=geo_json,
-        data=data_pd,
-        columns=["code_commune", "valeur_plot"],
-        key_on="feature.properties.code_commune",
-        fill_color="YlOrRd",
-        nan_fill_color="#CCCCCC",
-        fill_opacity=0.75,
-        line_opacity=0.2,
-        legend_name=libelle,
-    )
-    choropleth.add_to(m)
-    choropleth.geojson.add_child(
+    classe_zero = indicateur in INDICATEURS_CLASSE_ZERO
+
+    def _couleur(v: float | None) -> str:
+        if v is None:
+            return COULEUR_ND
+        if classe_zero and v == 0:
+            return COULEUR_ZERO
+        return colormap(v)
+
+    def _style(f: dict) -> dict:
+        v = valeurs.get(f["properties"]["code_commune"])
+        return {
+            "fillColor": _couleur(v),
+            "fillOpacity": 0.75 if v is not None else 0.5,
+            "color": "#999999",
+            "weight": 0.3,
+        }
+
+    tooltip_target = folium.GeoJson(geo_json, style_function=_style)
+    tooltip_target.add_to(m)
+    if a_des_valeurs:
+        ajouter_html(
+            m,
+            folium.Element(
+                _build_legend_html(
+                    libelle,
+                    breaks,
+                    _COULEURS_YLORD5,
+                    fmt_fn=lambda x: _fmt_fr(x) if x >= 100 else f"{x:g}".replace(".", ","),
+                    note=NOTE_CLASSES_FIXES
+                    + (
+                        ". Euros courants, non corrigés de l'inflation"
+                        if indicateur == "niveau_vie_median"
+                        else ""
+                    ),
+                    avec_nd=any(v is None for v in valeurs.values()),
+                    avec_zero=classe_zero,
+                )
+            ),
+        )
+    tooltip_target.add_child(
         folium.features.GeoJsonTooltip(
             fields=["nom", "valeur_str"],
             aliases=["Commune", libelle],
@@ -143,11 +272,15 @@ def _render_carte_tab() -> None:
     indicateurs = get_indicateurs()
     annees_par_indic = get_annees_par_indicateur()
 
+    # `index=` explicite (en plus de `key=`) : cf. `_theme.index_persiste`, évite
+    # la désynchronisation widget/donnée après réouverture d'un onglet paresseux.
+    indicateurs_cles = list(indicateurs.keys())
     c1, c2 = st.columns([2, 1])
     with c1:
         indicateur: str = st.selectbox(  # type: ignore[assignment]
             "Indicateur",
-            list(indicateurs.keys()),
+            indicateurs_cles,
+            index=index_persiste("eco_indicateur", indicateurs_cles, 0),
             format_func=lambda k: indicateurs[k],
             key="eco_indicateur",
         )
@@ -156,7 +289,9 @@ def _render_carte_tab() -> None:
         if not annees:
             st.warning("Pas de données disponibles pour cet indicateur.")
             return
-        annee: int = st.selectbox("Année", annees, key="eco_annee")  # type: ignore[assignment]
+        annee: int = st.selectbox(  # type: ignore[assignment]
+            "Année", annees, index=index_persiste("eco_annee", annees, 0), key="eco_annee"
+        )
 
     libelle = indicateurs[indicateur]
     df = get_scores_commune(annee, indicateur)
@@ -168,18 +303,40 @@ def _render_carte_tab() -> None:
     n_valides = df.filter(pl.col("valeur").is_not_null() & ~pl.col("secret")).height
     n_secret = df.filter(pl.col("secret")).height
     if indicateur in _FILOSOFI_INDICS:
-        source = "INSEE Filosofi"
+        source = mention("insee_filosofi_rp")
     elif indicateur == "nb_foyers_rsa":
-        source = "CNAF data.caf.fr"
+        source = mention("cnaf")
     elif indicateur == "apl_medecins":
-        source = "DREES data.solidarites-sante.gouv.fr"
+        source = mention("drees")
     else:
-        source = "INSEE Recensement de la Population"
-    secret_info = f" · {n_secret:,} secret statistique INSEE (gris)" if n_secret else ""
-    st.caption(f"{n_valides:,} communes avec données{secret_info} — Source : {source}")
+        source = mention("insee_filosofi_rp")
+    secret_info = (
+        f" · {n_secret:,} sous secret statistique INSEE (gris)".replace(",", " ")
+        if n_secret
+        else ""
+    )
+    st.caption(
+        f"{n_valides:,}".replace(",", " ")
+        + f" communes avec données{secret_info} — Source : {source}, millésime {annee}"
+    )
+    if indicateur == "nb_foyers_rsa":
+        st.info(
+            "Cette carte montre le **nombre** de foyers allocataires du RSA, et non un taux : "
+            "les communes les plus peuplées ressortent mécaniquement. "
+            "Aucun dénominateur fiable (nombre de ménages de la même année) n'est "
+            "disponible en base pour calculer un taux.",
+            icon=":material/info:",
+        )
+    if n_valides == 0:
+        st.info(
+            f"Aucune donnée exploitable pour {libelle} en {annee} (secret statistique "
+            "intégral ou données non publiées pour ce millésime). La carte ci-dessous "
+            "n'affiche que les contours des communes.",
+            icon=":material/info:",
+        )
 
     try:
-        carte = _make_choropleth(df, libelle)
+        carte = _make_choropleth(df, libelle, indicateur)
         st_folium(carte, use_container_width=True, height=540, returned_objects=[])
     except Exception as exc:
         st.error(f"Erreur carte : {exc}")
@@ -190,13 +347,18 @@ def _render_carte_tab() -> None:
         st.metric("Communes en désert médical (APL < 2,5)", n_desert)
 
     # ── Drill-down commune ─────────────────────────────────────────────────────
-    with st.expander("🔍 Drill-down commune"):
+    with st.expander("Détail d'une commune"):
         communes = [
             (row["code_commune"], row["nom_commune"])
             for row in df.filter(pl.col("valeur").is_not_null()).iter_rows(named=True)
         ]
         options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes]
-        sel: str = st.selectbox("Commune", options, key="eco_drilldown")  # type: ignore[assignment]
+        sel: str = st.selectbox(  # type: ignore[assignment]
+            "Commune",
+            options,
+            index=index_persiste("eco_drilldown", options, 0),
+            key="eco_drilldown",
+        )
 
         if sel != "(aucune sélection)":
             code_sel = sel.rsplit("(", 1)[1].rstrip(")")
@@ -208,8 +370,25 @@ def _render_carte_tab() -> None:
                 return
 
             st.subheader(nom_sel)
+            eco_affiche = eco_df.drop("secret").rename(_LIBELLES_COLONNES_ECO)
             st.dataframe(
-                eco_df.drop("secret").to_pandas(), use_container_width=True, hide_index=True
+                eco_affiche,
+                width="stretch",
+                hide_index=True,
+                placeholder="n.d.",
+                column_config={
+                    "Année": st.column_config.NumberColumn("Année", format="%d"),
+                    **{
+                        col: st.column_config.NumberColumn(col, format="localized")
+                        for col in eco_affiche.columns
+                        if col != "Année"
+                    },
+                },
+            )
+            st.caption(
+                "Sources : INSEE Filosofi (pauvreté, niveau de vie) et Recensement de la "
+                "Population (chômage, CSP, emploi, logements). « n.d. » : donnée non "
+                "disponible ou sous secret statistique."
             )
 
             indic_cols = [
@@ -221,8 +400,9 @@ def _render_carte_tab() -> None:
             indic_cols = [c for c in indic_cols if c in eco_df.columns]
             eco_long = (
                 eco_df.select(["annee"] + indic_cols)
-                .melt(id_vars=["annee"], variable_name="indicateur", value_name="valeur")
+                .unpivot(index="annee", variable_name="indicateur", value_name="valeur")
                 .filter(pl.col("valeur").is_not_null())
+                .with_columns(pl.col("indicateur").replace(_LIBELLES_COLONNES_ECO))
             )
             if not eco_long.is_empty():
                 fig = px.line(
@@ -232,10 +412,10 @@ def _render_carte_tab() -> None:
                     color="indicateur",
                     markers=True,
                     title=f"Évolution — {nom_sel}",
-                    labels={"annee": "Année", "valeur": "Valeur", "indicateur": "Indicateur"},
+                    labels={"annee": "Année", "valeur": "Valeur (%)", "indicateur": "Indicateur"},
                 )
                 fig.update_layout(height=340, margin={"t": 40, "b": 20})
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
 
 def _render_contexte_section() -> None:
@@ -247,9 +427,11 @@ def _render_contexte_section() -> None:
         )
         return
 
+    options_ctx = ["tx_chomage_bit", "pib_eur_hab"]
     indic_ctx: str = st.selectbox(  # type: ignore[assignment]
         "Indicateur",
-        ["tx_chomage_bit", "pib_eur_hab"],
+        options_ctx,
+        index=index_persiste("eco_ctx_indic", options_ctx, 0),
         format_func=lambda k: {
             "tx_chomage_bit": "Taux de chômage BIT (%)",
             "pib_eur_hab": "PIB par habitant (€)",
@@ -292,7 +474,7 @@ def _render_contexte_section() -> None:
         labels={"annee": "Année", "valeur": libelle, "territoire": "Territoire"},
     )
     fig.update_layout(hovermode="x unified")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     last = df_ctx.filter(pl.col("ecart_hdf_france").is_not_null()).sort("annee").tail(1)
     if not last.is_empty():
@@ -306,18 +488,23 @@ def _render_contexte_section() -> None:
             delta_color=delta_color,
         )
 
-    st.caption("Source : Eurostat — lfst_r_lfu3rt / nama_10r_2gdp")
+    st.caption(
+        f"Source : {mention('eurostat')} — jeux lfst_r_lfu3rt et nama_10r_2gdp, "
+        "drapeaux de qualité non repris."
+    )
 
 
 def _render_evolution_tab() -> None:
     """Onglet Évolution HdF — Filosofi/RP 2017-2021, RSA CNAF 2020-2024 ou Eurostat."""
+    options_mode = [
+        "Revenus & emploi (INSEE 2017-2021)",
+        "Allocataires RSA (CNAF 2020-2024)",
+        "Contexte HdF vs France (Eurostat)",
+    ]
     mode: str = st.radio(  # type: ignore[assignment]
         "Données à afficher",
-        [
-            "Revenus & emploi (INSEE 2017-2021)",
-            "Allocataires RSA (CNAF 2020-2024)",
-            "Contexte HdF vs France (Eurostat)",
-        ],
+        options_mode,
+        index=index_persiste("eco_evol_mode", options_mode, 0),
         horizontal=True,
         key="eco_evol_mode",
     )
@@ -340,8 +527,8 @@ def _render_evolution_tab() -> None:
             labels={"annee": "Année", "total_foyers_rsa_hdf": "Foyers RSA"},
         )
         fig.update_layout(height=420, margin={"t": 50, "b": 30})
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption("Source : CNAF data.caf.fr — snapshot décembre")
+        st.plotly_chart(fig, width="stretch")
+        st.caption(f"Source : {mention('cnaf')} — situation en décembre")
         return
 
     evol_df = get_evolution_hdf()
@@ -349,77 +536,127 @@ def _render_evolution_tab() -> None:
         st.warning("Aucune donnée d'évolution disponible.")
         return
 
+    options_indic_evol = list(_INDIC_EVOL.keys())
     indic_evol: str = st.selectbox(  # type: ignore[assignment]
         "Indicateur",
-        list(_INDIC_EVOL.keys()),
+        options_indic_evol,
+        index=index_persiste("eco_evol_indic", options_indic_evol, 0),
         format_func=lambda k: _INDIC_EVOL[k],
         key="eco_evol_indic",
     )
     libelle = _INDIC_EVOL[indic_evol]
-    annees = evol_df["annee"].to_list()
+    serie = evol_df.select(["annee", indic_evol]).drop_nulls(indic_evol)
+    if serie.is_empty():
+        st.info("Données non disponibles pour cet indicateur.")
+        return
+    annees = serie["annee"].to_list()
     fig = px.line(
-        evol_df.to_pandas(),
+        serie.to_pandas(),
         x="annee",
         y=indic_evol,
         markers=True,
-        title=f"Évolution {libelle} — Hauts-de-France {min(annees)}-{max(annees)}",
+        title=f"{libelle} — Hauts-de-France {min(annees)}-{max(annees)}",
         labels={"annee": "Année", indic_evol: libelle},
     )
     fig.update_layout(
         xaxis={"tickmode": "array", "tickvals": annees},
         height=420,
         margin={"t": 50, "b": 30},
+        separators=", ",
     )
     fig.update_traces(hovertemplate="<b>%{x}</b><br>%{y:.1f}<extra></extra>")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
+    if indic_evol == "tx_chomage_pondere":
+        methode = (
+            "taux communaux pondérés par le nombre d'actifs de 15-64 ans "
+            "(≈ total des chômeurs / total des actifs HdF)."
+        )
+    elif indic_evol == "taux_pauvrete_moyen":
+        methode = (
+            "moyenne simple des taux communaux (une petite commune pèse autant que Lille) ; "
+            "communes sous secret statistique exclues. Ce n'est pas le taux régional officiel."
+        )
+    else:
+        methode = (
+            "médiane des niveaux de vie médians communaux ; communes sous secret statistique "
+            "exclues. Ce n'est pas le niveau de vie médian régional officiel."
+        )
     st.caption(
         "Source : INSEE Filosofi (taux de pauvreté, niveau de vie médian) "
         "+ Recensement de la Population (chômage déclaratif) — "
-        "Agrégation : moyenne des communes HdF avec données disponibles."
+        f"Agrégation : {methode}"
     )
 
 
 def _render_croisement_tab() -> None:
     """Onglet Économie × Élections — scatter plot corrélation territoriale."""
     st.markdown(
-        "**Questions éditoriales** : Les communes les plus pauvres votent-elles RN ? "
-        "La désindustrialisation prédit-elle le vote EXD ? "
-        "La part d'ouvriers/employés détermine-t-elle la couleur politique ?"
+        "**Questions explorées** : le niveau de pauvreté, la part de l'emploi industriel "
+        "ou la part d'ouvriers et employés d'une commune sont-ils associés à son vote "
+        "par bloc ?"
     )
 
     indicateurs = _INDICATEURS_CROISEMENT
-    c1, c2, c3 = st.columns(3)
+    annees_par_indic = get_annees_par_indicateur()
+    annees_pres = get_annees_presidentielles()
+
+    options_indic_x = list(indicateurs.keys())
+    c1, c2, c3, c4 = st.columns([2, 1, 1, 2])
     with c1:
-        annee_election: int = st.selectbox(  # type: ignore[assignment]
-            "Élection présidentielle",
-            _ANNEES_PRES,
-            index=len(_ANNEES_PRES) - 1,
-            key="eco_crois_annee",
-            help="Données économiques de l'année n-1. Couverture optimale : 2022.",
-        )
-    with c2:
-        bloc_viz: str = st.selectbox(  # type: ignore[assignment]
-            "Bloc (axe Y — % voix)",
-            _BLOCS_ORDERED,
-            index=5,
-            format_func=lambda b: f"{b} — {_LIBELLES_BLOCS[b]}",
-            key="eco_crois_bloc",
-        )
-    with c3:
         indic_x: str = st.selectbox(  # type: ignore[assignment]
             "Indicateur éco (axe X)",
-            list(indicateurs.keys()),
+            options_indic_x,
+            index=index_persiste("eco_crois_indic", options_indic_x, 0),
             format_func=lambda k: indicateurs[k],
             key="eco_crois_indic",
         )
+    # Seules les présidentielles dont l'année n-1 est couverte par l'indicateur
+    # sont proposées (audit I5 : 4 années sur 5 donnaient un écran vide).
+    annees_ok = annees_croisement_exploitables(annees_pres, annees_par_indic.get(indic_x, []))
+    if not annees_ok:
+        st.info(
+            f"Aucune présidentielle ne peut être croisée avec « {indicateurs[indic_x]} » : "
+            "les données économiques de l'année précédant le scrutin ne sont pas disponibles."
+        )
+        return
+    with c2:
+        annee_election: int = st.selectbox(  # type: ignore[assignment]
+            "Présidentielle",
+            annees_ok,
+            index=index_persiste("eco_crois_annee", annees_ok, len(annees_ok) - 1),
+            key="eco_crois_annee",
+            help=(
+                "Seules les élections dont l'année précédente est couverte par l'indicateur "
+                "sont proposées (données économiques de l'année n-1)."
+            ),
+        )
+    with c3:
+        tour: int = st.radio(  # type: ignore[assignment]
+            "Tour",
+            [1, 2],
+            index=index_persiste("eco_crois_tour", [1, 2]),
+            format_func=lambda t: "1er" if t == 1 else "2e",
+            horizontal=True,
+            key="eco_crois_tour",
+            help="Au 2e tour, seuls les blocs des deux finalistes ont des voix.",
+        )
+    with c4:
+        bloc_viz: str = st.selectbox(  # type: ignore[assignment]
+            "Bloc (axe Y — % des exprimés)",
+            _BLOCS_ORDERED,
+            index=index_persiste("eco_crois_bloc", _BLOCS_ORDERED, 5),
+            format_func=lambda b: f"{b} — {_LIBELLES_BLOCS[b]}",
+            key="eco_crois_bloc",
+        )
 
-    crois_df = get_croisement_eco_elections(annee_election, bloc=bloc_viz)
+    tour_lbl = "1er tour" if tour == 1 else "2e tour"
+    crois_df = get_croisement_eco_elections(annee_election, bloc=bloc_viz, tour=tour)
 
     if crois_df.is_empty():
         st.info(
-            f"Aucune donnée de croisement pour {annee_election}. "
-            "Les données économiques (Filosofi) couvrent 2017-2021 : "
-            "couverture optimale pour l'élection 2022."
+            f"Aucun résultat pour le bloc {_LIBELLES_BLOCS[bloc_viz]} au {tour_lbl} "
+            f"de la présidentielle {annee_election}"
+            + (" : ce bloc n'était pas présent au second tour." if tour == 2 else ".")
         )
         return
 
@@ -432,40 +669,53 @@ def _render_croisement_tab() -> None:
     n_communes = scatter_df.height
     libelle_x = indicateurs[indic_x]
 
-    scatter_pd = scatter_df.with_columns(pl.col("pop_active").fill_null(1000)).to_pandas()
+    # Taille des bulles = actifs de 15-64 ans (RP). Communes sans effectif connu :
+    # taille médiane, signalée en légende (plus de valeur arbitraire cachée).
+    n_sans_pop = scatter_df.filter(pl.col("pop_active").is_null()).height
+    pop_mediane = scatter_df.select(pl.col("pop_active").median()).item()
+    taille_defaut = int(pop_mediane) if pop_mediane is not None else 1
+    scatter_pd = scatter_df.with_columns(
+        pl.col("pop_active").fill_null(taille_defaut).alias("taille_bulle")
+    ).to_pandas()
 
     fig = px.scatter(
         scatter_pd,
         x=indic_x,
         y="pct_voix",
-        size="pop_active",
+        size="taille_bulle",
         size_max=20,
         hover_name="nom_commune",
-        hover_data={indic_x: ":.1f", "pct_voix": ":.1f", "pop_active": ":,"},
+        hover_data={indic_x: ":.1f", "pct_voix": ":.1f", "pop_active": ":,", "taille_bulle": False},
         title=(
-            f"% voix {bloc_viz} ({_LIBELLES_BLOCS[bloc_viz]}) "
-            f"× {libelle_x} — Présidentielles {annee_election} T2 (HdF)"
+            f"% des exprimés {bloc_viz} ({_LIBELLES_BLOCS[bloc_viz]}) "
+            f"× {libelle_x} — Présidentielle {annee_election}, {tour_lbl} (HdF)"
         ),
         labels={
             indic_x: libelle_x,
-            "pct_voix": f"% voix {bloc_viz} (T2)",
-            "pop_active": "Pop. active",
+            "pct_voix": f"% des exprimés {bloc_viz} ({tour_lbl})",
+            "pop_active": "Actifs 15-64 ans",
         },
         color_discrete_sequence=[_COULEURS_BLOCS[bloc_viz]],
     )
-    fig.update_layout(height=500, margin={"t": 60, "b": 40})
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(height=500, margin={"t": 60, "b": 40}, separators=", ")
+    st.plotly_chart(fig, width="stretch")
+    note_taille = (
+        f" {n_sans_pop} commune(s) sans effectif d'actifs connu : bulle de taille médiane."
+        if n_sans_pop
+        else ""
+    )
     st.caption(
-        f"{n_communes:,} communes — "
+        f"{n_communes:,}".replace(",", " ") + " communes — "
         f"Données économiques : année {annee_election - 1} "
-        f"(source INSEE Filosofi / Recensement de la Population) — "
-        f"Résultats électoraux : Ministère de l'Intérieur via data.gouv.fr. "
+        "(source INSEE Filosofi / Recensement de la Population) — "
+        "Résultats électoraux : Ministère de l'Intérieur via data.gouv.fr. "
+        f"Taille des bulles : actifs de 15-64 ans (RP).{note_taille} "
         "**Corrélation ne signifie pas causalité.**"
     )
 
 
 def _render_industrie_tab() -> None:
-    """Onglet Désindustrialisation — emploi GS1 Industrie + déserts médicaux."""
+    """Onglet Emploi industriel et accès aux médecins — emploi GS1 Industrie + APL."""
     st.subheader("Emploi industriel (GS1) — Hauts-de-France 2006-2025")
     hdf_df = get_desindustrialisation_commune()
     if hdf_df.is_empty():
@@ -480,19 +730,43 @@ def _render_industrie_tab() -> None:
             title=f"Effectifs salariés secteur Industrie — HdF {min(annees_ind)}-{max(annees_ind)}",
             labels={"annee": "Année", "nb_salaries": "Salariés industrie"},
         )
-        fig.add_vrect(x0=2008, x1=2010, fillcolor="grey", opacity=0.15, line_width=0)
-        fig.add_vrect(x0=2020, x1=2021, fillcolor="#4488ff", opacity=0.12, line_width=0)
+        fig.add_vrect(
+            x0=2008,
+            x1=2010,
+            fillcolor="grey",
+            opacity=0.15,
+            line_width=0,
+            annotation_text="Crise financière 2008-2010",
+            annotation_position="top left",
+        )
+        fig.add_vrect(
+            x0=2020,
+            x1=2021,
+            fillcolor="#4488ff",
+            opacity=0.12,
+            line_width=0,
+            annotation_text="Crise sanitaire 2020-2021",
+            annotation_position="top left",
+        )
         fig.update_layout(height=400, margin={"t": 50, "b": 30})
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption("Source : URSSAF / ACOSS — open.urssaf.fr")
+        st.plotly_chart(fig, width="stretch")
+        st.caption(
+            f"Source : {mention('urssaf')}. Champ : secteur privé, établissements "
+            "employeurs ; cases masquées par l'URSSAF non comptées."
+        )
 
-    st.subheader("Drill-down commune")
+    st.subheader("Détail d'une commune")
     communes_ind = get_communes_industrie_hdf()
     if not communes_ind:
         st.info("Données URSSAF non chargées.")
     else:
         opts = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes_ind]
-        sel: str = st.selectbox("Commune", opts, key="industrie_commune")  # type: ignore[assignment]
+        sel: str = st.selectbox(  # type: ignore[assignment]
+            "Commune",
+            opts,
+            index=index_persiste("industrie_commune", opts, 0),
+            key="industrie_commune",
+        )
         if sel != "(aucune sélection)":
             code_ind = sel.rsplit("(", 1)[1].rstrip(")")
             nom_ind = sel.rsplit(" (", 1)[0]
@@ -509,10 +783,11 @@ def _render_industrie_tab() -> None:
                     labels={"annee": "Année", "nb_salaries": "Salariés"},
                 )
                 fig2.update_layout(height=340, margin={"t": 40, "b": 20})
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig2, width="stretch")
 
-    st.subheader("Déserts médicaux HdF (APL < 2,5) — Millésime 2023")
     annees_apl = get_annees_par_indicateur().get("apl_medecins", [])
+    millesime_apl = f" — Millésime {max(annees_apl)}" if annees_apl else ""
+    st.subheader(f"Déserts médicaux HdF (APL < 2,5){millesime_apl}")
     if not annees_apl:
         st.info("Données DREES APL non chargées. Lancez : `load_economie.py --source drees`")
     else:
@@ -523,6 +798,12 @@ def _render_industrie_tab() -> None:
                 pl.col("valeur").is_not_null() & (pl.col("valeur") < 2.5)
             ).height
             st.metric("Communes désert médical / avec données APL", f"{n_desert} / {n_total}")
+            if n_total == 0:
+                st.info(
+                    "Aucune donnée APL exploitable pour ce millésime. La carte "
+                    "ci-dessous n'affiche que les contours des communes.",
+                    icon=":material/info:",
+                )
             try:
                 st_folium(
                     _make_desert_map(apl_df),
@@ -534,34 +815,42 @@ def _render_industrie_tab() -> None:
                 st.error(f"Erreur carte déserts médicaux : {exc}")
                 logger.exception("Erreur carte déserts médicaux")
             st.caption(
-                "Rouge : APL < 2,5 consult./hab./an (seuil officiel DREES). "
-                "Source : DREES data.solidarites-sante.gouv.fr"
+                "Désert médical : APL < 2,5 consultations par habitant et par an, seuil de "
+                "sous-densité médicale utilisé par la DREES (convention, pas un zonage "
+                "réglementaire). Les communes sans donnée (gris foncé) sont distinguées de "
+                f"celles au-dessus du seuil. Source : {mention('drees')}"
             )
 
 
 def render() -> None:
     """Point d'entrée de la page Économie — ministere-de-l-info."""
-    if not is_data_loaded():
-        st.warning("Données économiques non chargées. Lancez :")
-        st.code("uv run python scripts/load_economie.py")
-        return
-
     render_page_header(icon="bar_chart", title="Économie", subtitle="Hauts-de-France")
 
+    if not is_base_disponible() or not is_data_loaded():
+        render_donnees_indisponibles(
+            "économiques",
+            base_absente=not is_base_disponible(),
+            commande_dev="uv run python scripts/load_economie.py",
+        )
+        return
+
+    # Onglets paresseux (Streamlit ≥ 1.57) : seul l'onglet ouvert est calculé,
+    # au lieu de reconstruire les 2 cartes de ~3 800 communes à chaque interaction.
+    # Les sélections des onglets fermés sont conservées (sinon remises à zéro).
+    conserver_selections("eco_onglet", _PREFIXES_ONGLETS)
     tab_carte, tab_evolution, tab_croisement, tab_industrie = st.tabs(
-        [
-            "🗺️ Carte des indicateurs",
-            "📈 Évolution HdF",
-            "🔗 Économie × Élections",
-            "🏭 Désindustrialisation",
-        ]
+        _ONGLETS, key="eco_onglet", on_change="rerun"
     )
 
     with tab_carte:
-        _render_carte_tab()
+        if tab_carte.open:
+            _render_carte_tab()
     with tab_evolution:
-        _render_evolution_tab()
+        if tab_evolution.open:
+            _render_evolution_tab()
     with tab_croisement:
-        _render_croisement_tab()
+        if tab_croisement.open:
+            _render_croisement_tab()
     with tab_industrie:
-        _render_industrie_tab()
+        if tab_industrie.open:
+            _render_industrie_tab()

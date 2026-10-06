@@ -6,7 +6,10 @@ Fonctions exportées
 -------------------
 - create_elections_schema(con)        : CREATE TABLE IF NOT EXISTS × 6, idempotent
 - populate_elections_referentiels(con): remplit blocs_politiques, elections,
-  nuances_harmonisees et candidats_presidentielle ; idempotent (DELETE + INSERT)
+  nuances_harmonisees (pres + legi + muni) et candidats_presidentielle ;
+  idempotent (DELETE + INSERT)
+- populate_nuances_municipales(con)   : remplace les seules nuances municipales
+  (DELETE ciblé par année + INSERT), utilisé par load_elections_municipales.py
 
 Les tables de résultats (resultats_participation, resultats_candidats) sont créées
 vides ici ; le chargement des Parquet est fait en C2b (scripts/load_elections.py).
@@ -19,12 +22,14 @@ jointure sur geographies_communes.code_region.
 Blocs politiques
 ----------------
 Nomenclature officielle du Ministère de l'Intérieur : 6 blocs (EXG, GAU, DIV, CENT,
-DTE, EXD), introduits par la circulaire IOMA2322276J (sénatoriales 2023).
-Le classement "officiel de l'époque" s'applique : un parti est classé selon le bloc
-qui lui était attribué à la date du scrutin. Chaque entrée porte une colonne
-source_bloc indiquant la circulaire ou décision CE de référence.
-Voir docs/adr/0005-nuances-et-blocs-officiels.md et
-docs/sources-officielles/nuances/index.md.
+DTE, EXD). Première grille officielle de blocs : INTA1931378J (municipales 2020,
+annexe 3, bloc « divers » nommé AUT), puis IOMA2322276J (sénatoriales 2023) et
+INTP2602966C (municipales 2026). Doctrine (ADR-0010) : grille du scrutin si elle
+existe ; sinon grille la plus proche dans le temps (antérieure de préférence) si le
+code y désigne la même famille politique ; sinon classement reconstruit justifié.
+Chaque entrée porte une colonne source_bloc indiquant la source de référence.
+Voir docs/adr/0005-nuances-et-blocs-officiels.md, docs/adr/0010-revision-nuances-et-blocs.md
+et docs/sources-officielles/nuances/index.md.
 """
 
 from __future__ import annotations
@@ -32,6 +37,8 @@ from __future__ import annotations
 import logging
 
 import duckdb
+
+from ministere_de_l_info._sql import ligne_unique
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +134,8 @@ _ELECTIONS: list[tuple[str, str, int, int, str, bool]] = _build_elections()
 
 # ── Blocs politiques ──────────────────────────────────────────────────────────
 # Nomenclature officielle Ministère de l'Intérieur — 6 blocs, codes en majuscules.
-# Source : circulaire IOMA2322276J (sénatoriales 2023, 1re occurrence du regroupement).
+# Première grille officielle : INTA1931378J (municipales 2020, annexe 3 ; « AUT » = DIV).
+# Grilles suivantes : IOMA2322276J (2023), INTP2602966C (2026). Voir ADR-0010.
 # (bloc, libelle, couleur_hex, ordre_gauche_droite)
 
 _BLOCS: list[tuple[str, str, str, int]] = [
@@ -170,7 +178,8 @@ _CIRCO21_CODES: tuple[str, ...] = (
 # Pour ces scrutins, la colonne 'nuance' du Parquet est un code-candidat
 # (CHIR = Chirac, JOSP = Jospin, etc.), contrairement aux scrutins de liste
 # qui utilisent des codes partisans (RN, SOC, LDVG, …).
-# Blocs officiels Ministère (reconstruction ante-2023 selon ADR-0005).
+# Aucune grille officielle ne couvre ces scrutins : doctrine ADR-0010 (grille la plus
+# proche, INTA1931378J 2020, si même famille politique ; sinon reconstruction justifiée).
 # (nuance, annee, bloc, source_bloc) — source_bloc = justification courte (1 ligne).
 #
 _NUANCES_PRES: list[tuple[str, int, str, str]] = [
@@ -192,14 +201,23 @@ _NUANCES_PRES: list[tuple[str, int, str, str]] = [
     (
         "LEPA",
         2002,
-        "CENT",
-        "Lepage – Cap21 (écologie libérale) → CENT ; pas de bloc écolo officiel",
+        "DIV",
+        "Lepage – Cap21, écologiste autonome → DIV : grille la plus proche INTA1931378J "
+        "(2020) range « Rassemblement citoyen-CAP 21 » dans ECO → AUT (= DIV), même "
+        "formation (ADR-0010 ; avant : CENT)",
     ),
     ("LEPE", 2002, "EXD", "Le Pen J.-M. – FN → EXD"),
     ("MADE", 2002, "DTE", "Madelin – DL (libéral-conservateur) → DTE"),
     ("MAME", 2002, "GAU", "Mamère – Verts (DVGV) → GAU"),
     ("MEGR", 2002, "EXD", "Mégret – MNR (scission FN) → EXD"),
-    ("SAIN", 2002, "DIV", "Saint-Josse – CPNT → DIV"),
+    (
+        "SAIN",
+        2002,
+        "DIV",
+        "Saint-Josse – CPNT autonome (candidat contre la droite parlementaire) → DIV "
+        "maintenu : INTA1931378J (2020) range CPNT dans DVD du fait de son association "
+        "à l'UMP/LR après 2010, famille différente à l'époque (ADR-0010)",
+    ),
     ("TAUB", 2002, "GAU", "Taubira – PRG (allié PS) → GAU"),
     # ── 2007 (12 candidats) ────────────────────────────────────────────────
     ("BAYR", 2007, "CENT", "Bayrou – MoDem → CENT"),
@@ -208,17 +226,33 @@ _NUANCES_PRES: list[tuple[str, int, str, str]] = [
     ("BUFF", 2007, "GAU", "Buffet – PCF → GAU"),
     ("LAGU", 2007, "EXG", "Laguiller – LO → EXG"),
     ("LEPE", 2007, "EXD", "Le Pen J.-M. – FN → EXD"),
-    ("NIHO", 2007, "DIV", "Nihous – CPNT → DIV"),
+    (
+        "NIHO",
+        2007,
+        "DIV",
+        "Nihous – CPNT autonome (candidat contre l'UMP) → DIV maintenu : rattachement "
+        "de CPNT à DVD (INTA1931378J, 2020) postérieur à 2010 (ADR-0010)",
+    ),
     ("ROYA", 2007, "GAU", "Royal – PS → GAU"),
     ("SARK", 2007, "DTE", "Sarkozy – UMP → DTE"),
     ("SCHI", 2007, "EXG", "Schivardi – PT trotskiste → EXG"),
-    ("VILL", 2007, "DTE", "de Villiers – MPF (DVDR) → DTE (CE 31/01/2020 n°437675)"),
+    (
+        "VILL",
+        2007,
+        "DTE",
+        "de Villiers – MPF (DVDR) → DTE (INTA1931378J p. 8 : MPF ∈ DVD ; p. 10 : DVD → DTE)",
+    ),
     ("VOYN", 2007, "GAU", "Voynet – Verts (DVGV) → GAU"),
     # ── 2012 (10 candidats) ────────────────────────────────────────────────
     ("ARTH", 2012, "EXG", "Arthaud – LO → EXG"),
     ("BAYR", 2012, "CENT", "Bayrou – MoDem → CENT"),
     ("CHEM", 2012, "DIV", "Cheminade – Solidarité et Progrès → DIV"),
-    ("DUPO", 2012, "DTE", "Dupont-Aignan – DLR (DVDR) → DTE (CE 31/01/2020 n°437675)"),
+    (
+        "DUPO",
+        2012,
+        "DTE",
+        "Dupont-Aignan – DLR (devenu DLF) → DTE (INTA1931378J p. 10 : DLF → DTE)",
+    ),
     ("HOLL", 2012, "GAU", "Hollande – PS → GAU"),
     ("JOLY", 2012, "GAU", "Joly – EELV (DVGV) → GAU ; pas de bloc écolo officiel"),
     ("LEPE", 2012, "EXD", "Le Pen Marine – FN → EXD"),
@@ -236,17 +270,33 @@ _NUANCES_PRES: list[tuple[str, int, str, str]] = [
 # 111 entrées (nuance, annee) validées par Mathias le 2026-06-01.
 # Classement "officiel de l'époque" (ADR-0005) ; circulaires 2002-2017 non publiées
 # au JO (documents internes) → reconstruction sourcée ; 2022 = INTA2212053C ;
-# 2024 = IOMA2415630C. Détail et justification : reports/mapping-nuances-legislatives-validated.md
+# 2024 = IOMA2415630C. Aucune de ces circulaires ne contient de grille de blocs :
+# doctrine ADR-0010 (grille la plus proche : INTA1931378J 2020 pour 2002-2022,
+# IOMA2322276J 2023 pour 2024). Reclassements ADR-0010 : ECO 2002/2007/2012/2024 → DIV,
+# PRV 2012 → CENT, UDI 2024 → DTE.
+# Détail et justification : reports/mapping-nuances-legislatives-validated.md, ADR-0010
 # Format : (nuance, annee, bloc, source_bloc)
 _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     # ── 2002 (22 nuances) ──────────────────────────────────────────────────
     ("COM", 2002, "GAU", "PCF → GAU (logique officielle Ministère, pas EXG)"),
-    ("CPNT", 2002, "DIV", "Chasse Pêche Nature Tradition → DIV"),
+    (
+        "CPNT",
+        2002,
+        "DIV",
+        "CPNT, nuance propre et autonome en 2002 → DIV maintenu : son rangement dans DVD "
+        "(INTA1931378J, 2020) reflète l'association à l'UMP/LR après 2010 (ADR-0010)",
+    ),
     ("DIV", 2002, "DIV", "Divers → mapping direct"),
     ("DL", 2002, "DTE", "Démocratie Libérale (Madelin) libéral-conservateur → DTE"),
     ("DVD", 2002, "DTE", "Divers Droite → mapping direct"),
     ("DVG", 2002, "GAU", "Divers Gauche → mapping direct"),
-    ("ECO", 2002, "GAU", "Écologistes/Verts → GAU (pas de bloc écolo officiel, ADR-0005)"),
+    (
+        "ECO",
+        2002,
+        "DIV",
+        "Écologistes hors Verts (VEC distinct) → DIV : INTA1931378J (2020) ECO hors EELV "
+        "→ AUT (= DIV), même sens (ADR-0010 ; avant : GAU)",
+    ),
     ("EXD", 2002, "EXD", "Extrême droite → code = bloc"),
     ("EXG", 2002, "EXG", "Extrême gauche → code = bloc"),
     ("FN", 2002, "EXD", "Front National → EXD"),
@@ -257,7 +307,7 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
         "MPF",
         2002,
         "DTE",
-        "MPF (Villiers) souverainiste conservateur → DTE (CE 31/01/2020 n°437675)",
+        "MPF (Villiers) → DTE (INTA1931378J p. 8 : MPF ∈ DVD ; p. 10 : DVD → DTE)",
     ),
     (
         "PREP",
@@ -271,14 +321,26 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     ("SOC", 2002, "GAU", "Parti Socialiste → GAU"),
     ("UDF", 2002, "CENT", "UDF (Bayrou-Giscard) → CENT"),
     ("UMP", 2002, "DTE", "UMP (Chirac) → DTE"),
-    ("VEC", 2002, "GAU", "Les Verts → GAU (idem ECO)"),
+    ("VEC", 2002, "GAU", "Les Verts → GAU (VEC = GAU dans les grilles 2020, 2023, 2026)"),
     # ── 2007 (17 nuances) ──────────────────────────────────────────────────
     ("COM", 2007, "GAU", "PCF → GAU"),
-    ("CPNT", 2007, "DIV", "Chasse Pêche Nature Tradition → DIV"),
+    (
+        "CPNT",
+        2007,
+        "DIV",
+        "CPNT, nuance propre et autonome en 2007 → DIV maintenu : son rangement dans DVD "
+        "(INTA1931378J, 2020) reflète l'association à l'UMP/LR après 2010 (ADR-0010)",
+    ),
     ("DIV", 2007, "DIV", "Divers → mapping direct"),
     ("DVD", 2007, "DTE", "Divers Droite → DTE"),
     ("DVG", 2007, "GAU", "Divers Gauche → GAU"),
-    ("ECO", 2007, "GAU", "Écologistes → GAU (ADR-0005)"),
+    (
+        "ECO",
+        2007,
+        "DIV",
+        "Écologistes hors Verts (VEC distinct) → DIV : INTA1931378J (2020) ECO hors EELV "
+        "→ AUT (= DIV), même sens (ADR-0010 ; avant : GAU)",
+    ),
     ("EXD", 2007, "EXD", "Extrême droite → code = bloc"),
     ("EXG", 2007, "EXG", "Extrême gauche → code = bloc"),
     ("FN", 2007, "EXD", "Front National → EXD"),
@@ -296,13 +358,26 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     ("CEN", 2012, "CENT", "Centre → code centriste, CENT"),
     ("DVD", 2012, "DTE", "Divers Droite → DTE"),
     ("DVG", 2012, "GAU", "Divers Gauche → GAU"),
-    ("ECO", 2012, "GAU", "Écologistes (EELV) → GAU"),
+    (
+        "ECO",
+        2012,
+        "DIV",
+        "Écologistes hors EELV (VEC distinct) → DIV : INTA1931378J (2020) ECO hors EELV "
+        "→ AUT (= DIV), même sens (ADR-0010 ; avant : GAU)",
+    ),
     ("EXD", 2012, "EXD", "Extrême droite → code = bloc"),
     ("EXG", 2012, "EXG", "Extrême gauche → code = bloc"),
     ("FG", 2012, "GAU", "Front de Gauche (PCF+PG) → GAU ; LFI bascule EXG en 2026 (INTP2602966C)"),
     ("FN", 2012, "EXD", "Front National → EXD"),
     ("NCE", 2012, "CENT", "Nouveau Centre (Borloo, allié UMP) → CENT"),
-    ("PRV", 2012, "DTE", "Parti Radical Valoisien (allié UMP) → DTE"),
+    (
+        "PRV",
+        2012,
+        "CENT",
+        "Parti radical valoisien (sorti de l'UMP en 2011, ARES puis UDI) → CENT : "
+        "INTA1931378J (2020) Mouvement radical (MR, successeur du PRV) → CENT ; "
+        "INTP2602966C (2026) PR → CENT (ADR-0010 ; avant : DTE)",
+    ),
     ("RDG", 2012, "GAU", "Radical de Gauche (allié PS) → GAU"),
     ("REG", 2012, "DIV", "Régionalistes → DIV"),
     ("SOC", 2012, "GAU", "Parti Socialiste → GAU"),
@@ -311,10 +386,21 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     # ── 2017 (17 nuances) ──────────────────────────────────────────────────
     ("COM", 2017, "GAU", "PCF → GAU"),
     ("DIV", 2017, "DIV", "Divers → mapping direct"),
-    ("DLF", 2017, "DTE", "Debout la France (Dupont-Aignan) → DTE (CE 31/01/2020 n°437675)"),
+    (
+        "DLF",
+        2017,
+        "DTE",
+        "Debout la France → DTE (INTA1931378J p. 10 ; CE n° 437675 a suspendu DLF → EXD)",
+    ),
     ("DVD", 2017, "DTE", "Divers Droite → DTE"),
     ("DVG", 2017, "GAU", "Divers Gauche → GAU"),
-    ("ECO", 2017, "GAU", "Écologistes (EELV) → GAU"),
+    (
+        "ECO",
+        2017,
+        "GAU",
+        "Écologistes incluant EELV (pas de code VEC en 2017) → GAU maintenu : ECO de "
+        "la grille INTA1931378J (2020) exclut EELV, sens différent (ADR-0010)",
+    ),
     ("EXD", 2017, "EXD", "Extrême droite → code = bloc"),
     ("EXG", 2017, "EXG", "Extrême gauche → code = bloc"),
     (
@@ -330,7 +416,13 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     ("REG", 2017, "DIV", "Régionalistes → DIV"),
     ("REM", 2017, "CENT", "La République En Marche (Macron) → CENT"),
     ("SOC", 2017, "GAU", "Parti Socialiste → GAU"),
-    ("UDI", 2017, "CENT", "Union des Démocrates Indépendants → CENT"),
+    (
+        "UDI",
+        2017,
+        "CENT",
+        "Union des démocrates et indépendants → CENT : grille la plus proche "
+        "INTA1931378J (2020) UDI → CENT (ADR-0010)",
+    ),
     # ── 2022 (16 nuances) — source INTA2212053C ────────────────────────────
     ("DIV", 2022, "DIV", "Divers → mapping direct"),
     ("DSV", 2022, "DTE", "Divers Souverainiste → DTE (souverainistes non-EXD, logique CE DLF)"),
@@ -339,7 +431,14 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     ("DVG", 2022, "GAU", "Divers Gauche → GAU"),
     ("DXD", 2022, "EXD", "Divers Extrême Droite → code explicite"),
     ("DXG", 2022, "EXG", "Divers Extrême Gauche → code explicite"),
-    ("ECO", 2022, "GAU", "Écologistes (EELV, INTA2212053C) → GAU"),
+    (
+        "ECO",
+        2022,
+        "GAU",
+        "Écologistes incluant EELV (INTA2212053C annexe 1, pas de code VEC) → GAU "
+        "maintenu : ECO de la grille antérieure INTA1931378J (2020) exclut EELV, sens "
+        "différent (ADR-0010)",
+    ),
     ("ENS", 2022, "CENT", "Ensemble! (LREM+MoDem+Horizons) → CENT"),
     ("LR", 2022, "DTE", "Les Républicains → DTE"),
     ("NUP", 2022, "GAU", "NUPES (LFI+PS+PCF+EELV) → GAU ; LFI bascule EXG en 2026 (INTP2602966C)"),
@@ -347,15 +446,33 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     ("REC", 2022, "EXD", "Reconquête (Zemmour, INTA2212053C) → EXD"),
     ("REG", 2022, "DIV", "Régionalistes → DIV"),
     ("RN", 2022, "EXD", "Rassemblement National → EXD (CE 21/09/2023 n°488379)"),
-    ("UDI", 2022, "CENT", "UDI → CENT"),
+    (
+        "UDI",
+        2022,
+        "CENT",
+        "UDI → CENT : grille antérieure la plus proche INTA1931378J (2020) UDI → CENT (ADR-0010)",
+    ),
     # ── 2024 (22 nuances) — source IOMA2415630C ────────────────────────────
     ("COM", 2024, "GAU", "PCF standalone (hors NFP) → GAU"),
     ("DIV", 2024, "DIV", "Divers → mapping direct"),
-    ("DSV", 2024, "DTE", "Divers Souverainiste → DTE (IOMA2415630C : souverainistes ≠ EXD)"),
+    (
+        "DSV",
+        2024,
+        "DTE",
+        "Droite souverainiste (Debout la France…) → DTE : IOMA2322276J (2023) DLF → "
+        "Droite ; INTP2602966C (2026) DSV → DTE (IOMA2415630C sans grille de blocs)",
+    ),
     ("DVC", 2024, "CENT", "Divers Centre → CENT"),
     ("DVD", 2024, "DTE", "Divers Droite → DTE"),
     ("DVG", 2024, "GAU", "Divers Gauche → GAU"),
-    ("ECO", 2024, "GAU", "Écologistes → GAU"),
+    (
+        "ECO",
+        2024,
+        "DIV",
+        "Autres candidats de sensibilité écologiste (VEC distinct, IOMA2415630C) → DIV : "
+        "IOMA2322276J (2023) ECO → Autres (= DIV), même sens ; INTP2602966C (2026) "
+        "concorde (ADR-0010 ; avant : GAU)",
+    ),
     ("ENS", 2024, "CENT", "Ensemble (Macron) → CENT"),
     ("EXD", 2024, "EXD", "Extrême droite → code = bloc"),
     (
@@ -377,7 +494,14 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     ("REG", 2024, "DIV", "Régionalistes → DIV"),
     ("RN", 2024, "EXD", "Rassemblement National → EXD"),
     ("SOC", 2024, "GAU", "PS standalone (hors NFP) → GAU"),
-    ("UDI", 2024, "CENT", "UDI → CENT"),
+    (
+        "UDI",
+        2024,
+        "DTE",
+        "UDI → DTE : grille antérieure la plus proche IOMA2322276J (2023) UDI → Droite, "
+        "même formation ; INTP2602966C (2026) la replace en CENT, postérieure au scrutin "
+        "(ADR-0010 ; avant : CENT)",
+    ),
     (
         "UG",
         2024,
@@ -387,6 +511,298 @@ _NUANCES_LEGI: list[tuple[str, int, str, str]] = [
     ("UXD", 2024, "EXD", "Union d'extrême droite (RN+alliés 2024) → EXD"),
     ("VEC", 2024, "GAU", "Verts standalone (hors NFP) → GAU"),
 ]
+
+# ── Nuances municipales (2008 / 2014 / 2020 / 2026) ──────────────────────────
+# Source unique du référentiel municipal (correctif C2, audit 2026-09-24).
+# 67 entrées validées en phase D3.2 (ADR-0005), révisées par l'ADR-0010 (2026-09-24,
+# addendum 2026-09-25) :
+# - 2020 et 2026 : application stricte des grilles officielles de blocs
+#   (INTA1931378J annexe 3 p. 10 ; INTP2602966C annexe 3 p. 12) ; « AUT » (2020) = DIV ;
+#   ajout des codes de liste officiels jusque-là non mappés (2020 : LREG, LGJ, LMDM,
+#   LDLF ; 2026 : LUD, LREN, LMDM, LDSV, LREC, LREG) ;
+# - 2008 et 2014 (aucune grille) : grille la plus proche (INTA1931378J) pour LCOM,
+#   LUD, LUDI (même famille politique) ;
+# - lot 2 (addendum ADR-0010 du 2026-09-25) : libellés officiels 2008 et 2014 vérifiés sur
+#   les archives du ministère (docs/sources-officielles/nuances/2008-* et 2014-*) :
+#   LCMD GAU → CENT, LMAJ exclu → DTE, LGC (DIV) et LMC (CENT) maintenus par la règle 3,
+#   ajout de LREG → DIV et LEXD → EXD (2008).
+# Total : 80 entrées (2008 : 15, 2014 : 17, 2020 : 23, 2026 : 25).
+# Codes SANS mapping (non insérés, bloc NULL en vue) : NC (2014/2020), LNC (2020)
+# Format : (nuance, annee, bloc, source_bloc)
+_SRC_2020 = "INTA1931378J annexe 3 p. 10"
+_SRC_2026 = "INTP2602966C annexe 3 p. 12"
+_ARCH_2008 = "libellé officiel archives ministère MN2008 (vérif. 2026-09-25)"
+_ARCH_2014 = "libellé officiel archives ministère MN2014 (vérif. 2026-09-25)"
+
+_NUANCES_MUNI: list[tuple[str, int, str, str]] = [
+    # ── 2008 — seuil 3 500 hab — 164 communes HdF nuancées ───────────────────
+    # 15 codes = référentiel officiel complet des listes 2008 (archives du ministère).
+    ("LAUT", 2008, "DIV", f"« Liste inclassable » ({_ARCH_2008}) → DIV (D3.2)"),
+    (
+        "LCMD",
+        2008,
+        "CENT",
+        f"« Liste centre-MoDem » ({_ARCH_2008}) → CENT : grille la plus proche "
+        f"{_SRC_2020} LMDM → CENT, même formation (ADR-0010 lot 2 ; avant : GAU, "
+        "code lu à tort « Communiste et Divers »)",
+    ),
+    (
+        "LCOM",
+        2008,
+        "GAU",
+        f"« Liste du Parti Communiste » ({_ARCH_2008}) → GAU : aucune grille 2008, grille "
+        f"la plus proche {_SRC_2020} LCOM → GAU, même famille (ADR-0010 ; avant : EXG)",
+    ),
+    ("LDVD", 2008, "DTE", f"« Liste divers droite » ({_ARCH_2008}) → DTE (D3.2)"),
+    ("LDVG", 2008, "GAU", f"« Liste divers gauche » ({_ARCH_2008}) → GAU (D3.2)"),
+    (
+        "LEXD",
+        2008,
+        "EXD",
+        f"« Liste d'extrême droite » ({_ARCH_2008}) → EXD : grille la plus proche "
+        f"{_SRC_2020} LEXD → EXD (ADR-0010 lot 2 ; ajout)",
+    ),
+    ("LEXG", 2008, "EXG", f"« Liste d'extrême gauche » ({_ARCH_2008}) → EXG (D3.2)"),
+    ("LFN", 2008, "EXD", f"« Liste du Front National » ({_ARCH_2008}) → EXD (D3.2)"),
+    (
+        "LGC",
+        2008,
+        "DIV",
+        f"« Liste gauche-centristes » ({_ARCH_2008}) : entente gauche + centristes sans "
+        "équivalent dans les grilles officielles (règle 2 inapplicable) → classement "
+        "D3.2 maintenu, règle 3 (ADR-0010 lot 2)",
+    ),
+    (
+        "LMAJ",
+        2008,
+        "DTE",
+        f"« Liste de la majorité » ({_ARCH_2008}) : majorité présidentielle UMP/NC → DTE, "
+        f"grille la plus proche {_SRC_2020} LLR/LUD → DTE, même famille ; cohérent avec "
+        "MAJ 2007 → DTE (ADR-0010 lot 2 ; avant : exclu, lu « liste sortante »)",
+    ),
+    (
+        "LMC",
+        2008,
+        "CENT",
+        f"« Liste majorité-centristes » ({_ARCH_2008}) : entente majorité + centristes "
+        "sans équivalent dans les grilles officielles → classement D3.2 maintenu, "
+        "règle 3 (ADR-0010 lot 2)",
+    ),
+    (
+        "LREG",
+        2008,
+        "DIV",
+        f"« Liste régionaliste » ({_ARCH_2008}) → DIV : grille la plus proche "
+        f"{_SRC_2020} LREG → AUT = DIV (ADR-0010 lot 2 ; ajout)",
+    ),
+    ("LSOC", 2008, "GAU", f"« Liste du Parti Socialiste » ({_ARCH_2008}) → GAU (D3.2)"),
+    ("LUG", 2008, "GAU", f"« Liste d'union de la gauche » ({_ARCH_2008}) → GAU (D3.2)"),
+    ("LVEC", 2008, "GAU", f"« Liste des Verts » ({_ARCH_2008}) → GAU (D3.2 ; ADR-0010 (c))"),
+    # ── 2014 — seuil 1 000 hab — ~3 778 communes HdF nuancées ────────────────
+    # 17 codes = référentiel officiel des listes 2014 (archives du ministère), sans NC.
+    (
+        "LCOM",
+        2014,
+        "GAU",
+        f"« Liste du Parti communiste français » ({_ARCH_2014}) → GAU : aucune grille 2014, "
+        f"grille la plus proche {_SRC_2020} LCOM → GAU, même famille (ADR-0010 ; avant : EXG)",
+    ),
+    ("LDIV", 2014, "DIV", f"« Liste Divers » ({_ARCH_2014}) → DIV (D3.2)"),
+    ("LDVD", 2014, "DTE", f"« Liste Divers droite » ({_ARCH_2014}) → DTE (D3.2)"),
+    ("LDVG", 2014, "GAU", f"« Liste Divers gauche » ({_ARCH_2014}) → GAU (D3.2)"),
+    ("LEXD", 2014, "EXD", f"« Liste Extrême droite » ({_ARCH_2014}) → EXD (D3.2)"),
+    ("LEXG", 2014, "EXG", f"« Liste Extrême gauche » ({_ARCH_2014}) → EXG (D3.2)"),
+    (
+        "LFG",
+        2014,
+        "GAU",
+        f"« Liste Front de Gauche » ({_ARCH_2014}) : PCF + Parti de Gauche, 2012-2016 — "
+        "GAU per ADR-0005 ; bascule EXG concerne LFI/Mélenchon en 2026 seulement (D3.2)",
+    ),
+    ("LFN", 2014, "EXD", f"« Liste Front National » ({_ARCH_2014}) → EXD (D3.2)"),
+    ("LMDM", 2014, "CENT", f"« Liste Modem » ({_ARCH_2014}) → CENT (D3.2)"),
+    (
+        "LPG",
+        2014,
+        "GAU",
+        f"« Liste du Parti de Gauche » ({_ARCH_2014}) : Mélenchon, 2008-2016, dans le "
+        "Front de Gauche en 2014 ; GAU par cohérence avec LFG (D3.2)",
+    ),
+    ("LSOC", 2014, "GAU", f"« Liste Socialiste » ({_ARCH_2014}) → GAU (D3.2)"),
+    ("LUC", 2014, "CENT", f"« Liste Union du Centre » ({_ARCH_2014}) → CENT (D3.2)"),
+    (
+        "LUD",
+        2014,
+        "DTE",
+        f"« Liste Union de la Droite » ({_ARCH_2014}) → DTE : grille la plus proche "
+        f"{_SRC_2020} LUD → DTE, même sens (ADR-0010 ; avant : CENT)",
+    ),
+    (
+        "LUDI",
+        2014,
+        "CENT",
+        f"« Liste Union Démocrates et Indépendants » ({_ARCH_2014}) → CENT : grille la plus "
+        f"proche {_SRC_2020} LUDI → CENT, même formation (ADR-0010 ; avant : DIV)",
+    ),
+    ("LUG", 2014, "GAU", f"« Liste Union de la Gauche » ({_ARCH_2014}) → GAU (D3.2)"),
+    (
+        "LUMP",
+        2014,
+        "DTE",
+        f"« Liste Union pour un Mouvement Populaire » ({_ARCH_2014}) → DTE (D3.2)",
+    ),
+    (
+        "LVEC",
+        2014,
+        "GAU",
+        f"« Liste Europe-Ecologie-Les Verts » ({_ARCH_2014}) → GAU (D3.2 ; ADR-0010 (c))",
+    ),
+    # NC (~45 281 occurrences HdF t1) : non inséré — absent du référentiel officiel 2014
+    # (communes de moins de 1 000 hab.), pas un bloc idéologique (D3.2 ; vérif. 2026-09-25)
+    # ── 2020 — seuil 3 500 hab — ~3 779 communes HdF nuancées ────────────────
+    # Grille officielle INTA1931378J annexe 3 : les 23 codes de liste y figurent.
+    (
+        "LCOM",
+        2020,
+        "GAU",
+        f"Liste du Parti communiste français → GAU ({_SRC_2020} ; ADR-0010 ; avant : EXG)",
+    ),
+    ("LDIV", 2020, "DIV", f"Divers — grille officielle ({_SRC_2020})"),
+    (
+        "LDVC",
+        2020,
+        "CENT",
+        f"Divers centre → CENT ({_SRC_2020}) ; CE 31/01/2020 n°437675 a seulement "
+        "suspendu l'attribution de LDVC aux listes simplement soutenues par LREM/MoDem/UDI",
+    ),
+    ("LDVD", 2020, "DTE", f"Divers Droite — grille officielle ({_SRC_2020})"),
+    ("LDVG", 2020, "GAU", f"Divers Gauche — grille officielle ({_SRC_2020})"),
+    (
+        "LECO",
+        2020,
+        "DIV",
+        f"Autre liste écologiste, hors EELV (LVEC distinct) → AUT = DIV ({_SRC_2020} ; "
+        "ADR-0010 ; avant : GAU)",
+    ),
+    ("LEXD", 2020, "EXD", f"Extrême droite — grille officielle ({_SRC_2020})"),
+    ("LEXG", 2020, "EXG", f"Extrême gauche — grille officielle ({_SRC_2020})"),
+    (
+        "LFI",
+        2020,
+        "GAU",
+        "La France Insoumise 2020 — GAU per circulaire INTA1931378J ; "
+        "bascule EXG uniquement à partir de 2026 (INTP2602966C + CE 27/02/2026 n°512694) (D3.2)",
+    ),
+    ("LLR", 2020, "DTE", f"Les Républicains — grille officielle ({_SRC_2020})"),
+    # LNC (~1 787 occurrences) : non inséré — parallèle structurel avec NC ;
+    # identité LNC ambiguë (Nouveau Centre ou Liste Non Classée) → NULL (D3.2, Q9 validé)
+    ("LRDG", 2020, "GAU", f"Radicaux de Gauche — allié PS — grille officielle ({_SRC_2020})"),
+    ("LREM", 2020, "CENT", f"La République En Marche — grille officielle ({_SRC_2020})"),
+    ("LRN", 2020, "EXD", f"Rassemblement National — grille officielle ({_SRC_2020})"),
+    ("LSOC", 2020, "GAU", f"Socialiste — grille officielle ({_SRC_2020})"),
+    ("LUC", 2020, "CENT", f"Union Centre — grille officielle ({_SRC_2020})"),
+    (
+        "LUD",
+        2020,
+        "DTE",
+        f"Liste union de la droite (dont LR) → DTE ({_SRC_2020} ; ADR-0010 ; avant : CENT)",
+    ),
+    ("LUDI", 2020, "CENT", f"Liste UDI → CENT ({_SRC_2020} ; ADR-0010 ; avant : DIV)"),
+    ("LUG", 2020, "GAU", f"Union de la Gauche — grille officielle ({_SRC_2020})"),
+    ("LVEC", 2020, "GAU", f"Verts / EELV — grille officielle ({_SRC_2020})"),
+    # Codes officiels ajoutés par l'ADR-0010 (sans effet s'ils sont absents des données HdF)
+    ("LREG", 2020, "DIV", f"Liste régionaliste → AUT = DIV ({_SRC_2020} ; ajout ADR-0010)"),
+    ("LGJ", 2020, "DIV", f"Liste Gilets jaunes → AUT = DIV ({_SRC_2020} ; ajout ADR-0010)"),
+    ("LMDM", 2020, "CENT", f"Liste Modem → CENT ({_SRC_2020} ; ajout ADR-0010)"),
+    ("LDLF", 2020, "DTE", f"Liste Debout la France → DTE ({_SRC_2020} ; ajout ADR-0010)"),
+    # NC (~43 074 occurrences HdF t1) : non inséré — voir 2014 NC (D3.2)
+    # ── 2026 — seuil 3 500 hab — ~318 communes HdF nuancées ──────────────────
+    # Grille officielle INTP2602966C annexe 3 : les 25 codes de liste y figurent.
+    (
+        "LCOM",
+        2026,
+        "GAU",
+        f"Liste investie par le Parti communiste français → GAU ({_SRC_2026} ; "
+        "ADR-0010 ; avant : EXG)",
+    ),
+    ("LDIV", 2026, "DIV", f"Divers — grille officielle ({_SRC_2026})"),
+    ("LDVC", 2026, "CENT", f"Divers Centre — grille officielle ({_SRC_2026})"),
+    ("LDVD", 2026, "DTE", f"Divers Droite — grille officielle ({_SRC_2026})"),
+    ("LDVG", 2026, "GAU", f"Divers Gauche — grille officielle ({_SRC_2026})"),
+    (
+        "LECO",
+        2026,
+        "DIV",
+        f"Liste écologiste hors Les Écologistes (LVEC distinct) → DIV ({_SRC_2026} ; "
+        "ADR-0010 ; avant : GAU)",
+    ),
+    ("LEXD", 2026, "EXD", f"Extrême droite — grille officielle ({_SRC_2026})"),
+    ("LEXG", 2026, "EXG", f"Extrême gauche — grille officielle ({_SRC_2026})"),
+    (
+        "LFI",
+        2026,
+        "EXG",
+        "La France Insoumise 2026 — EXG per circulaire INTP2602966C (2 fév. 2026) "
+        "+ CE 27/02/2026 n°512694 (rejet recours LFI) (D3.2)",
+    ),
+    (
+        "LHOR",
+        2026,
+        "CENT",
+        f"Horizons — parti centriste Édouard Philippe — grille officielle ({_SRC_2026})",
+    ),
+    ("LLR", 2026, "DTE", f"Les Républicains — grille officielle ({_SRC_2026})"),
+    ("LRN", 2026, "EXD", f"Rassemblement National — grille officielle ({_SRC_2026})"),
+    ("LSOC", 2026, "GAU", f"Socialiste — grille officielle ({_SRC_2026})"),
+    ("LUC", 2026, "CENT", f"Union Centre — grille officielle ({_SRC_2026})"),
+    (
+        "LUDI",
+        2026,
+        "CENT",
+        f"Liste investie par l'UDI → CENT ({_SRC_2026} ; ADR-0010 ; avant : DIV)",
+    ),
+    (
+        "LUDR",
+        2026,
+        "EXD",
+        f"Union des droites pour la République (parti Ciotti, allié RN) → EXD "
+        f"({_SRC_2026} ; CE 27/02/2026 n°512694)",
+    ),
+    (
+        "LUG",
+        2026,
+        "GAU",
+        f"Union de la gauche (au moins deux partis parmi PCF, PS, Les Écologistes) → GAU "
+        f"({_SRC_2026})",
+    ),
+    (
+        "LUXD",
+        2026,
+        "EXD",
+        f"Union de l'extrême droite (au moins deux partis parmi RN, REC, UDR) → EXD ({_SRC_2026})",
+    ),
+    ("LVEC", 2026, "GAU", f"Les Écologistes → GAU ({_SRC_2026})"),
+    # Codes officiels ajoutés par l'ADR-0010 (sans effet s'ils sont absents des données HdF)
+    (
+        "LUD",
+        2026,
+        "DTE",
+        f"Union de la droite (partis du bloc de droite, dont LR) → DTE ({_SRC_2026} ; "
+        "ajout ADR-0010)",
+    ),
+    ("LREN", 2026, "CENT", f"Liste investie par Renaissance → CENT ({_SRC_2026} ; ajout ADR-0010)"),
+    ("LMDM", 2026, "CENT", f"Liste investie par le Modem → CENT ({_SRC_2026} ; ajout ADR-0010)"),
+    ("LDSV", 2026, "DTE", f"Droite souverainiste → DTE ({_SRC_2026} ; ajout ADR-0010)"),
+    ("LREC", 2026, "EXD", f"Liste Reconquête → EXD ({_SRC_2026} ; ajout ADR-0010)"),
+    ("LREG", 2026, "DIV", f"Liste régionaliste → DIV ({_SRC_2026} ; ajout ADR-0010)"),
+]
+
+
+# Années gérées par _NUANCES_MUNI (périmètre du DELETE ciblé de populate_nuances_municipales)
+_ANNEES_MUNI: tuple[int, ...] = tuple(sorted({annee for _, annee, _, _ in _NUANCES_MUNI}))
+# Codes municipaux volontairement SANS mapping (ADR-0005) : ne doivent jamais être insérés.
+# LMAJ (2008) en est sorti : mappé DTE depuis l'addendum ADR-0010 du 2026-09-25 (lot 2).
+_CODES_MUNI_SANS_MAPPING: frozenset[str] = frozenset({"NC", "LNC"})
 
 # ── Candidats présidentiels 2017 / 2022 ──────────────────────────────────────
 # La colonne 'nuance' est NULL pour ces scrutins dans le Parquet.
@@ -431,7 +847,7 @@ _CANDIDATS_PRES_2017: list[tuple[int, str, str, str, str, str, str]] = [
         "Debout la France",
         "DTE",
         "Nicolas Dupont-Aignan",
-        "Nuance DVDR — CE 31/01/2020 n°437675 conforte DTE",
+        "Nuance DVDR — DLF → DTE : INTA1931378J p. 10 (CE n° 437675 a suspendu DLF → EXD)",
     ),
     (
         2017,
@@ -500,7 +916,7 @@ _CANDIDATS_PRES_2022: list[tuple[int, str, str, str, str, str, str]] = [
         "Debout la France",
         "DTE",
         "Nicolas Dupont-Aignan",
-        "Nuance DVDR — CE 31/01/2020 n°437675 conforte DTE",
+        "Nuance DVDR — DLF → DTE : INTA1931378J p. 10 (CE n° 437675 a suspendu DLF → EXD)",
     ),
     (2022, "HIDALGO", "Anne", "Parti Socialiste", "GAU", "Anne Hidalgo", "PS — nuance PS → GAU"),
     (
@@ -510,7 +926,8 @@ _CANDIDATS_PRES_2022: list[tuple[int, str, str, str, str, str, str]] = [
         "EELV",
         "GAU",
         "Yannick Jadot",
-        "EELV, nuance ECO (INTA2212053C 2022) ; classement GAU selon logique officielle Ministère post-2023 (blocs inexistants en 2022)",
+        "EELV (nuance ECO en 2022, INTA2212053C) → GAU : EELV = VEC → GAU dans les "
+        "grilles INTA1931378J (2020), IOMA2322276J (2023) et INTP2602966C (2026) (ADR-0010)",
     ),
     (2022, "LASSALLE", "Jean", "Résistons!", "DIV", "Jean Lassalle", "Logique officielle DIV"),
     (
@@ -574,6 +991,20 @@ _CANDIDATS_PRES_2022: list[tuple[int, str, str, str, str, str, str]] = [
 # ── Création du schéma ────────────────────────────────────────────────────────
 
 
+def create_nuances_harmonisees(con: duckdb.DuckDBPyConnection) -> None:
+    """Crée la table (nuance, annee) → bloc. Idempotent ; partagée avec le module Législatif."""
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS nuances_harmonisees (
+            nuance VARCHAR NOT NULL,
+            annee  INTEGER NOT NULL,
+            bloc   VARCHAR NOT NULL,
+            PRIMARY KEY (nuance, annee)
+        )
+    """)
+    # Migration D1.2 : justification courte du bloc, sur le modèle de candidats_presidentielle
+    con.execute("ALTER TABLE nuances_harmonisees ADD COLUMN IF NOT EXISTS source_bloc VARCHAR")
+
+
 def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
     """Crée les 6 tables électorales. Idempotent (CREATE TABLE IF NOT EXISTS)."""
     con.execute("""
@@ -628,14 +1059,7 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
         )
     """)
 
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS nuances_harmonisees (
-            nuance VARCHAR NOT NULL,
-            annee  INTEGER NOT NULL,
-            bloc   VARCHAR NOT NULL,
-            PRIMARY KEY (nuance, annee)
-        )
-    """)
+    create_nuances_harmonisees(con)
 
     con.execute("""
         CREATE TABLE IF NOT EXISTS candidats_presidentielle (
@@ -659,8 +1083,6 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
         "ALTER TABLE elections ADD COLUMN IF NOT EXISTS ancien_decoupage BOOLEAN DEFAULT FALSE"
     )
     con.execute("ALTER TABLE resultats_participation ADD COLUMN IF NOT EXISTS code_circo VARCHAR")
-    # Migration D1.2 : justification courte du bloc, sur le modèle de candidats_presidentielle
-    con.execute("ALTER TABLE nuances_harmonisees ADD COLUMN IF NOT EXISTS source_bloc VARCHAR")
 
     logger.info("Schéma électoral créé/vérifié : 6 tables")
 
@@ -670,6 +1092,10 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
 
 def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
     """Remplit les 4 tables de référence. Idempotent (DELETE + INSERT).
+
+    nuances_harmonisees est réinitialisée avec ses trois jeux (présidentielles,
+    législatives, municipales) : relancer cette fonction ne perd plus les nuances
+    municipales (correctif C2, audit 2026-09-24).
 
     Ne touche pas resultats_participation ni resultats_candidats.
     Ordre de suppression respecté pour les FK déclaratives (blocs en dernier).
@@ -689,18 +1115,21 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
     logger.info("elections : %d scrutins", len(_ELECTIONS))
 
     # nuances_harmonisees : présidentielles (2002/2007/2012) + législatives
-    # (2002/2007/2012/2017/2022/2024). Chaque entrée porte sa justification (source_bloc).
-    nuances = _NUANCES_PRES + _NUANCES_LEGI
+    # (2002/2007/2012/2017/2022/2024) + municipales (2008/2014/2020/2026).
+    # Chaque entrée porte sa justification (source_bloc).
+    _verifier_nuances_municipales()
+    nuances = _NUANCES_PRES + _NUANCES_LEGI + _NUANCES_MUNI
     if nuances:
         con.executemany(
             "INSERT INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) VALUES (?, ?, ?, ?)",
             nuances,
         )
     logger.info(
-        "nuances_harmonisees : %d entrées (%d pres + %d legi)",
+        "nuances_harmonisees : %d entrées (%d pres + %d legi + %d muni)",
         len(nuances),
         len(_NUANCES_PRES),
         len(_NUANCES_LEGI),
+        len(_NUANCES_MUNI),
     )
 
     # candidats_presidentielle (présidentielles sans nuances : 2017, 2022)
@@ -713,6 +1142,66 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
             candidats,
         )
     logger.info("candidats_presidentielle : %d candidats (2017 + 2022)", len(candidats))
+
+
+def _verifier_nuances_municipales() -> None:
+    """Garde-fous sur _NUANCES_MUNI avant écriture en base.
+
+    - NC, LNC doivent rester absents (bloc NULL, décision ADR-0005).
+    - Les années municipales doivent être disjointes des années pres/legi, sinon le
+      DELETE ciblé de populate_nuances_municipales toucherait d'autres scrutins.
+    """
+    codes = {nuance for nuance, _, _, _ in _NUANCES_MUNI}
+    interdits = codes & _CODES_MUNI_SANS_MAPPING
+    if interdits:
+        raise RuntimeError(
+            f"Codes sans mapping détectés dans _NUANCES_MUNI : {sorted(interdits)}. "
+            "Ces codes doivent rester absents de nuances_harmonisees."
+        )
+    annees_autres = {annee for _, annee, _, _ in _NUANCES_PRES + _NUANCES_LEGI}
+    chevauchement = set(_ANNEES_MUNI) & annees_autres
+    if chevauchement:
+        raise RuntimeError(
+            f"Années municipales partagées avec pres/legi : {sorted(chevauchement)}. "
+            "Le remplacement ciblé par année n'est plus sûr (voir audit M5)."
+        )
+
+
+def populate_nuances_municipales(con: duckdb.DuckDBPyConnection) -> int:
+    """Remplace les nuances municipales de nuances_harmonisees. Idempotent et correcteur.
+
+    DELETE ciblé sur les années municipales puis INSERT de _NUANCES_MUNI, dans une
+    transaction : une correction de bloc ou de source_bloc dans le code est appliquée
+    à la relance, et une nuance retirée de la liste disparaît de la base
+    (correctif C3, audit 2026-09-24). Les nuances pres/legi ne sont pas touchées.
+
+    Retourne le nombre d'entrées municipales présentes après l'opération.
+    """
+    _verifier_nuances_municipales()
+    placeholders = ", ".join("?" for _ in _ANNEES_MUNI)
+    con.execute("BEGIN TRANSACTION")
+    try:
+        n_supprimees = ligne_unique(
+            con.execute(
+                f"DELETE FROM nuances_harmonisees WHERE annee IN ({placeholders})",  # noqa: S608
+                list(_ANNEES_MUNI),
+            )
+        )[0]
+        con.executemany(
+            "INSERT INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) VALUES (?, ?, ?, ?)",
+            _NUANCES_MUNI,
+        )
+        con.execute("COMMIT")
+    except Exception:
+        con.execute("ROLLBACK")
+        raise
+    logger.info(
+        "nuances_harmonisees (muni %s) : %d entrées remplacées par %d",
+        "/".join(str(a) for a in _ANNEES_MUNI),
+        n_supprimees,
+        len(_NUANCES_MUNI),
+    )
+    return len(_NUANCES_MUNI)
 
 
 # ── Vues d'agrégation ─────────────────────────────────────────────────────────

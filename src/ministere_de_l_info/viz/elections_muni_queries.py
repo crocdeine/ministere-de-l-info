@@ -5,6 +5,7 @@ from __future__ import annotations
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.viz.elections_queries import DB_PATH, _open_ro  # noqa: PLC2701
 
 _HDF_DEPTS_SQL: str = "'02', '59', '60', '62', '80'"
@@ -25,14 +26,21 @@ __all__ = [
 ]
 
 
+def _opt_int(v: object) -> int | None:
+    """int(v) ou None si valeur absente (pas de 0 inventé)."""
+    return None if v is None else int(v)  # type: ignore[call-overload]
+
+
 @st.cache_data(ttl=60)
 def is_muni_data_loaded() -> bool:
     """Vérifie que les résultats municipaux sont chargés."""
     con = _open_ro()
     try:
-        n = con.execute(
-            "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_muni_%'"
-        ).fetchone()[0]
+        n = ligne_unique(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_muni_%'"
+            )
+        )[0]
         return int(n) > 0
     finally:
         con.close()
@@ -220,28 +228,32 @@ def get_metrics_commune_muni(annee: int, tour: int, code_commune: str) -> dict:
     """Métriques agrégées d'une commune (inscrits/votants/taux/bloc_dominant/nb_listes/est_nuancee)."""
     con = _open_ro()
     try:
-        part_row = con.execute(
-            """
+        part_row = ligne_unique(
+            con.execute(
+                """
             SELECT SUM(rp.inscrits), SUM(rp.votants), SUM(rp.exprimes),
                    ROUND(100.0 * SUM(rp.votants) / NULLIF(SUM(rp.inscrits), 0), 2)
             FROM resultats_participation rp
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'muni' AND e.annee = ? AND e.tour = ? AND rp.code_commune = ?
             """,
-            [annee, tour, code_commune],
-        ).fetchone()
+                [annee, tour, code_commune],
+            )
+        )
 
-        nb_listes = con.execute(
-            """
+        nb_listes = ligne_unique(
+            con.execute(
+                """
             SELECT COUNT(DISTINCT rc.nuance) AS nb
             FROM resultats_candidats rc
             JOIN elections e ON e.id_election = rc.id_election
             WHERE e.type_scrutin = 'muni' AND e.annee = ? AND e.tour = ? AND rc.code_commune = ?
             """,
-            [annee, tour, code_commune],
-        ).fetchone()[0]
+                [annee, tour, code_commune],
+            )
+        )[0]
 
-        # est_nuancee : au moins 1 nuance avec bloc mappé (excluant NC/LMAJ/LNC → bloc NULL)
+        # est_nuancee : au moins 1 nuance avec bloc mappé (excluant NC/LNC → bloc NULL ; LMAJ 2008 = DTE depuis ADR-0010)
         nuancee_row = con.execute(
             """
             SELECT COUNT(*) > 0
@@ -263,10 +275,10 @@ def get_metrics_commune_muni(annee: int, tour: int, code_commune: str) -> dict:
         con.close()
 
     return {
-        "inscrits": int(part_row[0] or 0),
-        "votants": int(part_row[1] or 0),
-        "exprimes": int(part_row[2] or 0),
-        "taux_participation_pct": float(part_row[3] or 0.0),
+        "inscrits": _opt_int(part_row[0]),
+        "votants": _opt_int(part_row[1]),
+        "exprimes": _opt_int(part_row[2]),
+        "taux_participation_pct": None if part_row[3] is None else float(part_row[3]),
         "nb_listes": int(nb_listes or 0),
         "est_nuancee": bool(nuancee_row[0]) if nuancee_row else False,
         "bloc_dominant": bloc_row[0] if bloc_row else None,
@@ -302,7 +314,10 @@ def get_scores_bloc_commune_muni(annee: int, tour: int, code_commune: str) -> pl
 
 @st.cache_data(ttl=3600)
 def get_listes_commune_muni(annee: int, tour: int, code_commune: str) -> pl.DataFrame:
-    """Détail des listes pour une commune (vue liste du drill-down)."""
+    """Détail des listes pour une commune (vue liste du drill-down).
+
+    Une ligne par liste (numéro de panneau ; 2008 : descripteurs de liste), rang par voix.
+    """
     con = _open_ro()
     try:
         rows = con.execute(
@@ -311,7 +326,7 @@ def get_listes_commune_muni(annee: int, tour: int, code_commune: str) -> pl.Data
                    nom_tete_liste, prenom_tete_liste, voix, pct_exprimes
             FROM v_listes_commune_muni
             WHERE annee = ? AND tour = ? AND code_commune = ?
-            ORDER BY voix DESC NULLS LAST
+            ORDER BY voix DESC NULLS LAST, no_panneau NULLS LAST
             """,
             [annee, tour, code_commune],
         ).fetchall()

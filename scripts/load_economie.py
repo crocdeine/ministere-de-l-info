@@ -40,6 +40,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import duckdb  # noqa: E402
 
+from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.etl.loaders.economie_cnaf import load_economie_cnaf  # noqa: E402
 from ministere_de_l_info.etl.loaders.economie_drees import load_economie_drees  # noqa: E402
@@ -59,7 +60,7 @@ from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 configure_logging()
 logger = logging.getLogger(__name__)
 
-_DB_PATH = ROOT / "data" / "ministere.duckdb"
+_DB_PATH = get_settings().db_path
 _RAW_DIR = ROOT / "data" / "raw"
 _CACHE_DIR = _RAW_DIR / "economie"
 _CACHE_FILE = _CACHE_DIR / "donnees-insee-olap-hdf.parquet"

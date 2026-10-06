@@ -7,12 +7,14 @@ le cache mémoire est utilisé sans spinner, ce qui est idéal pour les tests.
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import folium
 import polars as pl
 import pytest
+from _helpers import ligne
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -72,14 +74,14 @@ _MOCK_GEO = pl.DataFrame(
 
 
 @pytest.fixture(scope="module")
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     if not DB_PATH.exists():
         pytest.skip("ministere.duckdb introuvable — lancer les scripts ETL d'abord")
     c = duckdb.connect(str(DB_PATH), read_only=True)
     c.execute("LOAD spatial")
-    n = c.execute(
-        "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'"
-    ).fetchone()[0]
+    n = ligne(
+        c.execute("SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'")
+    )[0]
     if n == 0:
         c.close()
         pytest.skip(
@@ -103,25 +105,29 @@ def test_blocs_meta_six_blocs(con):
 
 def test_scores_circo21_2022_t1_vingt_communes(con):
     """get_scores_communes(2022, 1, 'circo21') → exactement 20 communes distinctes."""
-    n = con.execute(
-        "SELECT COUNT(DISTINCT code_commune) FROM v_scores_circo21_pres WHERE annee = 2022 AND tour = 1"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute(
+            "SELECT COUNT(DISTINCT code_commune) FROM v_scores_circo21_pres WHERE annee = 2022 AND tour = 1"
+        )
+    )[0]
     assert n == len(_CIRCO21_CODES), f"{n} communes trouvées, attendu {len(_CIRCO21_CODES)}"
 
 
 def test_scores_circo21_voix_positives(con):
     """Somme des voix circo21 2022 t1 > 0."""
-    voix = con.execute(
-        "SELECT SUM(voix) FROM v_scores_circo21_pres WHERE annee = 2022 AND tour = 1"
-    ).fetchone()[0]
+    voix = ligne(
+        con.execute("SELECT SUM(voix) FROM v_scores_circo21_pres WHERE annee = 2022 AND tour = 1")
+    )[0]
     assert voix is not None and voix > 0
 
 
 def test_scores_hdf_plus_grand_que_circo21(con):
     """HdF contient plus de communes que la circo 21 seule."""
-    n_hdf = con.execute(
-        "SELECT COUNT(DISTINCT code_commune) FROM v_scores_commune_pres WHERE annee = 2022 AND tour = 1"
-    ).fetchone()[0]
+    n_hdf = ligne(
+        con.execute(
+            "SELECT COUNT(DISTINCT code_commune) FROM v_scores_commune_pres WHERE annee = 2022 AND tour = 1"
+        )
+    )[0]
     assert n_hdf > len(_CIRCO21_CODES)
 
 

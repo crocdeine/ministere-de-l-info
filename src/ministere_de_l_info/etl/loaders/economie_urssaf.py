@@ -32,6 +32,7 @@ import duckdb
 import httpx
 import polars as pl
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
 
 logger = logging.getLogger(__name__)
@@ -192,9 +193,9 @@ def load_economie_urssaf(
     """)
     con.unregister("_urssaf_stage")
 
-    count = con.execute("SELECT COUNT(*) FROM economie_emploi_urssaf").fetchone()[0]
+    count = ligne_unique(con.execute("SELECT COUNT(*) FROM economie_emploi_urssaf"))[0]
     logger.info("economie_emploi_urssaf : %d lignes.", count)
 
-    years = con.execute("SELECT MIN(annee), MAX(annee) FROM economie_emploi_urssaf").fetchone()
+    years = ligne_unique(con.execute("SELECT MIN(annee), MAX(annee) FROM economie_emploi_urssaf"))
     version = f"urssaf/commune-ape {years[0]}-{years[1]}"
     upsert_metadata(con, "economie_emploi_urssaf", count, version)

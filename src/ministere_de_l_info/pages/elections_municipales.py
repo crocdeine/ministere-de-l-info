@@ -7,6 +7,10 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._blocs_politiques import couleurs_traits, legende_classement_blocs
+from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
+from ministere_de_l_info.sources import mention
+from ministere_de_l_info.viz._display import fmt_nd
 from ministere_de_l_info.viz.elections_muni_queries import (
     get_communes_hdf_muni_list,
     get_communes_muni_geo,
@@ -61,6 +65,13 @@ _WARNINGS_SEUIL: dict[int, str] = {
     ),
 }
 
+_NOTE_SEUIL_NUANCAGE = (
+    "ⓘ Le seuil de nuançage change selon le scrutin : 3 500 habitants en 2008, "
+    "1 000 en 2014, 3 500 en 2020 et 2026. Les communes prises en compte ne sont donc pas les "
+    "mêmes d'une année à l'autre : en voix absolues, le saut de 2014 est artificiel. "
+    "La part porte sur les seules communes nuancées de chaque scrutin."
+)
+
 _ANNOTATION_LFI = (
     "ⓘ La nuance LFI est classée **GAUCHE** jusqu'aux européennes 2024 incluses, "
     "puis **EXTRÊME GAUCHE** à partir des municipales 2026 "
@@ -73,14 +84,15 @@ _ANNOTATION_LFI = (
 def render() -> None:
     """Vue Streamlit pour les municipales HdF 2008-2026."""
     if not is_muni_data_loaded():
-        st.info(
-            "Données municipales non chargées. Lancez :\n\n"
-            "```bash\nuv run python scripts/load_elections_municipales.py\n"
-            "uv run python scripts/migrations/0007_add_municipales_views.py\n```"
+        render_donnees_indisponibles(
+            "des municipales",
+            base_absente=False,
+            commande_dev=(
+                "uv run python scripts/load_elections_municipales.py\n"
+                "uv run python scripts/migrations/0007_add_municipales_views.py"
+            ),
         )
         return
-
-    st.subheader("🗳️ Municipales — Hauts-de-France")
 
     blocs_meta = get_blocs_meta()
     couleurs: dict[str, str] = {b[0]: b[2] for b in blocs_meta}
@@ -97,7 +109,7 @@ def render() -> None:
     selected_label: str = st.selectbox(  # type: ignore[assignment]
         "Scrutin",
         labels,
-        index=0,
+        index=index_persiste("muni_scrutin", labels, 0),
         key="muni_scrutin",
     )
     annee, tour = next((s[0], s[1]) for s in scrutins if s[2] == selected_label)
@@ -113,7 +125,7 @@ def render() -> None:
 
     # Drill-down commune
     st.divider()
-    st.subheader("🔍 Détail par commune")
+    st.subheader("Détail par commune")
     _render_drilldown_commune(annee, tour, libelles)
 
 
@@ -142,14 +154,11 @@ def _render_carte_hdf(
         carte = make_choropleth_muni_communes_bloc_dominant(
             geo_df, blocs_meta, bounds, "Bloc dominant"
         )
-        st_folium(carte, width="100%", height=580, returned_objects=[])
+        st_folium(carte, width="100%", height=580, returned_objects=[])  # pyright: ignore[reportArgumentType] # stub streamlit-folium : width typé int, '100%' accepté
     except Exception as exc:
         st.error(f"Erreur carte : {exc}")
 
-    st.caption(
-        "Source : data.gouv.fr — Données des élections agrégées. "
-        "Classement des blocs : nomenclature officielle Ministère de l'Intérieur."
-    )
+    st.caption(f"Source : {mention('elections')}. " + legende_classement_blocs("muni", annee))
 
 
 def _render_evolution_hdf(
@@ -168,25 +177,54 @@ def _render_evolution_hdf(
     # Uniquement t1 pour la cohérence de la comparaison temporelle
     ev_t1 = ev_df.filter((pl.col("tour") == 1) & pl.col("bloc").is_not_null())
 
+    # Le seuil de nuançage varie (3 500 hab. en 2008, 1 000 en 2014, 3 500 en 2020 et 2026) :
+    # les voix absolues sautent artificiellement en 2014. Défaut : part des exprimés des
+    # seules communes nuancées (voix du bloc / voix de tous les blocs classés).
+    modes = ["Part des exprimés (%)", "Voix totales"]
+    mode_evol: str = st.radio(  # type: ignore[assignment]
+        "Unité",
+        modes,
+        index=index_persiste("muni_mode_evol", modes),
+        horizontal=True,
+        key="muni_mode_evol",
+    )
+    st.caption(_NOTE_SEUIL_NUANCAGE)
+
     if not ev_t1.is_empty():
-        ev_plot = ev_t1.with_columns(pl.col("bloc").replace(libelles).alias("Bloc"))
+        if mode_evol == modes[0]:
+            totaux_nuances = ev_t1.group_by("annee").agg(pl.sum("voix").alias("total"))
+            ev_t1 = ev_t1.join(totaux_nuances, on="annee").with_columns(
+                (pl.col("voix").cast(pl.Float64) * 100.0 / pl.col("total").cast(pl.Float64)).alias(
+                    "pct"
+                )
+            )
+            y_col, y_label, fmt_y = (
+                "pct",
+                "Part des exprimés des communes nuancées (%)",
+                "%{y:.1f} %",
+            )
+        else:
+            y_col, y_label, fmt_y = "voix", "Voix totales", "%{y:,.0f} voix"
         fig = px.line(
-            ev_plot.to_pandas(),
+            ev_t1.to_pandas(),
             x="annee",
-            y="voix",
+            y=y_col,
             color="bloc",
-            color_discrete_map=couleurs,
+            color_discrete_map=couleurs_traits(couleurs),
             category_orders={"bloc": bloc_codes},
             markers=True,
-            labels={"annee": "Année", "voix": "Voix totales", "bloc": "Bloc"},
+            labels={"annee": "Année", y_col: y_label, "bloc": "Bloc"},
             height=360,
         )
         fig.update_layout(
             xaxis={"tickmode": "array", "tickvals": _ANNEES_MUNI},
             legend_title_text="Bloc",
             margin={"t": 30, "b": 30},
+            separators=", ",
         )
-        fig.update_traces(hovertemplate="<b>%{x}</b><br>%{y:,.0f}<extra>%{fullData.name}</extra>")
+        fig.update_traces(
+            hovertemplate=f"<b>%{{x}}</b><br>{fmt_y}<extra>%{{fullData.name}}</extra>"
+        )
         st.plotly_chart(fig, width="stretch")
 
     st.caption(_ANNOTATION_LFI)
@@ -214,11 +252,12 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
         return
 
     options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes]
+    cle_drilldown = f"muni_drilldown_{annee}_{tour}"
     selected: str = st.selectbox(  # type: ignore[assignment]
         "Commune",
         options,
-        index=0,
-        key=f"muni_drilldown_{annee}_{tour}",
+        index=index_persiste(cle_drilldown, options, 0),
+        key=cle_drilldown,
         help="Choisir une commune pour afficher le détail des listes.",
     )
 
@@ -232,9 +271,9 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
     st.caption(f"Commune sélectionnée : **{nom_commune}** ({code_commune})")
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Inscrits", f"{metrics['inscrits']:,}".replace(",", " "))
-    m2.metric("Votants", f"{metrics['votants']:,}".replace(",", " "))
-    m3.metric("Participation", f"{metrics['taux_participation_pct']:.1f} %")
+    m1.metric("Inscrits", fmt_nd(metrics["inscrits"]))
+    m2.metric("Votants", fmt_nd(metrics["votants"]))
+    m3.metric("Participation", fmt_nd(metrics["taux_participation_pct"], ".1f", " %"))
     if metrics["est_nuancee"] and metrics["bloc_dominant"]:
         m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "—"))
     else:
@@ -256,13 +295,14 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
             table_bloc = (
                 bloc_classee.with_columns(
                     pl.col("bloc").replace(libelles).alias("Bloc"),
-                    pl.col("pct_exprimes").fill_null(0.0),
                 )
                 .select(["Bloc", "voix", "pct_exprimes"])
                 .rename({"voix": "Voix", "pct_exprimes": "% exprimés"})
             )
             st.dataframe(
-                table_bloc.to_pandas().style.format({"Voix": "{:,.0f}", "% exprimés": "{:.2f}"}),
+                table_bloc.to_pandas().style.format(
+                    {"Voix": "{:,.0f}", "% exprimés": "{:.2f}"}, na_rep="n.d."
+                ),
                 width="stretch",
                 hide_index=True,
             )
@@ -285,7 +325,6 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
                 pl.col("nom_tete_liste").fill_null("—").alias("Nom tête de liste"),
                 pl.col("prenom_tete_liste").fill_null("").alias("Prénom"),
                 pl.col("libelle_abrege_liste").fill_null("—").alias("Libellé abrégé"),
-                pl.col("pct_exprimes").fill_null(0.0),
             )
             .select(
                 [
@@ -301,7 +340,9 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
             .rename({"rang": "Rang", "voix": "Voix", "pct_exprimes": "% exprimés"})
         )
         st.dataframe(
-            table_listes.to_pandas().style.format({"Voix": "{:,.0f}", "% exprimés": "{:.2f}"}),
+            table_listes.to_pandas().style.format(
+                {"Voix": "{:,.0f}", "% exprimés": "{:.2f}"}, na_rep="n.d."
+            ),
             width="stretch",
             hide_index=True,
         )

@@ -28,6 +28,7 @@ import duckdb
 import httpx
 import pandas as pd
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
 
 logger = logging.getLogger(__name__)
@@ -115,10 +116,10 @@ def load_economie_drees(
         )
 
     # Nettoyage et filtre HdF
-    df = raw[[col_code, col_apl]].copy()
+    df: pd.DataFrame = raw.loc[:, [col_code, col_apl]].copy()
     df.columns = ["code_commune", "apl_medecins"]
     df["code_commune"] = df["code_commune"].astype(str).str.strip().str.zfill(5).str[:5]
-    df = df[df["code_commune"].str[:2].isin(_DEPTS_HDF)].copy()
+    df = df.loc[df["code_commune"].str[:2].isin(_DEPTS_HDF)].copy()
     df["apl_medecins"] = pd.to_numeric(df["apl_medecins"], errors="coerce")
     df = df.dropna(subset=["apl_medecins"]).copy()
     df["desert_medical"] = df["apl_medecins"] < _SEUIL_DESERT
@@ -145,17 +146,17 @@ def load_economie_drees(
     """)
     con.unregister("_drees_stage")
 
-    count_apl = con.execute(
-        "SELECT COUNT(*) FROM economie_social WHERE apl_medecins IS NOT NULL"
-    ).fetchone()[0]
-    n_deserts = con.execute(
-        "SELECT COUNT(*) FROM economie_social WHERE desert_medical = TRUE"
-    ).fetchone()[0]
+    count_apl = ligne_unique(
+        con.execute("SELECT COUNT(*) FROM economie_social WHERE apl_medecins IS NOT NULL")
+    )[0]
+    n_deserts = ligne_unique(
+        con.execute("SELECT COUNT(*) FROM economie_social WHERE desert_medical = TRUE")
+    )[0]
     logger.info(
         "economie_social — APL : %d communes-années, dont %d déserts médicaux.",
         count_apl,
         n_deserts,
     )
 
-    total = con.execute("SELECT COUNT(*) FROM economie_social").fetchone()[0]
+    total = ligne_unique(con.execute("SELECT COUNT(*) FROM economie_social"))[0]
     upsert_metadata(con, "economie_social", total, f"drees/apl-medecins-generalistes/{annee_drees}")

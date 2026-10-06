@@ -1,7 +1,7 @@
 # 0005 — Nomenclature officielle des blocs politiques du Ministère de l'Intérieur
 
 Date : 2026-05-29
-Statut : Accepté
+Statut : Accepté — partiellement révisé par ADR-0010
 
 ## Contexte
 

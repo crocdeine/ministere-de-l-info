@@ -30,6 +30,7 @@ from pathlib import Path
 import duckdb
 import httpx
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
 
 logger = logging.getLogger(__name__)
@@ -115,9 +116,9 @@ def load_economie_cnaf(
             taux_foyers_rsa = excluded.taux_foyers_rsa
     """)  # noqa: S608
 
-    count_rsa = con.execute(
-        "SELECT COUNT(*) FROM economie_social WHERE nb_foyers_rsa IS NOT NULL"
-    ).fetchone()[0]
+    count_rsa = ligne_unique(
+        con.execute("SELECT COUNT(*) FROM economie_social WHERE nb_foyers_rsa IS NOT NULL")
+    )[0]
     logger.info("economie_social — RSA : %d communes-années.", count_rsa)
 
     for annee, n in con.execute(
@@ -126,5 +127,5 @@ def load_economie_cnaf(
     ).fetchall():
         logger.info("  RSA %d : %d communes", annee, n)
 
-    total = con.execute("SELECT COUNT(*) FROM economie_social").fetchone()[0]
+    total = ligne_unique(con.execute("SELECT COUNT(*) FROM economie_social"))[0]
     upsert_metadata(con, "economie_social", total, "cnaf/rsa_s_type_com_f")

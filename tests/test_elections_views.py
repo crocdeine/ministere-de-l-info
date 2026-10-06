@@ -11,10 +11,12 @@ ne sont pas chargées plutôt que de retourner des faux positifs.
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -37,16 +39,16 @@ _PRES_IDS = [
 
 
 @pytest.fixture(scope="module")
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     if not DB_PATH.exists():
         pytest.skip("ministere.duckdb introuvable — lancer les scripts ETL d'abord")
     c = duckdb.connect(str(DB_PATH), read_only=True)
     c.execute("LOAD spatial")
 
     # Vérifie que les données sont chargées
-    n = c.execute(
-        "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'"
-    ).fetchone()[0]
+    n = ligne(
+        c.execute("SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'")
+    )[0]
     if n == 0:
         c.close()
         pytest.skip("resultats_candidats vide — lancer load_elections_presidentielles.py d'abord")
@@ -57,9 +59,11 @@ def con() -> duckdb.DuckDBPyConnection:
 
 class TestVolumes:
     def test_participation_non_vide(self, con):
-        n = con.execute(
-            "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_pres_%'"
-        ).fetchone()[0]
+        n = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_pres_%'"
+            )
+        )[0]
         assert n > 0, "resultats_participation vide pour les présidentielles"
 
     def test_dix_scrutins_charges(self, con):
@@ -76,13 +80,15 @@ class TestVolumes:
 
     def test_communes_hdf_uniquement(self, con):
         """Aucune commune hors HdF ne doit être présente."""
-        n_hors_hdf = con.execute("""
+        n_hors_hdf = ligne(
+            con.execute("""
             SELECT COUNT(DISTINCT rc.code_commune)
             FROM resultats_candidats rc
             LEFT JOIN geographies_communes gc ON gc.code_insee = rc.code_commune
             WHERE rc.id_election LIKE '%_pres_%'
               AND (gc.code_region IS NULL OR gc.code_region != '32')
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n_hors_hdf == 0, f"{n_hors_hdf} communes hors HdF trouvées"
 
 
@@ -153,11 +159,13 @@ class TestVuesCommune:
 class TestCirco21:
     def test_circo21_contient_20_communes(self, con):
         """v_scores_circo21_pres doit couvrir exactement 20 communes distinctes."""
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(DISTINCT code_commune)
             FROM v_scores_circo21_pres
             WHERE annee = 2022 AND tour = 1
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n == len(_CIRCO21_CODES), (
             f"Circo 21 : {n} communes trouvées, attendu {len(_CIRCO21_CODES)}"
         )
@@ -178,9 +186,11 @@ class TestCirco21:
 
     def test_valenciennes_dans_circo21(self, con):
         """59606 (Valenciennes) doit être dans v_scores_circo21_pres."""
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(*)
             FROM v_scores_circo21_pres
             WHERE code_commune = '59606' AND annee = 2022 AND tour = 1
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n > 0, "Valenciennes absente de v_scores_circo21_pres"

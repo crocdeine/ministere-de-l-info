@@ -7,6 +7,7 @@ from pathlib import Path
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.data_sources.geo import fetch_admin_express
 from ministere_de_l_info.etl._common import upsert_metadata
 
@@ -58,7 +59,7 @@ def load_regions(
         """)
         logger.debug("Batch inséré : %s", batch_path.name)
 
-    count = con.execute("SELECT COUNT(*) FROM geographies_regions").fetchone()[0]
+    count = ligne_unique(con.execute("SELECT COUNT(*) FROM geographies_regions"))[0]
     if not (13 <= count <= 20):
         raise RuntimeError(
             f"Nombre de régions hors fourchette [13-20] : {count}. "

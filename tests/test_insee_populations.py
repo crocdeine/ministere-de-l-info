@@ -30,6 +30,7 @@ def test_millesimes_recommandes_sont_disponibles() -> None:
         assert m in _ANNEES_DISPONIBLES, f"{m} manquant dans _ANNEES_DISPONIBLES"
 
 
+@pytest.mark.network
 def test_schema_colonnes() -> None:
     """Le DataFrame retourné respecte le schéma garanti."""
     df = fetch_populations(2022)
@@ -47,6 +48,7 @@ def test_schema_colonnes() -> None:
     assert df.schema["totale"] == pl.Int64
 
 
+@pytest.mark.network
 def test_comptee_a_part_et_totale_sont_null() -> None:
     """comptee_a_part et totale sont intentionnellement NULL (PCAP non disponible)."""
     df = fetch_populations(2022)
@@ -54,6 +56,7 @@ def test_comptee_a_part_et_totale_sont_null() -> None:
     assert df["totale"].is_null().all(), "totale doit être entièrement NULL"
 
 
+@pytest.mark.network
 def test_count_2022() -> None:
     """Le millésime 2022 doit contenir entre 34 000 et 36 000 lignes."""
     df = fetch_populations(2022)
@@ -62,6 +65,7 @@ def test_count_2022() -> None:
     )
 
 
+@pytest.mark.network
 def test_code_format() -> None:
     """Tous les codes commune sont des str de 5 chars."""
     df = fetch_populations(2022)
@@ -70,6 +74,7 @@ def test_code_format() -> None:
     assert len(invalides) == 0, f"Codes de longueur ≠ 5 : {invalides[:10].to_list()}"
 
 
+@pytest.mark.network
 def test_no_duplicates() -> None:
     """Pas de doublon sur code_insee_commune pour un millésime donné."""
     df = fetch_populations(2022)
@@ -78,6 +83,7 @@ def test_no_duplicates() -> None:
     )
 
 
+@pytest.mark.network
 def test_plm_present() -> None:
     """Communes-mères PLM présentes pour 2022 (arrondissements absents de la source)."""
     df = fetch_populations(2022)
@@ -86,12 +92,14 @@ def test_plm_present() -> None:
         assert code in codes, f"Commune-mère PLM manquante : {code}"
 
 
+@pytest.mark.network
 def test_annee_dans_dataframe() -> None:
     """La colonne annee correspond au millésime demandé."""
     df = fetch_populations(2013)
     assert (df["annee"] == 2013).all(), "La colonne annee doit valoir 2013 partout"
 
 
+@pytest.mark.network
 def test_reprise_disque() -> None:
     """Un second appel force=False ne retélécharge pas le ZIP."""
     fetch_populations(2022, force=False)  # s'assure que le fichier existe

@@ -12,10 +12,12 @@ Prérequis :
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT / "src"))
@@ -51,13 +53,13 @@ _VOLUMES_COMMUNES = {
 
 
 @pytest.fixture(scope="module")
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     if not DB_PATH.exists():
         pytest.skip("DB absente. Lancer load_elections_municipales.py")
     c = duckdb.connect(str(DB_PATH), read_only=True)
-    n = c.execute(
-        "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%'"
-    ).fetchone()[0]
+    n = ligne(
+        c.execute("SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%'")
+    )[0]
     if n == 0:
         pytest.skip("Municipales non chargées. Lancer load_elections_municipales.py")
     yield c
@@ -83,64 +85,78 @@ class TestVolumesParScrutin:
 
     def test_volumes_bv_conformes_rapport_d31(self, con):
         for idel, attendu in _VOLUMES_BV.items():
-            n = con.execute(
-                "SELECT COUNT(*) FROM resultats_participation WHERE id_election = ?", [idel]
-            ).fetchone()[0]
+            n = ligne(
+                con.execute(
+                    "SELECT COUNT(*) FROM resultats_participation WHERE id_election = ?", [idel]
+                )
+            )[0]
             assert n == attendu, f"{idel} BV : {n} (attendu {attendu})"
 
     def test_volumes_communes_conformes_rapport_d31(self, con):
         for idel, attendu in _VOLUMES_COMMUNES.items():
-            n = con.execute(
-                "SELECT COUNT(DISTINCT code_commune) FROM resultats_participation WHERE id_election = ?",
-                [idel],
-            ).fetchone()[0]
+            n = ligne(
+                con.execute(
+                    "SELECT COUNT(DISTINCT code_commune) FROM resultats_participation WHERE id_election = ?",
+                    [idel],
+                )
+            )[0]
             assert n == attendu, f"{idel} communes : {n} (attendu {attendu})"
 
     def test_volume_global_plausible(self, con):
-        n_part = con.execute(
-            "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%'"
-        ).fetchone()[0]
-        n_cand = con.execute(
-            "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_muni_%'"
-        ).fetchone()[0]
+        n_part = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%'"
+            )
+        )[0]
+        n_cand = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_muni_%'"
+            )
+        )[0]
         assert 20_000 < n_part < 35_000, f"participation hors plage : {n_part}"
         assert 100_000 < n_cand < 200_000, f"candidats hors plage : {n_cand}"
 
 
 class TestNuancesHarmonisees:
-    """67 entrées municipales dans nuances_harmonisees, ventilation par année."""
+    """80 entrées municipales dans nuances_harmonisees (ADR-0010), ventilation par année."""
 
-    def test_67_entrees_municipales(self, con):
+    def test_80_entrees_municipales(self, con):
         from scripts.load_elections_municipales import _NUANCES_MUNI
 
-        assert len(_NUANCES_MUNI) == 67, (
-            f"_NUANCES_MUNI : {len(_NUANCES_MUNI)} entrées (attendu 67)"
+        assert len(_NUANCES_MUNI) == 80, (
+            f"_NUANCES_MUNI : {len(_NUANCES_MUNI)} entrées (attendu 80)"
         )
-        n_db = con.execute(
-            "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee IN (2008,2014,2020,2026)"
-        ).fetchone()[0]
-        assert n_db == 67, f"nuances_harmonisees muni : {n_db} (attendu 67)"
+        n_db = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee IN (2008,2014,2020,2026)"
+            )
+        )[0]
+        assert n_db == 80, f"nuances_harmonisees muni : {n_db} (attendu 80)"
 
     def test_ventilation_par_annee(self, con):
-        attendus = {2008: 12, 2014: 17, 2020: 19, 2026: 19}
+        attendus = {2008: 15, 2014: 17, 2020: 23, 2026: 25}
         for annee, n_att in attendus.items():
-            n = con.execute(
-                "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee = ?", [annee]
-            ).fetchone()[0]
+            n = ligne(
+                con.execute("SELECT COUNT(*) FROM nuances_harmonisees WHERE annee = ?", [annee])
+            )[0]
             assert n == n_att, f"nuances_harmonisees {annee} : {n} (attendu {n_att})"
 
     def test_pres_legi_preservees(self, con):
         """Les 149 entrées pres/legi ne doivent pas avoir été écrasées."""
-        n = con.execute(
-            "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee NOT IN (2008,2014,2020,2026)"
-        ).fetchone()[0]
+        n = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee NOT IN (2008,2014,2020,2026)"
+            )
+        )[0]
         assert n == 149, f"Entrées pres/legi : {n} (attendu 149)"
 
     def test_toutes_les_entrees_ont_source_bloc(self, con):
-        n_null = con.execute(
-            "SELECT COUNT(*) FROM nuances_harmonisees "
-            "WHERE annee IN (2008,2014,2020,2026) AND (source_bloc IS NULL OR source_bloc = '')"
-        ).fetchone()[0]
+        n_null = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM nuances_harmonisees "
+                "WHERE annee IN (2008,2014,2020,2026) AND (source_bloc IS NULL OR source_bloc = '')"
+            )
+        )[0]
         assert n_null == 0, f"{n_null} entrées muni sans source_bloc"
 
 
@@ -162,42 +178,89 @@ class TestLFIBascule:
         assert bloc[0] == "EXG", f"LFI 2026 → {bloc[0]} (attendu EXG)"
 
     def test_exactement_deux_entrees_lfi(self, con):
-        n = con.execute("SELECT COUNT(*) FROM nuances_harmonisees WHERE nuance='LFI'").fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(*) FROM nuances_harmonisees WHERE nuance='LFI'"))[0]
         assert n == 2, f"LFI : {n} entrées (attendu exactement 2 : 2020+2026)"
 
 
 class TestCodesSansMapping:
-    """NC, LMAJ, LNC doivent être absents de nuances_harmonisees."""
+    """NC, LNC doivent être absents de nuances_harmonisees.
 
-    @pytest.mark.parametrize("code", ["NC", "LMAJ", "LNC"])
+    LMAJ 2008 n'en fait plus partie : « Liste de la majorité » (libellé officiel des
+    archives du ministère), mappé DTE (ADR-0010, addendum 2026-09-25).
+    """
+
+    @pytest.mark.parametrize("code", ["NC", "LNC"])
     def test_code_absent_de_nuances_harmonisees(self, con, code):
-        n = con.execute(
-            "SELECT COUNT(*) FROM nuances_harmonisees "
-            "WHERE nuance = ? AND annee IN (2008,2014,2020,2026)",
-            [code],
-        ).fetchone()[0]
+        n = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM nuances_harmonisees "
+                "WHERE nuance = ? AND annee IN (2008,2014,2020,2026)",
+                [code],
+            )
+        )[0]
         assert n == 0, f"{code} trouvé dans nuances_harmonisees ({n} entrées) — doit être absent"
 
 
 class TestDecisionsStructurantes:
     """Vérifications des décisions validées en D3.1.2."""
 
-    def test_lcmd_2008_est_gau(self, con):
-        """LCMD 2008 → GAU (analyse contextuelle, libellés Parquet NULL, bassin minier HdF)."""
+    @pytest.mark.parametrize(
+        ("code", "bloc_attendu"),
+        [
+            ("LCMD", "CENT"),
+            ("LMAJ", "DTE"),
+            ("LGC", "DIV"),
+            ("LMC", "CENT"),
+            ("LREG", "DIV"),
+            ("LEXD", "EXD"),
+        ],
+    )
+    def test_lot2_2008_libelles_officiels(self, con, code, bloc_attendu):
+        """Lot 2 (ADR-0010, addendum 2026-09-25) : classements 2008 fondés sur les libellés
+        officiels des archives du ministère."""
         row = con.execute(
-            "SELECT bloc FROM nuances_harmonisees WHERE nuance='LCMD' AND annee=2008"
+            "SELECT bloc, source_bloc FROM nuances_harmonisees WHERE nuance=? AND annee=2008",
+            [code],
         ).fetchone()
-        assert row is not None, "LCMD 2008 absent"
-        assert row[0] == "GAU", f"LCMD 2008 → {row[0]} (attendu GAU)"
+        assert row is not None, f"{code} 2008 absent"
+        assert row[0] == bloc_attendu, f"{code} 2008 → {row[0]} (attendu {bloc_attendu})"
+        assert "archives ministère" in row[1], f"{code} 2008 : source officielle non citée"
 
-    def test_ldvc_2020_est_cent_avec_source_ce_437675(self, con):
-        """LDVC 2020 → CENT per CE 31/01/2020 n°437675."""
+    def test_ldvc_2020_est_cent_source_grille_2020(self, con):
+        """LDVC 2020 → CENT per INTA1931378J annexe 3 (CE 437675 cité pour contexte)."""
         row = con.execute(
             "SELECT bloc, source_bloc FROM nuances_harmonisees WHERE nuance='LDVC' AND annee=2020"
         ).fetchone()
         assert row is not None, "LDVC 2020 absent"
         assert row[0] == "CENT", f"LDVC 2020 → {row[0]} (attendu CENT)"
+        assert "INTA1931378J" in row[1], f"source_bloc ne cite pas INTA1931378J : {row[1]}"
         assert "437675" in row[1], f"source_bloc ne cite pas CE 437675 : {row[1]}"
+
+    @pytest.mark.parametrize(
+        ("nuance", "annee", "bloc_attendu"),
+        [
+            ("LCOM", 2008, "GAU"),
+            ("LCOM", 2014, "GAU"),
+            ("LCOM", 2020, "GAU"),
+            ("LCOM", 2026, "GAU"),
+            ("LUDI", 2014, "CENT"),
+            ("LUDI", 2020, "CENT"),
+            ("LUDI", 2026, "CENT"),
+            ("LUD", 2014, "DTE"),
+            ("LUD", 2020, "DTE"),
+            ("LUD", 2026, "DTE"),
+            ("LECO", 2020, "DIV"),
+            ("LECO", 2026, "DIV"),
+        ],
+    )
+    def test_reclassements_adr_0010_charges(self, con, nuance, annee, bloc_attendu):
+        """Reclassements du lot 1 (ADR-0010) présents dans la base chargée."""
+        row = con.execute(
+            "SELECT bloc FROM nuances_harmonisees WHERE nuance = ? AND annee = ?",
+            [nuance, annee],
+        ).fetchone()
+        assert row is not None, f"{nuance} {annee} absent"
+        assert row[0] == bloc_attendu, f"{nuance} {annee} → {row[0]} (attendu {bloc_attendu})"
 
     def test_ludr_2026_est_exd(self, con):
         """LUDR 2026 → EXD, nouveau code per INTP2602966C + CE 512694."""
@@ -220,7 +283,7 @@ class TestVueScoresCommune:
     """v_scores_commune_muni : agrégation par bloc et commune."""
 
     def test_vue_existe_et_non_vide(self, con):
-        n = con.execute("SELECT COUNT(*) FROM v_scores_commune_muni").fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(*) FROM v_scores_commune_muni"))[0]
         assert n > 10_000, f"v_scores_commune_muni : {n} lignes (attendu > 10 000)"
 
     def test_lille_2020_t1_blocs_cohérents(self, con):
@@ -241,10 +304,12 @@ class TestVueScoresCommune:
         assert 99.0 <= total_pct <= 101.0, f"Somme pct_exprimes Lille 2020 t1 = {total_pct}"
 
     def test_pas_de_pct_hors_bornes(self, con):
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(*) FROM v_scores_commune_muni
             WHERE pct_exprimes < 0 OR pct_exprimes > 100
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n == 0, f"{n} lignes avec pct_exprimes hors [0,100]"
 
 
@@ -252,9 +317,11 @@ class TestVueEvolutionBlocs:
     """v_evolution_blocs_hdf_muni : cohérence HdF × scrutin."""
 
     def test_vue_existe_et_8_scrutins(self, con):
-        n_scrutins = con.execute(
-            "SELECT COUNT(DISTINCT annee || '_' || tour) FROM v_evolution_blocs_hdf_muni"
-        ).fetchone()[0]
+        n_scrutins = ligne(
+            con.execute(
+                "SELECT COUNT(DISTINCT annee || '_' || tour) FROM v_evolution_blocs_hdf_muni"
+            )
+        )[0]
         assert n_scrutins == 8, f"Attendu 8 scrutins, trouvé {n_scrutins}"
 
     def test_pct_exprimes_nul_pour_bloc_null(self, con):
@@ -263,10 +330,12 @@ class TestVueEvolutionBlocs:
         La sémantique voix est candidat (plurinominal) et non liste pour ces communes,
         rendant le % non comparable aux blocs politiques des communes ≥ seuil.
         """
-        n_non_null = con.execute("""
+        n_non_null = ligne(
+            con.execute("""
             SELECT COUNT(*) FROM v_evolution_blocs_hdf_muni
             WHERE bloc IS NULL AND pct_exprimes IS NOT NULL
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n_non_null == 0, f"{n_non_null} lignes bloc=NULL avec pct_exprimes non-NULL"
 
     def test_pct_exprimes_blocs_nommes_dans_intervalle(self, con):
@@ -278,9 +347,7 @@ class TestVueEvolutionBlocs:
         assert rows == [], f"Lignes blocs nommés avec pct hors ]0,100] : {rows[:5]}"
 
     def test_voix_positifs_tous_scrutins(self, con):
-        n = con.execute(
-            "SELECT COUNT(*) FROM v_evolution_blocs_hdf_muni WHERE voix <= 0"
-        ).fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(*) FROM v_evolution_blocs_hdf_muni WHERE voix <= 0"))[0]
         assert n == 0, f"{n} lignes avec voix <= 0"
 
 
@@ -288,7 +355,7 @@ class TestVueListes:
     """v_listes_commune_muni : détail liste par liste pour le drill-down."""
 
     def test_vue_existe_et_non_vide(self, con):
-        n = con.execute("SELECT COUNT(*) FROM v_listes_commune_muni").fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(*) FROM v_listes_commune_muni"))[0]
         assert n > 10_000, f"v_listes_commune_muni : {n} lignes (attendu > 10 000)"
 
     def test_valenciennes_2026_t1_libelles_renseignes(self, con):
@@ -319,26 +386,32 @@ class TestCommunesSansNuance2026:
     """2026 : ~3 459 communes HdF avec nuance NULL (seuil 3 500 hab)."""
 
     def test_communes_sans_nuance_2026_t1(self, con):
-        n_sans = con.execute("""
+        n_sans = ligne(
+            con.execute("""
             SELECT COUNT(DISTINCT code_commune)
             FROM resultats_candidats
             WHERE id_election = '2026_muni_t1' AND nuance IS NULL
-        """).fetchone()[0]
+        """)
+        )[0]
         assert 3_400 <= n_sans <= 3_520, f"Communes sans nuance 2026 t1 : {n_sans} (attendu ~3 459)"
 
     def test_communes_avec_nuance_2026_t1(self, con):
-        n_avec = con.execute("""
+        n_avec = ligne(
+            con.execute("""
             SELECT COUNT(DISTINCT code_commune)
             FROM resultats_candidats
             WHERE id_election = '2026_muni_t1' AND nuance IS NOT NULL
-        """).fetchone()[0]
+        """)
+        )[0]
         assert 310 <= n_avec <= 330, f"Communes avec nuance 2026 t1 : {n_avec} (attendu ~320)"
 
     def test_null_bloc_dans_vue_scores_2026(self, con):
         """v_scores_commune_muni : bloc NULL présent en 2026 (communes sans nuance)."""
-        n_null = con.execute("""
+        n_null = ligne(
+            con.execute("""
             SELECT COUNT(*)
             FROM v_scores_commune_muni
             WHERE annee=2026 AND tour=1 AND bloc IS NULL
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n_null > 3_000, f"Lignes bloc=NULL en 2026 t1 : {n_null} (attendu > 3 000)"

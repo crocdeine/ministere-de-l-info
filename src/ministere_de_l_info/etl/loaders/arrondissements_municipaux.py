@@ -7,6 +7,7 @@ from pathlib import Path
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.data_sources.geo import fetch_admin_express
 from ministere_de_l_info.etl._common import upsert_metadata
 
@@ -64,16 +65,20 @@ def load_arrondissements_municipaux(
             FROM ST_Read('{path_sql}')
         """)
 
-    count = con.execute("SELECT COUNT(*) FROM geographies_arrondissements_municipaux").fetchone()[0]
+    count = ligne_unique(
+        con.execute("SELECT COUNT(*) FROM geographies_arrondissements_municipaux")
+    )[0]
     if count != 45:
         raise RuntimeError(
             f"Nombre d'arrondissements incorrect : {count} (attendu 45 = Paris 20 + Lyon 9 + Marseille 16). "
             "Utiliser --force pour re-télécharger si le cache est corrompu."
         )
 
-    nulls = con.execute(
-        "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere IS NULL"
-    ).fetchone()[0]
+    nulls = ligne_unique(
+        con.execute(
+            "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere IS NULL"
+        )
+    )[0]
     if nulls > 0:
         raise RuntimeError(f"{nulls} ARM avec code_commune_mere NULL — vérifier le WFS IGN.")
 
@@ -100,15 +105,21 @@ def load_arrondissements_municipaux(
     logger.info(
         "Chargé %d ARM — Paris %d, Lyon %d, Marseille %d.",
         count,
-        con.execute(
-            "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere = '75056'"
-        ).fetchone()[0],
-        con.execute(
-            "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere = '69123'"
-        ).fetchone()[0],
-        con.execute(
-            "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere = '13055'"
-        ).fetchone()[0],
+        ligne_unique(
+            con.execute(
+                "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere = '75056'"
+            )
+        )[0],
+        ligne_unique(
+            con.execute(
+                "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere = '69123'"
+            )
+        )[0],
+        ligne_unique(
+            con.execute(
+                "SELECT COUNT(*) FROM geographies_arrondissements_municipaux WHERE code_commune_mere = '13055'"
+            )
+        )[0],
     )
 
     upsert_metadata(con, "geographies_arrondissements_municipaux", count, "ADMINEXPRESS-COG.LATEST")

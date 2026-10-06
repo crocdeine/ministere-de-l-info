@@ -7,6 +7,7 @@ from pathlib import Path
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.data_sources.geo import fetch_admin_express
 from ministere_de_l_info.etl._common import upsert_metadata
 
@@ -63,7 +64,7 @@ def load_departements(
         """)
         logger.debug("Batch inséré : %s", batch_path.name)
 
-    count = con.execute("SELECT COUNT(*) FROM geographies_departements").fetchone()[0]
+    count = ligne_unique(con.execute("SELECT COUNT(*) FROM geographies_departements"))[0]
     if count != 101:
         raise RuntimeError(
             f"Nombre de départements incorrect : {count} (attendu exactement 101). "

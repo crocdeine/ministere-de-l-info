@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from _helpers import ligne
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -33,9 +34,9 @@ def db_ready():
     import duckdb
 
     con = duckdb.connect(str(DB_PATH), read_only=True)
-    n = con.execute(
-        "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'"
-    ).fetchone()[0]
+    n = ligne(
+        con.execute("SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'")
+    )[0]
     con.close()
     if n == 0:
         pytest.skip("Présidentielles non chargées. Lancer load_elections_presidentielles.py")
@@ -95,10 +96,10 @@ class TestGetMetricsCommunePres:
             "bloc_dominant",
         } == set(m)
 
-    def test_commune_inconnue_retourne_zeros(self, db_ready):
+    def test_commune_inconnue_retourne_none(self, db_ready):
         m = get_metrics_commune_pres(2022, 1, "99999")
-        assert m["inscrits"] == 0
-        assert m["votants"] == 0
+        assert m["inscrits"] is None
+        assert m["votants"] is None
 
 
 class TestGetBvDetailsPres:

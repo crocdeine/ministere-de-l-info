@@ -1,25 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  MODÈLE du LaunchAgent de sauvegarde quotidienne de la base.
+  Ne pas copier tel quel : deploy/native/install-native.sh remplace les
+  marqueurs @...@ et installe le résultat dans
+  ~/Library/LaunchAgents/com.crocdeine.ministere-info.backup.plist
+  (même identifiant que l'ancienne version : l'ancien agent est remplacé).
+-->
 <plist version="1.0">
 <dict>
-    <!-- Identifiant unique du job launchd -->
     <key>Label</key>
-    <string>com.crocdeine.ministere-info.backup</string>
+    <string>@LABEL@</string>
 
-    <!-- Script à exécuter -->
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/crocdeine/Documents/Docker/ministere-de-l-info/scripts/backup_db.sh</string>
+        <string>/bin/bash</string>
+        <string>@PROJECT_DIR@/scripts/backup_db.sh</string>
     </array>
 
-    <!-- Variables d'environnement pour que docker soit trouvé -->
+    <key>WorkingDirectory</key>
+    <string>@PROJECT_DIR@</string>
+
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+        <string>@PATH@</string>
+        <key>MINISTERE_PROJECT_DIR</key>
+        <string>@PROJECT_DIR@</string>
+        <!-- La base réellement lue par l'application native -->
+        <key>MINISTERE_DB_PATH</key>
+        <string>@DB_PATH@</string>
+        <key>BACKUP_DEST</key>
+        <string>@BACKUP_DEST@</string>
+        <key>BACKUP_RETENTION_DAYS</key>
+        <string>@RETENTION@</string>
+        <key>BACKUP_LOG</key>
+        <string>@LOG_DIR@/backup.log</string>
     </dict>
 
-    <!-- Déclenchement quotidien à 3h00 -->
+    <!-- Chaque jour à 3 h 00. Si le Mac dort à cette heure, launchd lance la
+         sauvegarde au réveil ; s'il est éteint, elle est sautée ce jour-là. -->
     <key>StartCalendarInterval</key>
     <dict>
         <key>Hour</key>
@@ -28,15 +48,19 @@
         <integer>0</integer>
     </dict>
 
-    <!-- Logs stdout/stderr -->
-    <key>StandardOutPath</key>
-    <string>/Users/crocdeine/Documents/Docker/ministere-de-l-info/data/backups/launchd.out.log</string>
-
-    <key>StandardErrorPath</key>
-    <string>/Users/crocdeine/Documents/Docker/ministere-de-l-info/data/backups/launchd.err.log</string>
-
-    <!-- Si le Mac était endormi à 3h, NE PAS exécuter au chargement -->
+    <!-- Pas d'exécution au chargement (ni à l'ouverture de session) -->
     <key>RunAtLoad</key>
     <false/>
+
+    <!-- Priorité basse : ne gêne pas l'usage du Mac -->
+    <key>LowPriorityIO</key>
+    <true/>
+    <key>Nice</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>@LOG_DIR@/backup.launchd.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>@LOG_DIR@/backup.launchd.err.log</string>
 </dict>
 </plist>

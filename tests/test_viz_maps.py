@@ -10,6 +10,11 @@ import pytest
 
 from ministere_de_l_info.viz.maps import make_choropleth
 
+# Extension spatial requise ; sans elle (non installée), tests ignorés par conftest.py.
+# Pas de marqueur network : aucun service de données n'est appelé ; seule l'installation
+# initiale de l'extension télécharge (étape dédiée en CI).
+pytestmark = pytest.mark.spatial
+
 # Polygone WGS84 minimaliste centré sur l'Île-de-France
 _WKT = "POLYGON((2.0 48.0, 3.0 48.0, 3.0 49.0, 2.0 49.0, 2.0 48.0))"
 _WKT2 = "POLYGON((1.0 47.0, 2.0 47.0, 2.0 48.0, 1.0 48.0, 1.0 47.0))"
@@ -260,7 +265,7 @@ def test_make_choropleth_commune_fallback_contours_sans_population(con_no_pop, c
 
 
 def test_make_choropleth_evolution_demographique(con_multi):
-    """annee_ref déclenche le mode évolution — carte Folium avec palette RdYlGn."""
+    """annee_ref déclenche le mode évolution — carte Folium avec palette divergente orange-violet."""
     result = make_choropleth(con_multi, "region", annee=2023, annee_ref=2013)
     assert isinstance(result, folium.Map)
     html = result.get_root().render()
@@ -268,7 +273,7 @@ def test_make_choropleth_evolution_demographique(con_multi):
     assert "2013" in html
     assert "2023" in html
     # La palette divergente doit apparaître dans le HTML
-    assert "#d73027" in html or "#1a9850" in html  # rouge ou vert RdYlGn
+    assert "#e66101" in html or "#5e3c99" in html  # orange ou violet (sans rouge-vert)
 
 
 def test_make_choropleth_evolution_titre_auto(con_multi):

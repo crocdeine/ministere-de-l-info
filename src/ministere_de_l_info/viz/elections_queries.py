@@ -8,19 +8,49 @@ import duckdb
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._sql import ligne_unique
+from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.etl.schema_elections import _CIRCO21_CODES
+from ministere_de_l_info.viz._queries import open_ro
 
-DB_PATH: Path = Path(__file__).resolve().parents[3] / "data" / "ministere.duckdb"
+DB_PATH: Path = get_settings().db_path
 
 _CIRCO21_SQL: str = ", ".join(f"'{c}'" for c in _CIRCO21_CODES)
 _HDF_DEPTS_SQL: str = "'02', '59', '60', '62', '80'"
 _BLOCS_ORDERED: list[str] = ["EXG", "GAU", "DIV", "CENT", "DTE", "EXD"]
 
 
+def taux_participation_agrege(part_df: pl.DataFrame) -> float | None:
+    """Taux de participation d'une zone : 100 × Σ votants / Σ inscrits (pondéré).
+
+    Remplace la moyenne des taux communaux (audit I4), où une commune de
+    80 inscrits pesait autant que Lille. Renvoie None si aucun inscrit
+    (affiché « n.d. »). Les lignes sans votants ou sans inscrits sont exclues
+    des deux sommes.
+    """
+    if part_df.is_empty():
+        return None
+    valides = part_df.filter(pl.col("inscrits").is_not_null() & pl.col("votants").is_not_null())
+    inscrits = valides["inscrits"].sum()
+    if not inscrits:
+        return None
+    return 100.0 * float(valides["votants"].sum()) / float(inscrits)
+
+
+def format_pct_fr(valeur: float | None, decimales: int = 1) -> str:
+    """Formate un pourcentage à la française (« 72,4 % ») ; « n.d. » si absent."""
+    if valeur is None or valeur != valeur:  # None ou NaN
+        return "n.d."
+    return f"{valeur:.{decimales}f} %".replace(".", ",")
+
+
 def _open_ro() -> duckdb.DuckDBPyConnection:
-    con = duckdb.connect(str(DB_PATH), read_only=True)
-    con.execute("LOAD spatial")
-    return con
+    return open_ro(DB_PATH)
+
+
+def _opt_int(v: object) -> int | None:
+    """int(v) ou None si valeur absente (pas de 0 inventé)."""
+    return None if v is None else int(v)  # type: ignore[call-overload]
 
 
 @st.cache_data(ttl=60)
@@ -28,9 +58,11 @@ def is_data_loaded() -> bool:
     """Vérifie que les résultats présidentiels sont chargés."""
     con = _open_ro()
     try:
-        n = con.execute(
-            "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'"
-        ).fetchone()[0]
+        n = ligne_unique(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'"
+            )
+        )[0]
         return int(n) > 0
     finally:
         con.close()
@@ -197,16 +229,18 @@ def get_metrics_commune_pres(annee: int, tour: int, code_commune: str) -> dict:
     """Métriques agrégées d'une commune (inscrits/votants/taux/bloc_dominant)."""
     con = _open_ro()
     try:
-        row = con.execute(
-            """
+        row = ligne_unique(
+            con.execute(
+                """
             SELECT SUM(rp.inscrits), SUM(rp.votants), SUM(rp.exprimes),
                    ROUND(100.0 * SUM(rp.votants) / NULLIF(SUM(rp.inscrits), 0), 2)
             FROM resultats_participation rp
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'pres' AND e.annee = ? AND e.tour = ? AND rp.code_commune = ?
             """,
-            [annee, tour, code_commune],
-        ).fetchone()
+                [annee, tour, code_commune],
+            )
+        )
         bloc_row = con.execute(
             """
             SELECT bloc FROM v_resultats_candidats_avec_bloc
@@ -218,11 +252,11 @@ def get_metrics_commune_pres(annee: int, tour: int, code_commune: str) -> dict:
     finally:
         con.close()
     return {
-        "inscrits": int(row[0] or 0),
-        "votants": int(row[1] or 0),
-        "exprimes": int(row[2] or 0),
-        "taux_participation_pct": float(row[3] or 0.0),
-        "bloc_dominant": bloc_row[0] if bloc_row else "DIV",
+        "inscrits": _opt_int(row[0]),
+        "votants": _opt_int(row[1]),
+        "exprimes": _opt_int(row[2]),
+        "taux_participation_pct": None if row[3] is None else float(row[3]),
+        "bloc_dominant": bloc_row[0] if bloc_row else None,
     }
 
 
@@ -243,14 +277,14 @@ def _build_bv_df(part_rows: list, voix_rows: list) -> pl.DataFrame:
     part_df = pl.DataFrame(
         {
             "code_bv": [r[0] for r in part_rows],
-            "inscrits": [int(r[1] or 0) for r in part_rows],
-            "votants": [int(r[2] or 0) for r in part_rows],
-            "exprimes": [int(r[3] or 0) for r in part_rows],
-            "taux_participation_pct": [float(r[4] or 0.0) for r in part_rows],
+            "inscrits": [_opt_int(r[1]) for r in part_rows],
+            "votants": [_opt_int(r[2]) for r in part_rows],
+            "exprimes": [_opt_int(r[3]) for r in part_rows],
+            "taux_participation_pct": [None if r[4] is None else float(r[4]) for r in part_rows],
         }
     )
     if not voix_rows:
-        result = part_df.with_columns(pl.lit("DIV").alias("bloc_gagnant"))
+        result = part_df.with_columns(pl.lit(None, dtype=pl.Utf8).alias("bloc_gagnant"))
         for b in _BLOCS_ORDERED:
             result = result.with_columns(pl.lit(0).cast(pl.Int64).alias(f"voix_{b}"))
         return result.sort("code_bv")
@@ -280,7 +314,6 @@ def _build_bv_df(part_rows: list, voix_rows: list) -> pl.DataFrame:
         part_df.join(bloc_gagnant_df, on="code_bv", how="left")
         .join(pivot, on="code_bv", how="left")
         .with_columns([pl.col(f"voix_{b}").fill_null(0) for b in _BLOCS_ORDERED])
-        .with_columns(pl.col("bloc_gagnant").fill_null("DIV"))
         .sort("code_bv")
     )
 

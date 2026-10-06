@@ -45,6 +45,9 @@ data/interim/
 data/processed/
 data/external/
 data/backups/
+data/exploration/
+# Copies de sécurité de la base (900 Mo chacune) : jamais dans git
+data/*.duckdb*
 *.parquet
 *.duckdb
 *.duckdb.wal
@@ -103,3 +106,12 @@ coverage.xml
 logs/
 nohup.out
 /tmp/
+
+# ===== Claude Code (worktrees temporaires des agents) =====
+.claude/worktrees/
+
+# Échantillon de test commité (données publiques, < 5 Mo) : exception à *.parquet
+!tests/fixtures/sample/*.parquet
+
+# Graphe du code (graphify), régénérable : graphify update .
+graphify-out/

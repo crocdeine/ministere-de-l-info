@@ -6,6 +6,12 @@ Mathias (GitHub : crocdeine) développe ministere-de-l-info comme projet personn
 
 **Workflow** : Mathias supervise via un chat Claude (web/app) où sont prises les décisions structurantes (architecture, scope, choix éditoriaux). Claude Code intervient sur le Mac mini M4 (OrbStack) pour l'exécution technique : code, tests, commits, déploiement. Claude Code ne prend pas de décisions structurantes sans validation explicite — il propose, attend, exécute. En fin de tâche significative, il rapporte avec un rapport structuré que Mathias relit en chat.
 
+**Gouvernance (depuis le 2026-09-24)** : Claude Code est **directeur de projet**. Mathias fixe les grandes orientations et tranche les décisions structurantes ; le directeur pilote tout le reste et délègue à des agents spécialisés lancés en parallèle (définitions dans `.claude/agents/` : `verificateur-code`, `chercheur-donnees`, `documentaliste`, `architecte-restructuration`, `ingenieur-etl`, `developpeur-ui`, `ingenieur-infra`, `outilleur-claude` — liste extensible). Règles :
+- Les agents qui modifient des fichiers travaillent en worktree isolé et ne poussent jamais ; le directeur relit, vérifie, fusionne et pousse.
+- Aucun agent ne tranche une décision structurante ou méthodologique (classement politique, architecture, périmètre, stack) : il instruit et formule des questions fermées ; le directeur les regroupe pour Mathias.
+- Le directeur peut engager sans attendre les correctifs de bugs avérés et la maintenance (documentation, tests, outillage) qui n'engagent aucun choix de fond.
+- Chaque vague d'agents se termine par un rapport de synthèse dans `reports/`.
+
 Toujours communiquer en français, ton neutre, sans blabla.
 
 ---
@@ -39,14 +45,14 @@ Leçon D3.3 : run 27265331430 watché au lieu du vrai run du commit 7f21346 — 
 
 | Module | Statut | Tag | Détail |
 |--------|--------|-----|--------|
-| 📍 Géographie | ✅ Terminé | v0.2 | Régions, dpts, EPCI, communes, arrondissements, circos. Population 2013/2018/2023. |
-| 🗳️ Élections | ✅ Phase D complète (pres+legi+muni 2002-2026) | v0.4-elections-complet | Présidentielles 2002-2022, Législatives 2002-2024, Municipales 2008-2026, HdF. Drill-down BV. 30 scrutins, 11 vues SQL, 216 mappings nuances, méthodologie tracée (ADR-0005). |
-| 🚀 Déploiement | ✅ v0.4.3 (Mac/OrbStack, testé) | — | install.sh validé sur macOS 26.4.1. Image sur ghcr.io. DB sur GitHub Release. TODO : update.sh test réel, page Paramètres UI. |
-| 📊 Économie | ✅ Phase E++ complète | — | Sources : Filosofi + RP + logements sociaux + CNAF RSA + DREES APL + URSSAF + Eurostat. 7 indicateurs Phase E, Phase E+ : CNAF RSA + DREES APL + URSSAF (1.15M lignes 2006-2025). 943 déserts médicaux HdF détectés. Phase E++ : economie_contexte (Eurostat chômage BIT 1999-2025 + PIB/hab 2000-2024, HdF vs France). UI Streamlit : carte choroplèthe + évolution HdF + croisement économie×élections. 348 tests, 75.34% coverage. ETL : load_economie.py (cache HdF 40Mo). UI Phase E+ : onglet Désindustrialisation (URSSAF 2006-2025), RSA et APL dans carte + évolution, déserts médicaux carte binaire. UI Phase E++ : Tab 2 section Eurostat. |
-| 🏛️ Législatif | ✅ Phase F complète | — | Périmètre national (4065 élus, 1945 Sénat + 2120 AN, 2002-présent). Source Datan (scores activité AN, législatures 12-17) + Sénat CSV officiel (data.senat.fr). UI Streamlit : 4 onglets (composition politique, liste élus, activité parlementaire AN, évolution historique). Filtre national + HdF en UI. 3 tables (leg_elus, leg_activite, leg_blocs_override), 2 vues SQL, 10 fonctions requêtes. 381 tests, 75.34% coverage. Limitations connues : pas de scores Sénat (Datan = AN uniquement), pas de votes nominatifs (XML brut non parsé). |
-| 🎨 Design system | ✅ Terminé | — | Tokens CSS Claude Design (Bleu France, Rouge Marianne, Spectral/Hanken Grotesk/IBM Plex Mono) intégrés dans `custom.css` + `_theme.py::inject_css()`, injection centralisée une seule fois dans `app.py` (routeur). Migration `st.navigation()`/`st.Page()` : icônes Material Symbols sur les 5 entrées de la sidebar (fin de la contrainte "icône = emoji du nom de fichier" de l'ancien système classique `pages/`), Accueil extrait dans `pages/0_🏠_Accueil.py`, URLs propres (`/geographie`, `/elections`...). Accueil = hub de navigation (4 tuiles), micro-animations CSS (boutons, métriques, cards au hover). Filtres Chambre/Département de Législatif déplacés en sidebar (seuls filtres réellement persistants sur plusieurs onglets ; Élections et Économie n'en ont pas — leurs sélecteurs restent inline, contextuels à chaque onglet). Couleurs de blocs politiques réconciliées : source unique `_blocs_politiques.py`, alignée sur les tokens `--nuance-*` et la table `blocs_politiques` (Législatif et Économie avaient chacun une palette divergente). Troncature des libellés de métriques longs (ex. "Extrême gauche") corrigée en CSS. |
+| 📍 Géographie | ✅ Terminé | v0.2 (tag absent du dépôt distant) | Régions, dpts, EPCI, communes, arrondissements, circos. Population 2013/2018/2023. |
+| 🗳️ Élections | ✅ Phase D + J1-J3 (2026-10) | v0.4-elections-complet | Présidentielles 2002-2022, Législatives 2002-2024, Municipales 2008-2026, HdF. Drill-down BV. 229 correspondances nuance → bloc (ADR-0010), légende du classement par scrutin (« grille officielle » seulement pour les municipales 2020/2026, ADR-0013). Absences affichées « n.d. », évolutions en % des exprimés par défaut, score de bloc sur échelle fixe 0-100 %. |
+| 🚀 Déploiement | ✅ Mac natif + Docker | v0.5-economie-legislatif ; base `db-2026-10-04` | Exécution native sur Mac (ADR-0012). Base publiée en release GitHub sous ODbL (`db-2026-10-04`, tag hors `v*`). J4 : port 127.0.0.1, SHA256 obligatoire au téléchargement, actions par SHA, images par digest. Sauvegardes : le directeur en est garant (tâche launchd supprimée le 2026-10-06, voir `../ministere-de-l-info-backups/BACKUPS.md`). |
+| 📊 Économie | ✅ Phase E++ + J1-J3 | v0.5-economie-legislatif | Filosofi + RP (chômage 2015-2016 reconstitué par sexe) + logements sociaux + CNAF RSA + DREES APL + URSSAF (ODbL) + Eurostat. Onglets : carte des indicateurs (classes fixes par indicateur, classe « 0 » distincte), évolution HdF, Économie × Élections, Emploi industriel et accès aux médecins (déserts médicaux à 3 états). |
+| 🏛️ Législatif | ✅ Phase F + J2 | v0.5-economie-legislatif | National : 2120 députés (Datan, législatures 12-17) + 1203 sénateurs (ODSEN, composition d'avant le renouvellement du 27/09/2026 ; veille quotidienne des groupes). Groupes classés par législature (ADR-0011). Non-inscrits : bloc de leur nuance préfectorale d'élection, ou de celle de leur titulaire pour un remplaçant (AMO de l'AN) ; 5 restent « Divers ». Pas de date de naissance (ADR-0013). |
+| 🎨 Design system | ✅ Terminé | — (non publié en release) | Tokens CSS Claude Design (Bleu France, Rouge Marianne, Spectral/Hanken Grotesk/IBM Plex Mono) intégrés dans `custom.css` + `_theme.py::inject_css()`, injection centralisée une seule fois dans `app.py` (routeur). Migration `st.navigation()`/`st.Page()` : icônes Material Symbols sur les 5 entrées de la sidebar (fin de la contrainte "icône = emoji du nom de fichier" de l'ancien système classique `pages/`), Accueil extrait dans `pages/0_🏠_Accueil.py`, URLs propres (`/geographie`, `/elections`...). Accueil = hub de navigation (4 tuiles), micro-animations CSS (boutons, métriques, cards au hover). Filtres Chambre/Département de Législatif déplacés en sidebar (seuls filtres réellement persistants sur plusieurs onglets ; Élections et Économie n'en ont pas — leurs sélecteurs restent inline, contextuels à chaque onglet). Couleurs de blocs politiques réconciliées : source unique `_blocs_politiques.py`, alignée sur les tokens `--nuance-*` et la table `blocs_politiques` (Législatif et Économie avaient chacun une palette divergente). Troncature des libellés de métriques longs (ex. "Extrême gauche") corrigée en CSS. |
 
-**Dernier rapport** : `reports/session-2026-08-19_design-system-cloture.md` — Clôture du chantier design system : filtres, couleurs, icônes sidebar (migration st.navigation), troncature métriques
+**Dernier rapport** : `reports/synthese-j4-2026-10-06.md` — Audit 2026-10-04 et jalons J1-J4 (conformité, exactitude, lisibilité, hygiène). Point de reprise : `docs/reprise.md`.
 
 ---
 
@@ -77,7 +83,14 @@ Toute décision d'architecture non triviale est documentée dans `docs/adr/`. Ne
 | [0003](docs/adr/0003-uv-vs-pip-poetry.md) | uv ≠ pip/poetry | Lock file reproductible, CI rapide, API moderne. |
 | [0004](docs/adr/0004-polars-vs-pandas.md) | Polars > Pandas | Colonnaire, expressions paresseuses, API stricte. |
 | [0005](docs/adr/0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère | 6 blocs officiels (EXG/GAU/DIV/CENT/DTE/EXD), classement "de l'époque", sources tracées. |
-| [0006](docs/adr/0006-module-economie-sources-et-schema.md) | Module Économie — sources et schéma | Filosofi + RP + Sirene, 5 indicateurs, 2 tables, 3 vues, pièges ETL INSEE. |
+| [0006](docs/adr/0006-module-economie-sources-et-schema.md) | Module Économie — sources et schéma | Filosofi + RP + Sirene, 5 indicateurs, 2 tables, 3 vues, pièges ETL INSEE. Note d'exécution : emploi industriel via RP (pas Sirene), 7 indicateurs, Filosofi 2017-2021, RP 2015-2021. |
+| [0007](docs/adr/0007-module-legislatif-perimetre-et-sources.md) | Module Législatif — périmètre et sources | National, Datan (AN) + data.senat.fr, abandon NosDéputés/CLAIR, `leg_blocs_override`. Rétroactif. |
+| [0008](docs/adr/0008-economie-sources-complementaires.md) | Économie — sources complémentaires | CNAF, DREES, URSSAF, Eurostat ; tables `economie_social`, `economie_emploi_urssaf`, `economie_contexte`. Rétroactif. |
+| [0009](docs/adr/0009-design-system-et-navigation.md) | Design system et navigation | Tokens CSS, `app.py` routeur `st.navigation()`/`st.Page()`, `_blocs_politiques.py`. Rétroactif. |
+| [0010](docs/adr/0010-revision-nuances-et-blocs.md) | Révision nuances et blocs | Grilles officielles dès 2020, doctrine « grille la plus proche », 18 reclassements. Révise 0005. |
+| [0011](docs/adr/0011-legislatif-groupes-par-legislature.md) | Législatif par législature | Classement des groupes parlementaires par législature (`leg_groupes_blocs`, `leg_mandats`). |
+| [0012](docs/adr/0012-execution-native-mac.md) | Exécution native sur Mac | LaunchAgent, 127.0.0.1, port 8502 ; Docker conservé pour la distribution. |
+| [0013](docs/adr/0013-licences-et-mentions-des-sources.md) | Licences et mentions des sources | Code MIT, base ODbL, registre `sources.py`, légende des blocs par scrutin, `date_naissance` supprimée, fond Plan IGN. |
 
 ---
 
@@ -129,7 +142,7 @@ Toute décision d'architecture non triviale est documentée dans `docs/adr/`. Ne
 8. **Nommage Parquet inversé** : `general-results.parquet` = résultats candidats ; `candidats-results.parquet` = participation. Ne pas se fier aux noms de fichiers, utiliser les noms de tables DuckDB. (→ `docs/data-sources.md`)
 9. **Nuances NULL** : colonne `nuance` = NULL pour présidentielles 2017/2022 et européennes 2019. Résolution via table `candidats_presidentielle` (jointure sur `nom`). (→ `docs/schema-elections.md`)
 10. **Codes circo sur le web peu fiables** : les listes de communes par circonscription trouvées sur le web sont souvent erronées. Toujours valider par jointure spatiale `ST_Within` sur `geographies_circonscriptions`.
-11. **Blocs officiels depuis 2023 seulement** : le regroupement en blocs de clivages n'existe officiellement que depuis la circulaire IOMA2322276J (sénatoriales 2023). Pour les scrutins antérieurs, reconstruction selon logique officielle datée (voir ADR-0005).
+11. **Blocs officiels depuis 2020** : la première grille officielle de blocs de clivages est l'annexe 3 de INTA1931378J (municipales 2020), puis IOMA2322276J (2023) et INTP2602966C (2026) ; IOMA2415630C (législatives 2024) n'en contient pas. Scrutins sans grille : doctrine de l'ADR-0010 (grille la plus proche dans le temps, même famille politique). Le gotcha « blocs depuis 2023 » de l'ADR-0005 est révisé.
 
 ### Infra Docker
 12. **Dev vs prod** : le compose dev (`docker-compose.yml`) monte `./data:/app/data:ro` (bind mount — DB locale visible immédiatement). Le compose prod (`docker-compose.prod.yml`) utilise un named volume (`duckdb-data`). Ne pas confondre les deux.
@@ -179,11 +192,16 @@ Toute décision d'architecture non triviale est documentée dans `docs/adr/`. Ne
 
 | Fichier | Ce qu'on y trouve |
 |---------|-------------------|
-| `docs/architecture.md` | Structure du code, flux ETL géographie, schéma DuckDB géo, CI, tests |
+| `docs/architecture.md` | Structure du code, navigation `st.navigation()`, flux ETL et schéma DuckDB des 4 modules, CI, tests |
 | `docs/schema-elections.md` | 6 tables électorales, 5 vues, 4 pièges Parquet, classements blocs détaillés |
-| `docs/data-sources.md` | Toutes les sources (IGN, INSEE, circos, Parquet élections), formats, limitations |
+| `docs/data-sources.md` | Toutes les sources (IGN, INSEE, circos, Parquet élections, Économie, Législatif), formats, limitations, sources abandonnées |
 | `docs/deployment.md` | Docker dev/prod, backups launchd, DB GitHub Releases, troubleshooting |
-| `docs/adr/` | 5 ADR — décisions d'architecture non réversibles sans consensus |
-| `docs/sources-officielles/nuances/index.md` | 4 circulaires Ministère archivées + 3 décisions Conseil d'État |
+| `docs/adr/` | 13 ADR (0007-0009 rédigés a posteriori) — décisions d'architecture non réversibles sans consensus |
+| `docs/reprise.md` | Point de reprise : où on en est, prochaines étapes, règles des sessions de relais |
+| `docs/orientations.md`, `docs/journal.md`, `docs/roadmap.md` | Décisions de Mathias, journal des sessions, feuille de route |
+| `docs/sources.md`, `LICENSE-DONNEES.md` | Registre des licences des sources ; base sous ODbL |
+| `docs/audit-2026-10-04.md` | Audit de l'existant (constats, verdicts, jalons J1-J5) |
+| `docs/sources-officielles/nuances/index.md` | 5 circulaires Ministère archivées (PDF) + 2 décisions Conseil d'État archivées, 2 citées |
 | `docs/lessons-learned.md` | Leçons techniques consolidées par thème (data, infra, workflow) |
+| `docs/guide-utilisateur.md` | Mode d'emploi des 5 pages pour un utilisateur non technique |
 | `reports/` | Récaps chronologiques par phase (A, B, C...) — historique complet |

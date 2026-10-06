@@ -10,11 +10,13 @@ Prérequis : DB chargée (init_elections_schema.py + load_elections_legislatives
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import polars as pl
 import pytest
+from _helpers import ligne
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -43,14 +45,14 @@ _HDF_DEPTS_SQL = "'02', '59', '60', '62', '80'"
 
 
 @pytest.fixture(scope="module")
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     if not DB_PATH.exists():
         pytest.skip("DB absente. Lancer init_elections_schema.py + load_elections_legislatives.py")
     c = duckdb.connect(str(DB_PATH), read_only=True)
     c.execute("LOAD spatial")
-    n = c.execute(
-        "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%'"
-    ).fetchone()[0]
+    n = ligne(
+        c.execute("SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%'")
+    )[0]
     if n == 0:
         pytest.skip("Législatives non chargées. Lancer load_elections_legislatives.py")
     yield c
@@ -91,9 +93,11 @@ class TestGetCarteHdfData:
 
     def test_cinquante_circos_2022_t1(self, con):
         """2022 t1 doit couvrir 50 circos."""
-        n = con.execute(
-            "SELECT COUNT(DISTINCT code_circo) FROM v_scores_circo_legi WHERE annee = 2022 AND tour = 1"
-        ).fetchone()[0]
+        n = ligne(
+            con.execute(
+                "SELECT COUNT(DISTINCT code_circo) FROM v_scores_circo_legi WHERE annee = 2022 AND tour = 1"
+            )
+        )[0]
         assert n == 50, f"Attendu 50 circos 2022t1, trouvé {n}"
 
     def test_chaque_circo_a_un_bloc_dominant(self, con):
@@ -142,17 +146,20 @@ class TestGetCircoDetailData:
 
     def test_communes_dans_circo_59_21(self, con):
         """La circo 59-21 contient ~20 communes (validé par jointure spatiale D1.2)."""
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(DISTINCT rp.code_commune)
             FROM resultats_participation rp
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'legi' AND e.annee = 2022 AND e.tour = 1 AND rp.code_circo = '59-21'
-        """).fetchone()[0]
+        """)
+        )[0]
         assert 15 <= n <= 25, f"Nombre de communes hors plage [15-25] : {n}"
 
     def test_geo_communes_circo(self, con):
         """Les communes de 59-21 ont des géométries dans geographies_communes."""
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(*)
             FROM geographies_communes gc
             WHERE gc.code_insee IN (
@@ -161,7 +168,8 @@ class TestGetCircoDetailData:
                 JOIN elections e ON e.id_election = rp.id_election
                 WHERE e.type_scrutin = 'legi' AND e.annee = 2022 AND e.tour = 1 AND rp.code_circo = '59-21'
             )
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n >= 15, f"Trop peu de communes géo : {n}"
 
 
@@ -170,11 +178,13 @@ class TestGetEvolutionCirco:
 
     def test_six_annees_disponibles(self, con):
         """6 années × 2 tours = 12 lignes (en termes d'annee×tour×bloc)."""
-        n_annees = con.execute("""
+        n_annees = ligne(
+            con.execute("""
             SELECT COUNT(DISTINCT annee)
             FROM v_scores_circo_legi
             WHERE code_circo = '59-21'
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n_annees == 6, f"Attendu 6 années, trouvé {n_annees}"
 
     def test_deux_tours_par_annee(self, con):
@@ -214,19 +224,23 @@ class TestGeoCircos:
 
     def test_cinquante_circos_geo(self, con):
         """50 circos HdF dans geographies_circonscriptions."""
-        n = con.execute(  # noqa: S608
-            f"SELECT COUNT(*) FROM geographies_circonscriptions "
-            f"WHERE code_departement IN ({_HDF_DEPTS_SQL})"
-        ).fetchone()[0]
+        n = ligne(
+            con.execute(  # noqa: S608
+                f"SELECT COUNT(*) FROM geographies_circonscriptions "
+                f"WHERE code_departement IN ({_HDF_DEPTS_SQL})"
+            )
+        )[0]
         assert n == 50, f"Attendu 50 circos HdF, trouvé {n}"
 
     def test_geometry_non_nulle(self, con):
         """Toutes les circos HdF ont une géométrie simplifiée."""
-        n_null = con.execute(  # noqa: S608
-            f"SELECT COUNT(*) FROM geographies_circonscriptions "
-            f"WHERE code_departement IN ({_HDF_DEPTS_SQL}) "
-            f"AND (geometry_simplified_circo IS NULL OR ST_IsEmpty(geometry_simplified_circo))"
-        ).fetchone()[0]
+        n_null = ligne(
+            con.execute(  # noqa: S608
+                f"SELECT COUNT(*) FROM geographies_circonscriptions "
+                f"WHERE code_departement IN ({_HDF_DEPTS_SQL}) "
+                f"AND (geometry_simplified_circo IS NULL OR ST_IsEmpty(geometry_simplified_circo))"
+            )
+        )[0]
         assert n_null == 0, f"{n_null} circos HdF sans géométrie"
 
     def test_bounds_hdf_plausibles(self, con):
@@ -278,7 +292,8 @@ class TestLegiFunctionsInterface:
     def test_get_participation_hdf_legi(self, db_ready):
         df = get_participation_hdf_legi(2022, 1)
         assert len(df) == 50
-        assert df["taux_participation_pct"].min() > 0
+        mini = df.select(pl.col("taux_participation_pct").min()).item()
+        assert mini is not None and mini > 0
 
     def test_get_evolution_hdf_legi(self, db_ready):
         df = get_evolution_hdf_legi()
@@ -294,7 +309,8 @@ class TestLegiFunctionsInterface:
     def test_get_scores_communes_circo_legi(self, db_ready):
         df = get_scores_communes_circo_legi(2022, 1, "59-21")
         assert not df.is_empty()
-        assert df["voix"].min() >= 0
+        mini = df.select(pl.col("voix").min()).item()
+        assert mini is not None and mini >= 0
 
     def test_get_communes_circo_legi_geo(self, db_ready):
         df = get_communes_circo_legi_geo(2022, 1, "59-21")
@@ -385,10 +401,10 @@ class TestGetMetricsCommuneLegi:
         assert m["bloc_dominant"] in {"EXG", "GAU", "DIV", "CENT", "DTE", "EXD"}
         assert m["votants"] <= m["inscrits"]
 
-    def test_commune_inconnue_retourne_zeros(self, db_ready):
+    def test_commune_inconnue_retourne_none(self, db_ready):
         m = get_metrics_commune_legi(2022, 1, "99999")
-        assert m["inscrits"] == 0
-        assert m["votants"] == 0
+        assert m["inscrits"] is None
+        assert m["votants"] is None
 
 
 class TestGetBvDetailsLegi:

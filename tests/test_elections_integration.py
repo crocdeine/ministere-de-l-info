@@ -11,10 +11,12 @@ Prérequis :
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -22,16 +24,16 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "ministere.duckdb"
 
 
 @pytest.fixture(scope="module")
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     if not DB_PATH.exists():
         pytest.skip(
             "DB absente. Lancer init_elections_schema.py + load_elections_presidentielles.py"
         )
     c = duckdb.connect(str(DB_PATH), read_only=True)
     c.execute("LOAD spatial")
-    n = c.execute(
-        "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'"
-    ).fetchone()[0]
+    n = ligne(
+        c.execute("SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_pres_%'")
+    )[0]
     if n == 0:
         pytest.skip("Présidentielles non chargées. Lancer load_elections_presidentielles.py")
     yield c
@@ -42,7 +44,8 @@ class TestCoherenceVolumes:
     """La somme des voix par bloc dans une commune doit correspondre au total des candidats."""
 
     def test_somme_voix_par_commune_egale_total_candidats(self, con):
-        ref = con.execute("""
+        ref = ligne(
+            con.execute("""
             SELECT SUM(rc.voix) AS total
             FROM resultats_candidats rc
             JOIN elections e ON e.id_election = rc.id_election
@@ -50,12 +53,15 @@ class TestCoherenceVolumes:
             LEFT JOIN candidats_presidentielle cp ON cp.nom = rc.nom AND cp.annee = e.annee
             WHERE e.id_election = '2022_pres_t1'
               AND COALESCE(nh.bloc, cp.bloc) IS NOT NULL
-        """).fetchone()[0]
-        agg = con.execute("""
+        """)
+        )[0]
+        agg = ligne(
+            con.execute("""
             SELECT SUM(voix) AS total
             FROM v_scores_commune_pres
             WHERE annee = 2022 AND tour = 1
-        """).fetchone()[0]
+        """)
+        )[0]
         assert ref == agg, f"Incohérence : référence={ref}, agrégat={agg}"
 
     def test_chaque_scrutin_a_des_donnees(self, con):
@@ -80,10 +86,12 @@ class TestCoherenceBlocs:
 
     def test_aucun_candidat_sans_bloc(self, con):
         """Pres et legi uniquement : muni a des NULL blocs intentionnels (NC/<seuil)."""
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(*) FROM v_resultats_candidats_avec_bloc
             WHERE bloc IS NULL AND type_scrutin != 'muni'
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n == 0, f"{n} lignes orphelines de bloc (pres+legi)"
 
     def test_tous_blocs_officiels_presents(self, con):
@@ -102,10 +110,12 @@ class TestCoherenceParticipation:
     """Participation : votants <= inscrits, taux dans [0, 100]."""
 
     def test_votants_inferieur_inscrits(self, con):
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(*) FROM v_participation_commune_pres
             WHERE votants > inscrits
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n == 0, f"{n} communes avec votants > inscrits"
 
     def test_taux_participation_dans_intervalle(self, con):
@@ -122,9 +132,7 @@ class TestCircoVingtEtUn:
     """La circo 21 doit avoir exactement 20 communes dans toutes les vues."""
 
     def test_circo21_exactement_vingt_communes(self, con):
-        n = con.execute(
-            "SELECT COUNT(DISTINCT code_commune) FROM v_scores_circo21_pres"
-        ).fetchone()[0]
+        n = ligne(con.execute("SELECT COUNT(DISTINCT code_commune) FROM v_scores_circo21_pres"))[0]
         assert n == 20, f"Circo 21 devrait avoir 20 communes, trouvé {n}"
 
     def test_circo21_couvre_cinq_annees(self, con):
@@ -136,8 +144,10 @@ class TestCircoVingtEtUn:
 
     def test_valenciennes_2002_t1_a_les_six_blocs(self, con):
         """Test de fumée : Valenciennes 2002 t1 doit avoir au moins 5 blocs représentés."""
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(DISTINCT bloc) FROM v_scores_commune_pres
             WHERE code_commune = '59606' AND annee = 2002 AND tour = 1
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n >= 5, f"Valenciennes 2002 t1 : seulement {n} blocs, attendu >= 5"

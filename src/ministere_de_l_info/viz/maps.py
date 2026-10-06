@@ -10,7 +10,10 @@ import branca.colormap as cm
 import duckdb
 import folium
 import folium.features
+import streamlit as st
 
+from ministere_de_l_info.config import get_settings
+from ministere_de_l_info.sources import LO2, mention
 from ministere_de_l_info.viz._config import (
     _CENTRE_FRANCE,
     _LIBELLES_NIVEAUX,
@@ -23,13 +26,17 @@ from ministere_de_l_info.viz._config import (
 from ministere_de_l_info.viz._display import (
     _COULEUR_CONTOURS,
     _COULEUR_FOND_CONTOURS,
-    _COULEURS_RDYLGN5,
+    _COULEURS_EVOLUTION5,
     _COULEURS_YLORD5,
     _SEUILS_EVOLUTION,
+    COULEUR_ND,
+    NOTE_CLASSES_FIXES,
     _build_legend_html,
-    _compute_breaks,
     _fmt_fr,
     _fmt_pct,
+    ajouter_html,
+    bornes_fixes,
+    nouvelle_carte,
 )
 from ministere_de_l_info.viz._queries import (
     _build_query_choropleth,
@@ -38,6 +45,7 @@ from ministere_de_l_info.viz._queries import (
     _fit_bounds_for_filter,
     _get_geometry_column,
     _resolve_mode,
+    open_ro,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,7 +67,7 @@ def make_choropleth(
 
     Pour niveau='commune', filtre_departement est obligatoire.
     Si annee_ref est fourni (et niveau supporte la population), la carte affiche
-    l'évolution démographique (%) entre annee_ref et annee avec une palette RdYlGn.
+    l'évolution démographique (%) entre annee_ref et annee avec une palette divergente orange-violet.
     mode='auto' bascule automatiquement en contours si les données population sont absentes.
     """
     if niveau not in _NIVEAUX_SUPPORTES:
@@ -78,7 +86,7 @@ def make_choropleth(
     is_evolution = annee_ref is not None and niveau in _VUE_PAR_NIVEAU
 
     if mode_effectif == "choropleth":
-        if is_evolution:
+        if annee_ref is not None and is_evolution:
             sql, params = _build_query_evolution(
                 niveau,
                 annee,
@@ -111,16 +119,20 @@ def make_choropleth(
 
     # Construction du FeatureCollection GeoJSON
     features: list[dict] = []
-    values: list[float] = []
 
     if mode_effectif == "choropleth":
         if is_evolution:
             for code, nom, delta_abs, delta_pct, geojson_str in rows:
-                v = float(delta_pct) if delta_pct is not None else 0.0
-                values.append(v)
-                icon = "↗" if v > 1.0 else ("↘" if v < -1.0 else "→")
-                abs_val = int(delta_abs) if delta_abs is not None else 0
-                abs_str = (f"+{abs_val:,}" if abs_val >= 0 else f"{abs_val:,}").replace(",", " ")
+                v = float(delta_pct) if delta_pct is not None else None
+                if v is None or delta_abs is None:
+                    fmt = "n.d."  # population de référence absente ou nulle : pas de 0 inventé
+                else:
+                    icon = "↗" if v > 1.0 else ("↘" if v < -1.0 else "→")
+                    abs_val = int(delta_abs)
+                    abs_str = (f"+{abs_val:,}" if abs_val >= 0 else f"{abs_val:,}").replace(
+                        ",", " "
+                    )
+                    fmt = f"{icon} {v:+.1f}% ({abs_str} hab)"
                 features.append(
                     {
                         "type": "Feature",
@@ -128,15 +140,14 @@ def make_choropleth(
                             "code": code,
                             "nom": nom,
                             "valeur": v,
-                            "valeur_fmt": f"{icon} {v:+.1f}% ({abs_str} hab)",
+                            "valeur_fmt": fmt,
                         },
                         "geometry": json.loads(geojson_str),
                     }
                 )
         else:
             for code, nom, valeur, geojson_str in rows:
-                v = float(valeur) if valeur is not None else 0.0
-                values.append(v)
+                v = float(valeur) if valeur is not None else None
                 features.append(
                     {
                         "type": "Feature",
@@ -144,7 +155,7 @@ def make_choropleth(
                             "code": code,
                             "nom": nom,
                             "valeur": v,
-                            "valeur_fmt": _fmt_fr(v),
+                            "valeur_fmt": "n.d." if v is None else _fmt_fr(v),
                         },
                         "geometry": json.loads(geojson_str),
                     }
@@ -161,7 +172,7 @@ def make_choropleth(
 
     geojson_data = {"type": "FeatureCollection", "features": features}
 
-    m = folium.Map(location=_CENTRE_FRANCE, zoom_start=_ZOOM_DEPART, tiles="CartoDB positron")
+    m = nouvelle_carte(_CENTRE_FRANCE, _ZOOM_DEPART)
 
     if zoomed:
         bounds = _fit_bounds_for_filter(con, niveau, geom_col, filtre_departement, filtre_region)
@@ -173,9 +184,9 @@ def make_choropleth(
     if mode_effectif == "choropleth":
         if is_evolution:
             breaks = _SEUILS_EVOLUTION
-            legend_colors = _COULEURS_RDYLGN5
+            legend_colors = _COULEURS_EVOLUTION5
             colormap = cm.StepColormap(
-                colors=_COULEURS_RDYLGN5,
+                colors=_COULEURS_EVOLUTION5,
                 index=_SEUILS_EVOLUTION,
                 vmin=_SEUILS_EVOLUTION[0],
                 vmax=_SEUILS_EVOLUTION[-1],
@@ -185,7 +196,7 @@ def make_choropleth(
                 f"Évolution {annee_ref}→{annee} :",
             ]
         else:
-            breaks = _compute_breaks(values)
+            breaks = bornes_fixes(f"{indicateur}:{niveau}")
             legend_colors = _COULEURS_YLORD5
             colormap = cm.StepColormap(
                 colors=_COULEURS_YLORD5,
@@ -198,7 +209,9 @@ def make_choropleth(
                 f"{indicateur.replace('_', ' ').capitalize()} :",
             ]
         style_fn = lambda f, _cm=colormap: {  # noqa: E731
-            "fillColor": _cm(f["properties"]["valeur"]),
+            "fillColor": COULEUR_ND
+            if f["properties"]["valeur"] is None
+            else _cm(f["properties"]["valeur"]),
             "fillOpacity": 0.75,
             "color": "white",
             "weight": 0.5,
@@ -233,15 +246,18 @@ def make_choropleth(
                 if is_evolution
                 else f"{indicateur.replace('_', ' ').capitalize()} — {annee}"
             )
-        m.get_root().html.add_child(
+        ajouter_html(
+            m,
             folium.Element(
                 _build_legend_html(
                     titre,
                     breaks,
                     legend_colors,
                     fmt_fn=_fmt_pct if is_evolution else None,
+                    note=None if is_evolution else NOTE_CLASSES_FIXES,
+                    avec_nd=any(f["properties"]["valeur"] is None for f in features),
                 )
-            )
+            ),
         )
 
     if mode_effectif == "choropleth" and is_evolution:
@@ -250,13 +266,47 @@ def make_choropleth(
         source_suffix = f" {annee}"
     else:
         source_suffix = ""
-    source_txt = f"{_SOURCE}{source_suffix}"
-    m.get_root().html.add_child(
+    source = (
+        f"Source : {mention('circos')} (non officiel)"
+        if niveau == "circonscription"
+        else f"{_SOURCE} — {LO2}"
+    )
+    source_txt = f"{source}{source_suffix}"
+    ajouter_html(
+        m,
         folium.Element(
             '<div style="position:fixed;bottom:12px;right:12px;z-index:1000;background:white;'
             f"color:#555;padding:4px 10px;border-radius:4px;font-size:11px;border:1px solid #ddd;"
             f'pointer-events:none;">{source_txt}</div>'
-        )
+        ),
     )
 
     return m
+
+
+# ponytail: Map partagée entre sessions (cache_resource, 32 entrées max) ; st_folium ne la modifie pas.
+@st.cache_resource(max_entries=32, show_spinner="Construction de la carte…")
+def get_carte_cache(
+    niveau: str,
+    annee: int,
+    annee_ref: int | None,
+    filtre_departement: str | None,
+    filtre_region: str | None,
+    titre: str,
+    mode: Literal["choropleth", "contours", "auto"],
+) -> folium.Map:
+    """`make_choropleth` en cache (connexion courte) ; les exceptions ne sont pas mises en cache."""
+    con = open_ro(get_settings().db_path)
+    try:
+        return make_choropleth(
+            con,
+            niveau=niveau,
+            annee=annee,
+            annee_ref=annee_ref,
+            filtre_departement=filtre_departement,
+            filtre_region=filtre_region,
+            titre=titre,
+            mode=mode,
+        )
+    finally:
+        con.close()

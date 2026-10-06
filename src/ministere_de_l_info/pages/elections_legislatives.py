@@ -7,6 +7,10 @@ import polars as pl
 import streamlit as st
 from streamlit_folium import st_folium
 
+from ministere_de_l_info._blocs_politiques import couleurs_traits, legende_classement_blocs
+from ministere_de_l_info._theme import index_persiste, render_donnees_indisponibles
+from ministere_de_l_info.sources import mention
+from ministere_de_l_info.viz._display import fmt_nd
 from ministere_de_l_info.viz.elections_legi_queries import (
     get_bv_details_legi,
     get_circo_bounds,
@@ -24,7 +28,12 @@ from ministere_de_l_info.viz.elections_legi_queries import (
     get_scores_hdf_legi,
     is_legi_data_loaded,
 )
-from ministere_de_l_info.viz.elections_queries import _BLOCS_ORDERED, get_blocs_meta
+from ministere_de_l_info.viz.elections_queries import (
+    _BLOCS_ORDERED,
+    format_pct_fr,
+    get_blocs_meta,
+    taux_participation_agrege,
+)
 from ministere_de_l_info.viz.maps_elections import (
     make_choropleth_elections_bloc_dominant,
     make_choropleth_legi_circos_bloc_dominant,
@@ -46,9 +55,10 @@ _WARNING_ANCIEN_DECOUPAGE = (
 def render() -> None:
     """Vue Streamlit pour les législatives HdF 2002-2024."""
     if not is_legi_data_loaded():
-        st.info(
-            "Données législatives non chargées. Lancez :\n\n"
-            "```bash\nuv run python scripts/load_elections_legislatives.py\n```"
+        render_donnees_indisponibles(
+            "des législatives",
+            base_absente=False,
+            commande_dev="uv run python scripts/load_elections_legislatives.py",
         )
         return
 
@@ -58,20 +68,32 @@ def render() -> None:
     bloc_codes: list[str] = [b[0] for b in blocs_meta]
 
     # ── Sélecteurs ──────────────────────────────────────────────────────────────
+    # `index=` explicite (en plus de `key=`) : cf. `_theme.index_persiste`, évite
+    # la désynchronisation widget/donnée après réouverture d'un onglet paresseux.
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
         annee: int = st.selectbox(  # type: ignore[assignment]
-            "Année", _ANNEES_LEGI, index=4, key="legi_annee"
+            "Année",
+            _ANNEES_LEGI,
+            index=index_persiste("legi_annee", _ANNEES_LEGI, 4),
+            key="legi_annee",
         )
     with col2:
         tour: int = st.selectbox(  # type: ignore[assignment]
-            "Tour", [1, 2], format_func=lambda x: "1er" if x == 1 else "2e", key="legi_tour"
+            "Tour",
+            [1, 2],
+            index=index_persiste("legi_tour", [1, 2]),
+            format_func=lambda x: "1er" if x == 1 else "2e",
+            key="legi_tour",
         )
     with col3:
         circos = get_circos_hdf_legi()
         options = ["(toutes — vue HdF)"] + [c[1] for c in circos]
         circo_selected: str = st.selectbox(  # type: ignore[assignment]
-            "Circonscription", options, index=0, key="legi_circo"
+            "Circonscription",
+            options,
+            index=index_persiste("legi_circo", options, 0),
+            key="legi_circo",
         )
 
     # ── Avertissement ancien découpage ──────────────────────────────────────────
@@ -106,7 +128,7 @@ def _render_vue_hdf(
 
     # Métriques HdF
     inscrits_tot = int(part_df["inscrits"].sum()) if not part_df.is_empty() else 0
-    taux_moy = float(part_df["taux_participation_pct"].mean()) if not part_df.is_empty() else 0.0
+    taux_hdf = taux_participation_agrege(part_df)
     dominant_hdf = (
         scores_df.group_by("bloc")
         .agg(pl.sum("voix").alias("voix_total"))
@@ -115,14 +137,18 @@ def _render_vue_hdf(
     )
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Inscrits HdF", f"{inscrits_tot:,}".replace(",", " "))
-    m2.metric("Participation moy.", f"{taux_moy:.1f} %")
-    m3.metric("Bloc dominant HdF", libelles.get(dominant_hdf, dominant_hdf))
-    m4.metric("Circos 1er tour", f"{scores_df['code_circo'].n_unique()}")
-
-    st.caption(
-        "Source : data.gouv.fr — Données des élections agrégées. "
-        "Classement des blocs : nomenclature officielle Ministère de l'Intérieur."
+    m2.metric(
+        "Participation HdF",
+        format_pct_fr(taux_hdf),
+        help="Total des votants divisé par le total des inscrits des circonscriptions HdF.",
     )
+    m3.metric("Bloc dominant HdF", libelles.get(dominant_hdf, dominant_hdf))
+    m4.metric(
+        f"Circonscriptions ({'1er' if tour == 1 else '2e'} tour)",
+        f"{scores_df['code_circo'].n_unique()}",
+    )
+
+    st.caption(f"Source : {mention('elections')}. " + legende_classement_blocs("legi", annee))
 
     # Carte choroplèthe circos
     st.subheader(f"Carte HdF par circonscription — {annee}, {'1er' if tour == 1 else '2e'} tour")
@@ -131,7 +157,7 @@ def _render_vue_hdf(
             carte = make_choropleth_legi_circos_bloc_dominant(
                 scores_df, geo_df, blocs_meta, bounds, "Bloc dominant"
             )
-            st_folium(carte, width="100%", height=550, returned_objects=[])
+            st_folium(carte, width="100%", height=550, returned_objects=[])  # pyright: ignore[reportArgumentType] # stub streamlit-folium : width typé int, '100%' accepté
         except Exception as exc:
             st.error(f"Erreur carte : {exc}")
 
@@ -223,7 +249,7 @@ def _render_vue_circo(
             carte = make_choropleth_elections_bloc_dominant(
                 scores_df, geo_df, blocs_meta, bounds, f"Blocs — {code_circo}"
             )
-            st_folium(carte, width="100%", height=450, returned_objects=[])
+            st_folium(carte, width="100%", height=450, returned_objects=[])  # pyright: ignore[reportArgumentType] # stub streamlit-folium : width typé int, '100%' accepté
         except Exception as exc:
             st.error(f"Erreur carte : {exc}")
 
@@ -278,16 +304,17 @@ def _render_vue_circo(
 
     # ── Section drill-down BV ────────────────────────────────────────────────────
     st.divider()
-    st.subheader("🔍 Détail par bureau de vote")
+    st.subheader("Détail par bureau de vote")
 
     communes_list = get_communes_circo_legi_list(annee, tour, code_circo)
     commune_options = ["(aucune sélection)"] + [f"{nom} ({code})" for code, nom in communes_list]
 
+    cle_drilldown = f"legi_drilldown_commune_{code_circo}"
     commune_selected: str = st.selectbox(  # type: ignore[assignment]
         "Commune",
         commune_options,
-        index=0,
-        key=f"legi_drilldown_commune_{code_circo}",
+        index=index_persiste(cle_drilldown, commune_options, 0),
+        key=cle_drilldown,
         help="Choisir une commune pour afficher le détail par bureau de vote.",
     )
 
@@ -299,10 +326,10 @@ def _render_vue_circo(
         st.caption(f"Commune sélectionnée : **{nom_commune}** ({code_commune})")
 
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Inscrits", f"{metrics['inscrits']:,}".replace(",", " "))
-        m2.metric("Votants", f"{metrics['votants']:,}".replace(",", " "))
-        m3.metric("Participation", f"{metrics['taux_participation_pct']:.1f} %")
-        m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "—"))
+        m1.metric("Inscrits", fmt_nd(metrics["inscrits"]))
+        m2.metric("Votants", fmt_nd(metrics["votants"]))
+        m3.metric("Participation", fmt_nd(metrics["taux_participation_pct"], ".1f", " %"))
+        m4.metric("Bloc dominant", libelles.get(metrics["bloc_dominant"], "n.d."))
 
         bv_df = get_bv_details_legi(annee, tour, code_commune)
         if bv_df.is_empty():
@@ -332,7 +359,7 @@ def _render_vue_circo(
             for col in ["Inscrits", "Votants", "Exprimés"] + list(_BLOCS_ORDERED):
                 fmt[col] = "{:,}"
             st.dataframe(
-                bv_display.to_pandas().style.format(fmt),
+                bv_display.to_pandas().style.format(fmt, na_rep="n.d."),  # pyright: ignore[reportArgumentType] # stub pandas : ExtFormatter n'admet pas les formats str
                 width="stretch",
                 hide_index=True,
                 height=400,
@@ -358,18 +385,22 @@ def _render_evolution_chart(
 ) -> None:
     """Graphe d'évolution temporelle (HdF ou circo), avec zone grisée 2002/2007."""
     ev_left, ev_right = st.columns([1, 3])
+    cle_tour_evol = f"legi_tour_evol_{'hdf' if hdf_mode else code_circo}"
+    cle_mode_evol = f"legi_mode_evol_{'hdf' if hdf_mode else code_circo}"
     with ev_left:
         tour_evol: int = st.radio(  # type: ignore[assignment]
             "Tour (évolution)",
             [1, 2],
+            index=index_persiste(cle_tour_evol, [1, 2]),
             format_func=lambda x: "1er" if x == 1 else "2e",
             horizontal=True,
-            key=f"legi_tour_evol_{'hdf' if hdf_mode else code_circo}",
+            key=cle_tour_evol,
         )
         mode_evol: str = st.radio(  # type: ignore[assignment]
             "Unité",
-            ["Voix totales", "Part des exprimés (%)"],
-            key=f"legi_mode_evol_{'hdf' if hdf_mode else code_circo}",
+            ["Part des exprimés (%)", "Voix totales"],
+            index=index_persiste(cle_mode_evol, ["Part des exprimés (%)", "Voix totales"]),
+            key=cle_mode_evol,
         )
 
     ev_df = get_evolution_hdf_legi() if hdf_mode else get_evolution_circo_legi(code_circo)  # type: ignore[arg-type]
@@ -397,7 +428,7 @@ def _render_evolution_chart(
         x="annee",
         y=y_col,
         color="bloc",
-        color_discrete_map=couleurs,
+        color_discrete_map=couleurs_traits(couleurs),
         category_orders={"bloc": bloc_codes},
         markers=True,
         labels={"annee": "Année", y_col: y_label, "bloc": "Bloc"},
@@ -419,6 +450,13 @@ def _render_evolution_chart(
         legend_title_text="Bloc",
         margin={"t": 30, "b": 30},
     )
-    fig.update_traces(hovertemplate="<b>%{x}</b><br>%{y:,.0f}<extra>%{fullData.name}</extra>")
+    fmt_y = "%{y:.1f} %" if y_col == "pct" else "%{y:,.0f} voix"
+    fig.update_traces(hovertemplate=f"<b>%{{x}}</b><br>{fmt_y}<extra>%{{fullData.name}}</extra>")
     with ev_right:
         st.plotly_chart(fig, width="stretch")
+        if tour_evol == 2:
+            st.caption(
+                "2e tour : seules les circonscriptions où un second tour a eu lieu sont "
+                "comptées (celles pourvues dès le 1er tour en sont exclues de fait). "
+                "Les totaux ne sont donc pas ceux de l'ensemble du territoire."
+            )

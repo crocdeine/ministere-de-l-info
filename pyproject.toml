@@ -50,16 +50,20 @@ etl = [
 
 [tool.pytest.ini_options]
 addopts = [
-    "-m", "not slow",
+    "-m", "not slow and not network",
     "--cov=src/ministere_de_l_info",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
+    # Seuil relevé le 2026-10-06 : la CI (sans base ni réseau) mesure 64,2 % ; avec la base
+    # locale, 77 %. Fixé à 60 % pour faire échouer toute baisse notable (J4, audit 2026-10-04).
     "--cov-fail-under=60",
     "--cov-config=pyproject.toml",
 ]
 markers = [
-    "slow: tests démarant un processus externe (Streamlit). Lancer avec: pytest -m slow",
+    "slow: tests démarrant un processus externe (Streamlit). Lancer avec : pytest -m slow",
+    "network: tests appelant un service externe (IGN, INSEE, data.gouv). Lancer avec : pytest -m network",
+    "spatial: tests exigeant l'extension DuckDB spatial (ignorés si elle n'est pas installée)",
 ]
 testpaths = ["tests"]
 
@@ -116,3 +120,18 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pyright]
+# Typage vérifié en mode basic : 0 erreur, job bloquant en CI
+# (voir .github/workflows/ci.yml, job typecheck). Ne pas baisser les règles.
+typeCheckingMode = "basic"
+pythonVersion = "3.12"
+include = ["src", "pages", "app.py", "scripts", "tests"]
+exclude = [".claude", ".venv", "data", "notebooks", "**/__pycache__"]
+venvPath = "."
+venv = ".venv"
+executionEnvironments = [
+    { root = "tests", extraPaths = ["tests", "src", "."] },
+    { root = "scripts", extraPaths = ["src"] },
+    { root = "." },
+]

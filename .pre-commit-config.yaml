@@ -2,25 +2,39 @@
 # Installation : uv run pre-commit install
 # Lancement manuel : uv run pre-commit run --all-files
 
-# Les skills Claude Code dans .claude/ sont des fichiers tiers — exclus des hooks
-exclude: ^\.claude/
+# Les skills Claude Code dans .claude/ sont des fichiers tiers : exclus des hooks de
+# formatage, mais PAS de la détection de secrets (gitleaks, detect-private-key).
 
 repos:
+  # Détection de secrets (clés API, jetons, mots de passe) — audit 2026-10-04
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.13
     hooks:
       - id: ruff
         args: [--fix]
+        exclude: ^\.claude/
       - id: ruff-format
+        exclude: ^\.claude/
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^\.claude/
       - id: end-of-file-fixer
+        exclude: ^\.claude/
       - id: check-yaml
+        exclude: ^\.claude/
       - id: check-toml
+        exclude: ^\.claude/
       - id: check-merge-conflict
+      - id: detect-private-key
       - id: check-added-large-files
         args: ['--maxkb=1000']
-        exclude: \.pdf$
+        # Échantillon de test : budget global de 5 Mo contrôlé par scripts/export_sample_db.py
+        exclude: (\.pdf$|^tests/fixtures/sample/.*\.parquet$)

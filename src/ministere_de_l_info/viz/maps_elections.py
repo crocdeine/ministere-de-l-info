@@ -9,12 +9,22 @@ import folium
 import folium.features
 import polars as pl
 
-from ministere_de_l_info.viz._display import _build_legend_html, _fmt_fr
+from ministere_de_l_info.viz._display import (
+    COULEUR_ND,
+    _build_legend_html,
+    _fmt_fr,
+    ajouter_html,
+    nouvelle_carte,
+)
 
 _SOURCE_HTML: str = (
     '<div style="position:fixed;bottom:12px;right:12px;z-index:1000;background:white;'
     "color:#555;padding:4px 10px;border-radius:4px;font-size:11px;border:1px solid #ddd;"
-    'pointer-events:none;">Source : data.gouv.fr — Élections agrégées</div>'
+    "pointer-events:none;\">Source : ministère de l'Intérieur (data.gouv.fr) — Licence Ouverte 2.0"
+    "</div>"
+)
+_SOURCE_HTML_CIRCOS: str = _SOURCE_HTML.replace(
+    "</div>", " · Contours des circonscriptions : J. Desboeufs (non officiels)</div>"
 )
 
 
@@ -88,7 +98,7 @@ def make_choropleth_elections_bloc_dominant(
             }
         )
 
-    m = folium.Map(location=[50.35, 3.4], zoom_start=10, tiles="CartoDB positron")
+    m = nouvelle_carte([50.35, 3.4], 10)
     if bounds:
         m.fit_bounds(bounds)
 
@@ -109,8 +119,8 @@ def make_choropleth_elections_bloc_dominant(
         ),
     ).add_to(m)
 
-    m.get_root().html.add_child(folium.Element(_legend_blocs_html(blocs_meta, titre)))
-    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    ajouter_html(m, folium.Element(_legend_blocs_html(blocs_meta, titre)))
+    ajouter_html(m, folium.Element(_SOURCE_HTML))
     return m
 
 
@@ -163,7 +173,7 @@ def make_choropleth_legi_circos_bloc_dominant(
             }
         )
 
-    m = folium.Map(location=[50.2, 2.8], zoom_start=8, tiles="CartoDB positron")
+    m = nouvelle_carte([50.2, 2.8], 8)
     if bounds:
         m.fit_bounds(bounds)
 
@@ -184,9 +194,12 @@ def make_choropleth_legi_circos_bloc_dominant(
         ),
     ).add_to(m)
 
-    m.get_root().html.add_child(folium.Element(_legend_blocs_html(blocs_meta, titre)))
-    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    ajouter_html(m, folium.Element(_legend_blocs_html(blocs_meta, titre)))
+    ajouter_html(m, folium.Element(_SOURCE_HTML_CIRCOS))
     return m
+
+
+ECHELLE_SCORE_MAX: float = 100.0  # % exprimés : borne haute fixe de l'échelle du score d'un bloc
 
 
 def make_choropleth_elections_score_bloc(
@@ -204,18 +217,22 @@ def make_choropleth_elections_score_bloc(
     merged = bloc_scores.join(
         participation_df.select(["code_commune", "exprimes"]), on="code_commune", how="left"
     ).with_columns(
+        # exprimés absents ou nuls : pas de pourcentage calculable -> NULL (n.d.), jamais 0 %
         pl.when(pl.col("exprimes") > 0)
         .then(pl.col("voix").cast(pl.Float64) * 100.0 / pl.col("exprimes").cast(pl.Float64))
-        .otherwise(0.0)
+        .otherwise(None)
         .alias("pct")
     )
-    pct_map: dict[str, tuple[int, float]] = {
-        r[0]: (r[1], float(r[2]))
+    pct_map: dict[str, tuple[int, float | None]] = {
+        r[0]: (r[1], None if r[2] is None else float(r[2]))
         for r in merged.select(["code_commune", "voix", "pct"]).iter_rows()
     }
+    # commune sans ligne pour ce bloc : 0 voix si ses exprimés sont connus, sinon n.d.
+    exprimes_ok = set(participation_df.filter(pl.col("exprimes") > 0)["code_commune"].to_list())
 
-    max_val = max((v[1] for v in pct_map.values()), default=30.0)
-    max_val = max(max_val, 1.0)
+    # Échelle FIXE 0-100 % (et non 0-max de la carte) : un bloc à 8 % ne doit pas paraître aussi
+    # saturé qu'un bloc à 60 % ; même échelle aux deux tours (décision Mathias 2026-10-06).
+    max_val = ECHELLE_SCORE_MAX
     colormap = cm.LinearColormap(colors=["#ffffff", couleur_bloc], vmin=0.0, vmax=max_val)
 
     features: list[dict] = []
@@ -223,29 +240,31 @@ def make_choropleth_elections_score_bloc(
         code = row["code_commune"]
         if not row["geojson"]:
             continue
-        voix, pct = pct_map.get(code, (0, 0.0))
+        voix, pct = pct_map.get(code, (0, 0.0) if code in exprimes_ok else (None, None))
         features.append(
             {
                 "type": "Feature",
                 "properties": {
                     "code": code,
                     "nom": row["nom"],
-                    "pct_fmt": f"{pct:.1f} %",
-                    "voix_fmt": _fmt_fr(float(voix)),
+                    "pct_fmt": "n.d." if pct is None else f"{pct:.1f} %",
+                    "voix_fmt": "n.d." if voix is None else _fmt_fr(float(voix)),
                     "_pct": pct,
                 },
                 "geometry": json.loads(row["geojson"]),
             }
         )
 
-    m = folium.Map(location=[50.35, 3.4], zoom_start=10, tiles="CartoDB positron")
+    m = nouvelle_carte([50.35, 3.4], 10)
     if bounds:
         m.fit_bounds(bounds)
 
     folium.GeoJson(
         {"type": "FeatureCollection", "features": features},
         style_function=lambda f, _cm=colormap: {
-            "fillColor": _cm(f["properties"]["_pct"]),
+            "fillColor": COULEUR_ND
+            if f["properties"]["_pct"] is None
+            else _cm(f["properties"]["_pct"]),
             "fillOpacity": 0.85,
             "color": "white",
             "weight": 0.8,
@@ -263,17 +282,29 @@ def make_choropleth_elections_score_bloc(
     step = max_val / n
     breaks = [i * step for i in range(n + 1)]
     legend_colors = [colormap((i + 0.5) * step)[:7] for i in range(n)]
-    m.get_root().html.add_child(
+    ajouter_html(
+        m,
         folium.Element(
             _build_legend_html(
                 f"{titre} (% exprimés)",
                 breaks,
                 legend_colors,
                 fmt_fn=lambda x: f"{x:.0f}%",
+                note="Échelle fixe 0-100 %, identique pour tous les scrutins et tours",
             )
-        )
+        ),
     )
-    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    ajouter_html(
+        m,
+        folium.Element(
+            '<div style="position:fixed;bottom:24px;left:12px;z-index:9999;background:#fff;'
+            'padding:4px 8px;border:1px solid #8A8F98;font:12px sans-serif">'
+            f'<span style="display:inline-block;width:14px;height:14px;background:{COULEUR_ND};'
+            'border:1px solid #8A8F98;vertical-align:middle;margin-right:6px"></span>'
+            "n.d. (exprimés non disponibles)</div>"
+        ),
+    )
+    ajouter_html(m, folium.Element(_SOURCE_HTML))
     return m
 
 
@@ -307,7 +338,7 @@ def _legend_muni_html(
         '<div style="width:20px;height:14px;border:1px solid #bbb;flex-shrink:0;'
         "background:repeating-linear-gradient(135deg,#9E9E9E 0px,#9E9E9E 3px,"
         '#bbb 3px,#bbb 6px);"></div>'
-        '<span style="white-space:nowrap;">Non classé (commune &lt; seuil)</span>'
+        '<span style="white-space:nowrap;">Non classé (liste non nuancée en tête<br>ou commune sous le seuil)</span>'
         "</div>"
     )
     return (
@@ -373,7 +404,7 @@ def make_choropleth_muni_communes_bloc_dominant(
             }
         )
 
-    m = folium.Map(location=[50.2, 2.8], zoom_start=8, tiles="CartoDB positron")
+    m = nouvelle_carte([50.2, 2.8], 8)
     if bounds:
         m.fit_bounds(bounds)
 
@@ -426,6 +457,6 @@ def make_choropleth_muni_communes_bloc_dominant(
             name="communes_non_classees",
         ).add_to(m)
 
-    m.get_root().html.add_child(folium.Element(_legend_muni_html(blocs_meta, titre)))
-    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    ajouter_html(m, folium.Element(_legend_muni_html(blocs_meta, titre)))
+    ajouter_html(m, folium.Element(_SOURCE_HTML))
     return m

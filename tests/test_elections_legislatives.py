@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import re
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import duckdb
 import pytest
+from _helpers import ligne
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -30,14 +32,14 @@ _SPATIAUX = ("2002_legi_t1", "2007_legi_t1", "2024_legi_t1")
 
 
 @pytest.fixture(scope="module")
-def con() -> duckdb.DuckDBPyConnection:
+def con() -> Iterator[duckdb.DuckDBPyConnection]:
     if not DB_PATH.exists():
         pytest.skip("DB absente. Lancer init_elections_schema.py + load_elections_legislatives.py")
     c = duckdb.connect(str(DB_PATH), read_only=True)
     c.execute("LOAD spatial")
-    n = c.execute(
-        "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%'"
-    ).fetchone()[0]
+    n = ligne(
+        c.execute("SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%'")
+    )[0]
     if n == 0:
         pytest.skip("Législatives non chargées. Lancer load_elections_legislatives.py")
     yield c
@@ -64,12 +66,16 @@ class TestVolumes:
 
     def test_volume_global_plausible(self, con):
         """Ordre de grandeur conforme au chargement (HdF, BV-level)."""
-        n_part = con.execute(
-            "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_legi_%'"
-        ).fetchone()[0]
-        n_cand = con.execute(
-            "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%'"
-        ).fetchone()[0]
+        n_part = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_legi_%'"
+            )
+        )[0]
+        n_cand = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%'"
+            )
+        )[0]
         assert 50_000 < n_part < 120_000, f"participation hors plage : {n_part}"
         assert 400_000 < n_cand < 600_000, f"candidats hors plage : {n_cand}"
 
@@ -89,11 +95,13 @@ class TestBlocs:
         assert orphelins == [], f"Nuances orphelines de bloc : {orphelins}"
 
     def test_pas_de_nuance_null(self, con):
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(*) FROM resultats_candidats rc
             JOIN elections e ON e.id_election = rc.id_election
             WHERE e.type_scrutin = 'legi' AND rc.nuance IS NULL
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n == 0, f"{n} candidats legi sans nuance"
 
     def test_111_nuances_legislatives_dans_le_referentiel(self, con):
@@ -114,9 +122,11 @@ class TestBlocs:
         ]
         assert manquantes == [], f"Entrées absentes/divergentes : {manquantes[:10]}"
         # source_bloc renseigné sur 100 % des entrées (modèle candidats_presidentielle)
-        n_null = con.execute(
-            "SELECT COUNT(*) FROM nuances_harmonisees WHERE source_bloc IS NULL OR source_bloc = ''"
-        ).fetchone()[0]
+        n_null = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM nuances_harmonisees WHERE source_bloc IS NULL OR source_bloc = ''"
+            )
+        )[0]
         assert n_null == 0, f"{n_null} entrées sans source_bloc"
 
 
@@ -156,11 +166,13 @@ class TestCodeCirco:
 
     def test_cinquante_circos_hdf(self, con):
         """HdF = 50 circonscriptions (02:5, 59:21, 60:7, 62:12, 80:5)."""
-        n = con.execute("""
+        n = ligne(
+            con.execute("""
             SELECT COUNT(DISTINCT code_circo) FROM resultats_participation rp
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'legi' AND e.tour = 1 AND rp.code_circo IS NOT NULL
-        """).fetchone()[0]
+        """)
+        )[0]
         assert n == 50, f"Attendu 50 circos HdF, trouvé {n}"
 
 
@@ -168,9 +180,9 @@ class TestParticipation:
     """Cohérence participation au niveau circonscription."""
 
     def test_votants_inferieur_inscrits(self, con):
-        n = con.execute(
-            "SELECT COUNT(*) FROM v_participation_circo_legi WHERE votants > inscrits"
-        ).fetchone()[0]
+        n = ligne(
+            con.execute("SELECT COUNT(*) FROM v_participation_circo_legi WHERE votants > inscrits")
+        )[0]
         assert n == 0, f"{n} circos avec votants > inscrits"
 
     def test_taux_dans_intervalle(self, con):

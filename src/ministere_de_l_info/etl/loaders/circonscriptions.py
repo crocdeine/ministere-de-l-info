@@ -9,6 +9,7 @@ from pathlib import Path
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.data_sources.circonscriptions import fetch_circonscriptions_legislatives
 from ministere_de_l_info.etl._common import upsert_metadata
 
@@ -72,7 +73,7 @@ def load_circonscriptions(
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
 
-    count = con.execute("SELECT COUNT(*) FROM geographies_circonscriptions").fetchone()[0]
+    count = ligne_unique(con.execute("SELECT COUNT(*) FROM geographies_circonscriptions"))[0]
     if not (550 <= count <= 565):
         raise RuntimeError(
             f"Nombre de circonscriptions hors fourchette [550-565] : {count}. "
