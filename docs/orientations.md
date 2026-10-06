@@ -114,3 +114,10 @@ Voir `reports/synthese-brainstorm-fonctionnalites-2026-10-06.md`.
    scrutin : écartée. 8. « Top 20 » nominatif Datan remplacé par une distribution sans noms et une
    recherche individuelle. 9. CNCCFP sans licence déclarée : réutilisation au titre du code des
    relations entre le public et l'administration, source mentionnée, note juridique dans `docs/sources.md`.
+
+## Décisions du 2026-10-06 (application Mac, disque)
+
+- **Pas de compte développeur Apple** : l'application Mac reste non signée (ouverture par clic droit
+  › Ouvrir la première fois). À reconsidérer seulement si la diffusion l'exige.
+- Caches de développement sur le disque externe : `UV_CACHE_DIR` (uv) et Rust
+  (`RUSTUP_HOME`, `CARGO_HOME`) sous `/Volumes/le gros stockage/outils/`, déclarés dans `~/.zshenv`.
