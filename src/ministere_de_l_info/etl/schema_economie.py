@@ -165,6 +165,8 @@ def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
             --              présidentielles 2017 → Filosofi 2016 → NULL (Filosofi commence 2017)
             --              présidentielles 2002/2007/2012 → NULL (hors couverture Filosofi)
             -- Le LEFT JOIN retourne NULL pour les années sans données — comportement attendu.
+        -- Filtre explicite (vague B) : la base électorale peut contenir la France entière
+        WHERE e.code_departement IN ('02', '59', '60', '62', '80')
     """)
     logger.debug("Vue v_croisement_eco_elections créée.")
 

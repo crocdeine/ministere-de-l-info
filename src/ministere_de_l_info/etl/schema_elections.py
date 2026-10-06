@@ -804,6 +804,238 @@ _ANNEES_MUNI: tuple[int, ...] = tuple(sorted({annee for _, annee, _, _ in _NUANC
 # LMAJ (2008) en est sorti : mappé DTE depuis l'addendum ADR-0010 du 2026-09-25 (lot 2).
 _CODES_MUNI_SANS_MAPPING: frozenset[str] = frozenset({"NC", "LNC"})
 
+# ── Nuances européennes, régionales, départementales (vague B, 2026-10-06) ───
+# PROPOSITION soumise à Mathias (reports/etl-elections-france-2026-10-06.md) : classement
+# reconstruit selon la doctrine ADR-0010 (b). Aucune grille ne couvre ces scrutins :
+# - 1999 à 2021 : INTA1931378J (2020), seule grille antérieure ou la plus proche ;
+# - européennes 2024 : IOMA2322276J (2023), grille antérieure la plus proche.
+# Les codes de liste 2004 sont communs aux européennes et aux régionales ; les européennes
+# 2014 utilisent les codes des municipales 2014 (déjà dans _NUANCES_MUNI, même sens).
+# Codes NON insérés (cas ambigus, bloc NULL = « Non classé », questions fermées du
+# rapport) : LDR 2004, LUCD 2021, LECO 2021, BC-UCD 2021, BC-UCG 2021, BC-ECO 2021 ;
+# résidus LPC/LDD/LDV 2009 (< 10 voix au total).
+# « Composition » : code d'union absent des grilles dont toutes les composantes sont du
+# même bloc (question fermée Q3 du rapport).
+_SRC_2023 = "IOMA2322276J annexes 1-2 p. 6-7"
+_R2 = "ADR-0010 règle 2"
+
+
+def _n(
+    nuance: str, annee: int, bloc: str, motif: str, grille: str = _SRC_2020
+) -> tuple[str, int, str, str]:
+    """Entrée (nuance, annee, bloc, source_bloc) avec grille et règle citées."""
+    return (nuance, annee, bloc, f"{motif} ({grille} ; {_R2} ; vague B, proposition)")
+
+
+_NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
+    # ── Européennes 1999 (13 codes) ─────────────────────────────────────────
+    _n("GAU", 1999, "GAU", "Liste PS-PRG-MDC (Hollande) ; SOC/RDG → GAU"),
+    _n("DTE", 1999, "DTE", "Liste RPR-DL (Sarkozy) ; LR (successeur du RPR) → DTE"),
+    _n("DVD", 1999, "DTE", "Liste RPF-MPF (Pasqua-Villiers) ; MPF ∈ DVD (p. 8) → DTE"),
+    _n("VEC", 1999, "GAU", "Les Verts (Cohn-Bendit) ; VEC → GAU, ADR-0010 (c)"),
+    _n("UDF", 1999, "CENT", "UDF (Bayrou) → CENT, cohérent UDF législatives 2002"),
+    _n("CPNT", 1999, "DIV", "CPNT autonome (Saint-Josse) → DIV, cohérent CPNT 2002/2007 (règle 3)"),
+    _n("COM", 1999, "GAU", "PCF (Hue) ; LCOM → GAU"),
+    _n("FRN", 1999, "EXD", "Front national (Le Pen) ; LRN (successeur) → EXD"),
+    _n("EXG", 1999, "EXG", "Liste LO-LCR (Laguiller) ; code = bloc"),
+    _n("DIV", 1999, "DIV", "Divers ; LDIV → AUT = DIV"),
+    _n("MNA", 1999, "EXD", "MN-MNR (Mégret, scission FN) ; LEXD → EXD, cohérent MNR 2002"),
+    _n("ECO", 1999, "DIV", "Écologistes hors Verts (MEI, Waechter), VEC distinct ; LECO → AUT"),
+    _n("REG", 1999, "DIV", "Régionalistes ; LREG → AUT = DIV"),
+    # ── 2004 : européennes + régionales (codes communs, 15 codes ; LDR exclu) ──
+    _n("LPS", 2004, "GAU", "Liste du Parti socialiste ; LSOC → GAU"),
+    _n("LUMP", 2004, "DTE", "Liste UMP ; LLR (successeur) → DTE"),
+    _n("LUDF", 2004, "CENT", "Liste UDF ; LMDM / LUDI (héritiers) → CENT"),
+    _n("LFN", 2004, "EXD", "Liste du Front national ; LRN → EXD"),
+    _n("LDD", 2004, "DTE", "Liste divers droite (dont MPF) ; LDVD → DTE"),
+    _n("LVE", 2004, "GAU", "Liste des Verts ; LVEC → GAU, ADR-0010 (c)"),
+    _n("LPC", 2004, "GAU", "Liste du Parti communiste ; LCOM → GAU"),
+    _n("LDV", 2004, "DIV", "Liste divers ; LDIV → AUT = DIV"),
+    _n("LXG", 2004, "EXG", "Liste d'extrême gauche ; LEXG → EXG"),
+    _n("LCP", 2004, "DIV", "Liste CPNT autonome → DIV, cohérent CPNT 2002/2007 (règle 3)"),
+    _n("LDG", 2004, "GAU", "Liste divers gauche ; LDVG → GAU"),
+    _n("LEC", 2004, "DIV", "Liste écologiste hors Verts (LVE distinct, dont Cap 21) ; LECO → AUT"),
+    _n("LXD", 2004, "EXD", "Liste d'extrême droite ; LEXD → EXD"),
+    _n("LRG", 2004, "DIV", "Liste régionaliste ; LREG → AUT = DIV"),
+    _n("LGA", 2004, "GAU", "Liste de gauche (union PS-PCF-Verts : Huchon, Queyranne) ; LUG → GAU"),
+    # ── Européennes 2009 (12 codes) ─────────────────────────────────────────
+    _n(
+        "LMAJ",
+        2009,
+        "DTE",
+        "Liste de la majorité présidentielle (UMP-NC) ; LUD → DTE, cohérent LMAJ 2008",
+    ),
+    _n("LSOC", 2009, "GAU", "Liste du Parti socialiste ; LSOC → GAU"),
+    _n("LVEC", 2009, "GAU", "Europe Écologie ; LVEC → GAU, ADR-0010 (c)"),
+    _n("LCMD", 2009, "CENT", "Liste MoDem ; LMDM → CENT, cohérent LCMD 2008"),
+    _n("LDVD", 2009, "DTE", "Liste divers droite (Libertas MPF-CPNT, DLR) ; LDVD → DTE"),
+    _n("LFN", 2009, "EXD", "Liste du Front national ; LRN → EXD"),
+    _n("LEXG", 2009, "EXG", "Liste d'extrême gauche (NPA, LO) ; LEXG → EXG"),
+    _n("LCOP", 2009, "GAU", "Front de gauche (PCF-PG, Mélenchon) ; LCOM / LFI → GAU"),
+    _n("LAUT", 2009, "DIV", "Autres listes ; LDIV → AUT = DIV"),
+    _n("LEXD", 2009, "EXD", "Liste d'extrême droite ; LEXD → EXD"),
+    _n("LDVG", 2009, "GAU", "Liste divers gauche ; LDVG → GAU"),
+    _n("LREG", 2009, "DIV", "Liste régionaliste ; LREG → AUT = DIV"),
+    # ── Régionales 2010 (13 codes) ──────────────────────────────────────────
+    _n("LMAJ", 2010, "DTE", "Liste de la majorité présidentielle (UMP-NC) ; LUD → DTE"),
+    _n("LUG", 2010, "GAU", "Liste d'union de la gauche ; LUG → GAU"),
+    _n("LSOC", 2010, "GAU", "Liste du Parti socialiste ; LSOC → GAU"),
+    _n("LFN", 2010, "EXD", "Liste du Front national ; LRN → EXD"),
+    _n("LVEC", 2010, "GAU", "Europe Écologie ; LVEC → GAU, ADR-0010 (c)"),
+    _n("LDVG", 2010, "GAU", "Liste divers gauche (dont Frêche) ; LDVG → GAU"),
+    _n("LCOP", 2010, "GAU", "Front de gauche (PCF-PG) ; LCOM / LFI → GAU"),
+    _n("LCMD", 2010, "CENT", "Liste MoDem ; LMDM → CENT"),
+    _n("LEXG", 2010, "EXG", "Liste d'extrême gauche ; LEXG → EXG"),
+    _n("LAUT", 2010, "DIV", "Autres listes ; LDIV → AUT = DIV"),
+    _n("LREG", 2010, "DIV", "Liste régionaliste ; LREG → AUT = DIV"),
+    _n("LDVD", 2010, "DTE", "Liste divers droite ; LDVD → DTE"),
+    _n("LEXD", 2010, "EXD", "Liste d'extrême droite ; LEXD → EXD"),
+    # ── Régionales 2015 (20 codes) ──────────────────────────────────────────
+    _n("LUD", 2015, "DTE", "Liste d'union de la droite (LR-UDI-MoDem) ; LUD → DTE"),
+    _n("LFN", 2015, "EXD", "Liste du Front national ; LRN → EXD"),
+    _n("LUG", 2015, "GAU", "Liste d'union de la gauche ; LUG → GAU"),
+    _n("LDVG", 2015, "GAU", "Liste divers gauche ; LDVG → GAU"),
+    _n("LVEC", 2015, "GAU", "EELV ; LVEC → GAU, ADR-0010 (c)"),
+    _n("LDLF", 2015, "DTE", "Debout la France ; LDLF → DTE"),
+    _n("LVEG", 2015, "GAU", "Composition : liste EELV-Front de gauche, LVEC et LFG/LCOM → GAU"),
+    _n("LFG", 2015, "GAU", "Front de gauche ; LCOM / LFI → GAU, cohérent LFG 2014"),
+    _n("LREG", 2015, "DIV", "Liste régionaliste ; LREG → AUT = DIV"),
+    _n("LCOM", 2015, "GAU", "Liste du Parti communiste ; LCOM → GAU"),
+    _n("LEXG", 2015, "EXG", "Liste d'extrême gauche ; LEXG → EXG"),
+    _n("LDIV", 2015, "DIV", "Liste divers ; LDIV → AUT = DIV"),
+    _n("LDVD", 2015, "DTE", "Liste divers droite ; LDVD → DTE"),
+    _n("LSOC", 2015, "GAU", "Liste du Parti socialiste ; LSOC → GAU"),
+    _n("LECO", 2015, "DIV", "Liste écologiste hors EELV (LVEC distinct) ; LECO → AUT"),
+    _n("LMDM", 2015, "CENT", "Liste MoDem ; LMDM → CENT"),
+    _n("LLR", 2015, "DTE", "Liste Les Républicains ; LLR → DTE"),
+    _n("LEXD", 2015, "EXD", "Liste d'extrême droite ; LEXD → EXD"),
+    _n("LRDG", 2015, "GAU", "Liste du Parti radical de gauche ; LRDG → GAU"),
+    _n("LUDI", 2015, "CENT", "Liste UDI ; LUDI → CENT"),
+    # ── Régionales 2021 (20 codes ; LUCD et LECO exclus) ─────────────────────
+    _n("LRN", 2021, "EXD", "Liste du Rassemblement national ; LRN → EXD"),
+    _n("LUD", 2021, "DTE", "Liste d'union de la droite ; LUD → DTE"),
+    _n(
+        "LUGE",
+        2021,
+        "GAU",
+        "Composition : union de la gauche et des écologistes, LUG et LVEC → GAU",
+    ),
+    _n("LUG", 2021, "GAU", "Liste d'union de la gauche ; LUG → GAU"),
+    _n("LLR", 2021, "DTE", "Liste Les Républicains ; LLR → DTE"),
+    _n("LUC", 2021, "CENT", "Liste d'union du centre ; LUC → CENT"),
+    _n("LDVG", 2021, "GAU", "Liste divers gauche ; LDVG → GAU"),
+    _n("LEXG", 2021, "EXG", "Liste d'extrême gauche ; LEXG → EXG"),
+    _n("LDVC", 2021, "CENT", "Liste divers centre ; LDVC → CENT"),
+    _n("LREG", 2021, "DIV", "Liste régionaliste ; LREG → AUT = DIV"),
+    _n("LDVD", 2021, "DTE", "Liste divers droite ; LDVD → DTE"),
+    _n("LDSV", 2021, "DTE", "Liste droite souverainiste ; LDLF → DTE (2020), LDSV → DTE (2026)"),
+    _n("LREM", 2021, "CENT", "Liste La République en marche ; LREM → CENT"),
+    _n("LFI", 2021, "GAU", "Liste La France insoumise ; LFI → GAU (2020, antérieure)"),
+    _n("LDIV", 2021, "DIV", "Liste divers ; LDIV → AUT = DIV"),
+    _n("LSOC", 2021, "GAU", "Liste du Parti socialiste ; LSOC → GAU"),
+    _n("LCOM", 2021, "GAU", "Liste du Parti communiste ; LCOM → GAU"),
+    _n("LMDM", 2021, "CENT", "Liste MoDem ; LMDM → CENT"),
+    _n("LEXD", 2021, "EXD", "Liste d'extrême droite ; LEXD → EXD"),
+    _n("LUDI", 2021, "CENT", "Liste UDI ; LUDI → CENT"),
+    # ── Départementales 2015 (binômes, 19 codes) ────────────────────────────
+    _n("BC-UD", 2015, "DTE", "Binôme d'union de la droite ; LUD → DTE"),
+    _n("BC-FN", 2015, "EXD", "Binôme Front national ; RN → EXD"),
+    _n("BC-SOC", 2015, "GAU", "Binôme Parti socialiste ; SOC → GAU"),
+    _n("BC-UG", 2015, "GAU", "Binôme d'union de la gauche ; LUG → GAU"),
+    _n("BC-UMP", 2015, "DTE", "Binôme UMP ; LR (successeur) → DTE"),
+    _n("BC-DVD", 2015, "DTE", "Binôme divers droite ; DVD → DTE"),
+    _n("BC-DVG", 2015, "GAU", "Binôme divers gauche ; DVG → GAU"),
+    _n("BC-FG", 2015, "GAU", "Binôme Front de gauche ; COM / FI → GAU"),
+    _n("BC-UDI", 2015, "CENT", "Binôme UDI ; UDI → CENT"),
+    _n("BC-VEC", 2015, "GAU", "Binôme EELV ; VEC → GAU, ADR-0010 (c)"),
+    _n("BC-DIV", 2015, "DIV", "Binôme divers ; DIV → AUT = DIV"),
+    _n("BC-COM", 2015, "GAU", "Binôme Parti communiste ; COM → GAU"),
+    _n("BC-RDG", 2015, "GAU", "Binôme Parti radical de gauche ; RDG → GAU"),
+    _n("BC-MDM", 2015, "CENT", "Binôme MoDem ; MDM → CENT"),
+    _n("BC-UC", 2015, "CENT", "Binôme d'union du centre ; LUC → CENT"),
+    _n("BC-DLF", 2015, "DTE", "Binôme Debout la France ; DLF → DTE"),
+    _n("BC-EXD", 2015, "EXD", "Binôme d'extrême droite ; EXD → EXD"),
+    _n("BC-EXG", 2015, "EXG", "Binôme d'extrême gauche ; EXG → EXG"),
+    _n("BC-PG", 2015, "GAU", "Binôme Parti de gauche ; FI (successeur) → GAU, cohérent LPG 2014"),
+    # ── Départementales 2021 (binômes, 23 codes ; BC-UCD, BC-UCG, BC-ECO exclus) ──
+    _n("BC-DVD", 2021, "DTE", "Binôme divers droite ; DVD → DTE"),
+    _n("BC-RN", 2021, "EXD", "Binôme Rassemblement national ; RN → EXD"),
+    _n(
+        "BC-UGE",
+        2021,
+        "GAU",
+        "Composition : union de la gauche et des écologistes, UG et VEC → GAU",
+    ),
+    _n("BC-DVG", 2021, "GAU", "Binôme divers gauche ; DVG → GAU"),
+    _n("BC-UG", 2021, "GAU", "Binôme d'union de la gauche ; LUG → GAU"),
+    _n("BC-UD", 2021, "DTE", "Binôme d'union de la droite ; LUD → DTE"),
+    _n("BC-LR", 2021, "DTE", "Binôme Les Républicains ; LR → DTE"),
+    _n("BC-SOC", 2021, "GAU", "Binôme Parti socialiste ; SOC → GAU"),
+    _n("BC-DVC", 2021, "CENT", "Binôme divers centre ; DVC → CENT"),
+    _n("BC-DIV", 2021, "DIV", "Binôme divers ; DIV → AUT = DIV"),
+    _n("BC-COM", 2021, "GAU", "Binôme Parti communiste ; COM → GAU"),
+    _n("BC-UC", 2021, "CENT", "Binôme d'union du centre ; LUC → CENT"),
+    _n("BC-REM", 2021, "CENT", "Binôme La République en marche ; REM → CENT"),
+    _n("BC-UDI", 2021, "CENT", "Binôme UDI ; UDI → CENT (2020, antérieure)"),
+    _n("BC-FI", 2021, "GAU", "Binôme La France insoumise ; FI → GAU (2020, antérieure)"),
+    _n("BC-REG", 2021, "DIV", "Binôme régionaliste ; REG → AUT = DIV"),
+    _n("BC-RDG", 2021, "GAU", "Binôme Parti radical de gauche ; RDG → GAU"),
+    _n("BC-EXG", 2021, "EXG", "Binôme d'extrême gauche ; EXG → EXG"),
+    _n("BC-EXD", 2021, "EXD", "Binôme d'extrême droite ; EXD → EXD"),
+    _n("BC-MDM", 2021, "CENT", "Binôme MoDem ; MDM → CENT"),
+    _n("BC-DSV", 2021, "DTE", "Binôme droite souverainiste ; DLF → DTE (2020), DSV → DTE (2026)"),
+    _n("BC-GJ", 2021, "DIV", "Binôme Gilets jaunes ; LGJ → AUT = DIV"),
+    _n(
+        "BC-UXD",
+        2021,
+        "EXD",
+        "Binôme d'union de l'extrême droite ; absent de la grille 2020, grille suivante LUXD → EXD",
+        _SRC_2023,
+    ),
+    # ── Européennes 2024 (14 codes, grille antérieure la plus proche : 2023) ──
+    _n("LRN", 2024, "EXD", "Liste du Rassemblement national ; LRN → EXD", _SRC_2023),
+    _n("LENS", 2024, "CENT", "Liste Ensemble (Besoin d'Europe) ; LENS → Centre", _SRC_2023),
+    _n(
+        "LUG",
+        2024,
+        "GAU",
+        "Liste d'union de la gauche (PS-Place publique) ; LUG → Gauche",
+        _SRC_2023,
+    ),
+    _n(
+        "LFI",
+        2024,
+        "GAU",
+        "Liste La France insoumise ; FI → Gauche (2023) ; EXG seulement en 2026 (INTP2602966C), "
+        "cohérent FI législatives 2024",
+        _SRC_2023,
+    ),
+    _n("LLR", 2024, "DTE", "Liste Les Républicains ; LR → Droite", _SRC_2023),
+    _n("LVEC", 2024, "GAU", "Liste Les Écologistes ; VEC → Gauche", _SRC_2023),
+    _n("LREC", 2024, "EXD", "Liste Reconquête ; REC → EXD", _SRC_2023),
+    _n("LDIV", 2024, "DIV", "Liste divers ; DIV → Autres = DIV", _SRC_2023),
+    _n("LCOM", 2024, "GAU", "Liste du Parti communiste ; COM → Gauche", _SRC_2023),
+    _n("LDVD", 2024, "DTE", "Liste divers droite (Alliance rurale) ; DVD → Droite", _SRC_2023),
+    _n(
+        "LECO", 2024, "DIV", "Liste écologiste hors Les Écologistes ; ECO → Autres = DIV", _SRC_2023
+    ),
+    _n("LEXD", 2024, "EXD", "Liste d'extrême droite ; EXD → EXD", _SRC_2023),
+    _n("LEXG", 2024, "EXG", "Liste d'extrême gauche ; EXG → EXG", _SRC_2023),
+    _n("LDVG", 2024, "GAU", "Liste divers gauche ; DVG → Gauche", _SRC_2023),
+]
+
+# Codes ambigus volontairement non insérés (bloc NULL) — questions fermées du rapport.
+_CODES_VAGUE_B_NON_CLASSES: frozenset[tuple[str, int]] = frozenset(
+    {
+        ("LDR", 2004),
+        ("LUCD", 2021),
+        ("LECO", 2021),
+        ("BC-UCD", 2021),
+        ("BC-UCG", 2021),
+        ("BC-ECO", 2021),
+    }
+)
+
 # ── Candidats présidentiels 2017 / 2022 ──────────────────────────────────────
 # La colonne 'nuance' est NULL pour ces scrutins dans le Parquet.
 # Le classement se fait via le nom de famille EXACT tel qu'il apparaît dans le
@@ -988,6 +1220,119 @@ _CANDIDATS_PRES_2022: list[tuple[int, str, str, str, str, str, str]] = [
 ]
 
 
+# ── Listes européennes 2019 (nuance NULL dans la source, gotcha n° 9) ─────────
+# PROPOSITION vague B : résolution comme les présidentielles 2017/2022, par jointure
+# sur le nom (resultats_candidats.nom = nom_tete_liste de la source, ex. « BARDELLA Jordan »).
+# Grille la plus proche : INTA1931378J (2020, postérieure de 9 mois) ; ADR-0010 règle 2.
+# Non insérées (bloc NULL, question fermée Q5 du rapport) : PHILIPPOT (Les Patriotes),
+# VAUCLIN (Liste de la reconquête).
+_SRC_EURO_2019 = f"{_SRC_2020} ; ADR-0010 règle 2 ; vague B, proposition"
+
+
+def _l19(
+    nom: str, prenom: str, parti: str, bloc: str, motif: str
+) -> tuple[int, str, str, str, str, str, str]:
+    """Entrée candidats_presidentielle pour une liste européenne 2019."""
+    return (
+        2019,
+        f"{nom} {prenom}",
+        prenom,
+        parti,
+        bloc,
+        f"{prenom} {nom.title()}",
+        f"{motif} ({_SRC_EURO_2019})",
+    )
+
+
+_LISTES_EURO_2019: list[tuple[int, str, str, str, str, str, str]] = [
+    _l19("BARDELLA", "Jordan", "RN", "EXD", "Rassemblement national ; LRN → EXD"),
+    _l19("LOISEAU", "Nathalie", "LREM-MoDem", "CENT", "Renaissance (LREM-MoDem) ; LREM → CENT"),
+    _l19("JADOT", "Yannick", "EELV", "GAU", "Europe Écologie ; LVEC → GAU, ADR-0010 (c)"),
+    _l19("BELLAMY", "François-Xavier", "LR", "DTE", "Union droite-centre (LR) ; LLR → DTE"),
+    _l19("AUBRY", "Manon", "LFI", "GAU", "La France insoumise ; LFI → GAU (2020)"),
+    _l19("GLUCKSMANN", "Raphaël", "PS-Place publique", "GAU", "Envie d'Europe (PS) ; LSOC → GAU"),
+    _l19("DUPONT-AIGNAN", "Nicolas", "DLF", "DTE", "Debout la France ; LDLF → DTE"),
+    _l19("HAMON", "Benoît", "Génération.s", "GAU", "Liste citoyenne (Génération.s) ; LDVG → GAU"),
+    _l19("LAGARDE", "Jean-Christophe", "UDI", "CENT", "Les Européens (UDI) ; LUDI → CENT"),
+    _l19("BROSSAT", "Ian", "PCF", "GAU", "Parti communiste ; LCOM → GAU"),
+    _l19(
+        "THOUY",
+        "Hélène",
+        "Parti animaliste",
+        "DIV",
+        "Parti animaliste ; LECO → AUT (le parti animaliste relève d'ECO, INTA2212053C ; "
+        "LDIV aux européennes 2024)",
+    ),
+    _l19("BOURG", "Dominique", "Urgence écologie", "DIV", "Écologiste hors EELV ; LECO → AUT"),
+    _l19(
+        "ASSELINEAU",
+        "François",
+        "UPR",
+        "DIV",
+        "UPR (Frexit) ; LDIV → AUT, même formation nuancée LDIV aux européennes 2024",
+    ),
+    _l19("ARTHAUD", "Nathalie", "LO", "EXG", "Lutte ouvrière ; LEXG → EXG"),
+    _l19("LALANNE", "Francis", "Alliance jaune", "DIV", "Gilets jaunes ; LGJ → AUT = DIV"),
+    _l19(
+        "BIDOU", "Olivier", "Les oubliés de l'Europe", "DIV", "Liste sans rattachement ; LDIV → AUT"
+    ),
+    _l19("MARIE", "Florie", "Parti pirate", "DIV", "Parti pirate ; LDIV → AUT, LDIV en 2024"),
+    _l19("AZERGUI", "Nagib", "UDMF", "DIV", "UDMF ; LDIV → AUT, LDIV en 2024 (Free Palestine)"),
+    _l19("DIEUMEGARD", "Pierre", "Espéranto", "DIV", "Espéranto ; LDIV → AUT, LDIV en 2024"),
+    _l19(
+        "GERNIGON",
+        "Yves",
+        "Parti fédéraliste européen",
+        "DIV",
+        "Liste sans rattachement ; LDIV → AUT",
+    ),
+    _l19("DELFEL", "Thérèse", "Décroissance", "DIV", "Écologiste hors EELV ; LECO → AUT"),
+    _l19("CAILLAUD", "Sophie", "Allons enfants", "DIV", "Liste sans rattachement ; LDIV → AUT"),
+    _l19("TOMASINI", "Nathalie", "À voix égales", "DIV", "Liste sans rattachement ; LDIV → AUT"),
+    _l19("ALEXANDRE", "Audric", "PACE", "DIV", "PACE ; LDIV → AUT, LDIV en 2024"),
+    _l19("HELGEN", "Gilles", "Initiative citoyenne", "DIV", "Liste sans rattachement ; LDIV → AUT"),
+    _l19("PERSON", "Christian Luc", "UDLEF", "DIV", "Liste sans rattachement ; LDIV → AUT"),
+    _l19(
+        "DE PREVOISIN",
+        "Robert",
+        "Une France royale",
+        "DTE",
+        "Royaliste ; même tête de liste nuancée LDVD aux européennes 2014 ; LDVD → DTE",
+    ),
+    _l19(
+        "TRAORÉ",
+        "Hamada",
+        "Démocratie représentative",
+        "DIV",
+        "Liste sans rattachement ; LDIV → AUT, LDIV en 2024",
+    ),
+    _l19(
+        "CHALENÇON", "Christophe", "Évolution citoyenne", "DIV", "Gilets jaunes ; LGJ → AUT = DIV"
+    ),
+    _l19(
+        "CAMUS",
+        "Renaud",
+        "La ligne claire",
+        "EXD",
+        "Même tête de liste nuancée LEXD aux européennes 2014 ; LEXD → EXD",
+    ),
+    _l19(
+        "SANCHEZ",
+        "Antonio",
+        "Parti révolutionnaire Communistes",
+        "EXG",
+        "Même formation nuancée LEXG aux européennes 2024 ; LEXG → EXG",
+    ),
+    _l19(
+        "CORBET",
+        "Cathy Denise Ginette",
+        "Neutre et actif",
+        "DIV",
+        "Liste sans rattachement ; LDIV → AUT",
+    ),
+]
+
+
 # ── Création du schéma ────────────────────────────────────────────────────────
 
 
@@ -1118,22 +1463,24 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
     # (2002/2007/2012/2017/2022/2024) + municipales (2008/2014/2020/2026).
     # Chaque entrée porte sa justification (source_bloc).
     _verifier_nuances_municipales()
-    nuances = _NUANCES_PRES + _NUANCES_LEGI + _NUANCES_MUNI
+    nuances = _NUANCES_PRES + _NUANCES_LEGI + _NUANCES_MUNI + _NUANCES_EURO_REGI_DPMT
     if nuances:
         con.executemany(
             "INSERT INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) VALUES (?, ?, ?, ?)",
             nuances,
         )
     logger.info(
-        "nuances_harmonisees : %d entrées (%d pres + %d legi + %d muni)",
+        "nuances_harmonisees : %d entrées (%d pres + %d legi + %d muni + %d euro/regi/dpmt)",
         len(nuances),
         len(_NUANCES_PRES),
         len(_NUANCES_LEGI),
         len(_NUANCES_MUNI),
+        len(_NUANCES_EURO_REGI_DPMT),
     )
 
     # candidats_presidentielle (présidentielles sans nuances : 2017, 2022)
-    candidats = _CANDIDATS_PRES_2017 + _CANDIDATS_PRES_2022
+    # + listes européennes 2019 (nuance NULL aussi, même mécanisme de jointure sur nom)
+    candidats = _CANDIDATS_PRES_2017 + _CANDIDATS_PRES_2022 + _LISTES_EURO_2019
     if candidats:
         con.executemany(
             """INSERT INTO candidats_presidentielle
@@ -1141,7 +1488,9 @@ def populate_elections_referentiels(con: duckdb.DuckDBPyConnection) -> None:
                VALUES (?, ?, ?, ?, ?, ?, ?)""",
             candidats,
         )
-    logger.info("candidats_presidentielle : %d candidats (2017 + 2022)", len(candidats))
+    logger.info(
+        "candidats_presidentielle : %d entrées (pres 2017 + 2022, euro 2019)", len(candidats)
+    )
 
 
 def _verifier_nuances_municipales() -> None:
@@ -1158,11 +1507,13 @@ def _verifier_nuances_municipales() -> None:
             f"Codes sans mapping détectés dans _NUANCES_MUNI : {sorted(interdits)}. "
             "Ces codes doivent rester absents de nuances_harmonisees."
         )
-    annees_autres = {annee for _, annee, _, _ in _NUANCES_PRES + _NUANCES_LEGI}
+    annees_autres = {
+        annee for _, annee, _, _ in _NUANCES_PRES + _NUANCES_LEGI + _NUANCES_EURO_REGI_DPMT
+    }
     chevauchement = set(_ANNEES_MUNI) & annees_autres
     if chevauchement:
         raise RuntimeError(
-            f"Années municipales partagées avec pres/legi : {sorted(chevauchement)}. "
+            f"Années municipales partagées avec pres/legi/euro/regi/dpmt : {sorted(chevauchement)}. "
             "Le remplacement ciblé par année n'est plus sûr (voir audit M5)."
         )
 
@@ -1202,6 +1553,34 @@ def populate_nuances_municipales(con: duckdb.DuckDBPyConnection) -> int:
         len(_NUANCES_MUNI),
     )
     return len(_NUANCES_MUNI)
+
+
+def populate_nuances_vague_b(con: duckdb.DuckDBPyConnection) -> int:
+    """Insère ou remplace les nuances euro/regi/dpmt et les listes européennes 2019.
+
+    INSERT OR REPLACE ciblé sur les clés de _NUANCES_EURO_REGI_DPMT et _LISTES_EURO_2019 :
+    ne touche ni les autres nuances ni les autres candidats. Un code retiré de la liste
+    ne disparaît qu'au prochain populate_elections_referentiels (remise à plat complète).
+    Retourne le nombre d'entrées nuances écrites.
+    """
+    _verifier_nuances_municipales()
+    con.executemany(
+        "INSERT OR REPLACE INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) "
+        "VALUES (?, ?, ?, ?)",
+        _NUANCES_EURO_REGI_DPMT,
+    )
+    con.executemany(
+        """INSERT OR REPLACE INTO candidats_presidentielle
+           (annee, nom, prenom, parti, bloc, libelle, source_bloc)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        _LISTES_EURO_2019,
+    )
+    logger.info(
+        "nuances vague B : %d nuances, %d listes européennes 2019",
+        len(_NUANCES_EURO_REGI_DPMT),
+        len(_LISTES_EURO_2019),
+    )
+    return len(_NUANCES_EURO_REGI_DPMT)
 
 
 # ── Vues d'agrégation ─────────────────────────────────────────────────────────
@@ -1356,6 +1735,8 @@ def create_elections_views(con: duckdb.DuckDBPyConnection) -> None:
             bloc,
             SUM(voix) AS voix_total
         FROM v_scores_circo_legi
+        -- Filtre explicite (vague B) : la base peut contenir la France entière
+        WHERE split_part(code_circo, '-', 1) IN ('02', '59', '60', '62', '80')
         GROUP BY annee, tour, ancien_decoupage, bloc
         ORDER BY annee, tour, bloc
     """)

@@ -77,6 +77,8 @@ def _create_v_scores_commune_muni(con) -> None:
 def _create_v_evolution_blocs_hdf_muni(con) -> None:
     """Évolution temporelle des blocs sur l'ensemble HdF.
 
+    Filtre explicite sur les 5 départements (vague B : la base peut contenir la France).
+
     1 ligne par (annee, tour, bloc). voix = SUM(rc.voix) par bloc.
     pct_exprimes = voix_bloc / exprimes_HdF * 100, SEULEMENT pour les blocs nommés.
     Pour bloc=NULL (NC/plurinominal), pct_exprimes=NULL : les communes < 1000 hab
@@ -90,6 +92,7 @@ def _create_v_evolution_blocs_hdf_muni(con) -> None:
             FROM resultats_participation rp
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'muni'
+              AND rp.code_departement IN ('02', '59', '60', '62', '80')
             GROUP BY rp.id_election
         ),
         blocs_hdf AS (
@@ -105,6 +108,7 @@ def _create_v_evolution_blocs_hdf_muni(con) -> None:
             LEFT JOIN nuances_harmonisees nh
                 ON nh.nuance = rc.nuance AND nh.annee = e.annee
             WHERE e.type_scrutin = 'muni'
+              AND rc.code_departement IN ('02', '59', '60', '62', '80')
             GROUP BY e.id_election, e.annee, e.tour, nh.bloc
         )
         SELECT

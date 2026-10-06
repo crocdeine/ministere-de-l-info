@@ -74,8 +74,8 @@ def get_scores_communes_muni(annee: int, tour: int) -> pl.DataFrame:
     try:
         rows = con.execute(
             "SELECT code_commune, bloc, voix, pct_exprimes "
-            "FROM v_scores_commune_muni "
-            "WHERE annee = ? AND tour = ?",
+            "FROM v_scores_commune_muni "  # noqa: S608
+            f"WHERE annee = ? AND tour = ? AND LEFT(code_commune, 2) IN ({_HDF_DEPTS_SQL})",
             [annee, tour],
         ).fetchall()
     finally:

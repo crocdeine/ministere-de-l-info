@@ -93,7 +93,8 @@ def get_scores_communes(annee: int, tour: int, zone: str) -> pl.DataFrame:
         else:
             sql = (
                 "SELECT code_commune, bloc, voix "
-                "FROM v_scores_commune_pres WHERE annee = ? AND tour = ?"
+                "FROM v_scores_commune_pres WHERE annee = ? AND tour = ? "
+                f"AND code_departement IN ({_HDF_DEPTS_SQL})"
             )
         rows = con.execute(sql, [annee, tour]).fetchall()
     finally:
@@ -114,7 +115,11 @@ def get_participation_communes(annee: int, tour: int, zone: str) -> pl.DataFrame
     """Participation par commune. zone : 'circo21' | 'hdf'."""
     con = _open_ro()
     try:
-        where_zone = f"AND code_commune IN ({_CIRCO21_SQL})" if zone == "circo21" else ""
+        where_zone = (
+            f"AND code_commune IN ({_CIRCO21_SQL})"
+            if zone == "circo21"
+            else f"AND code_departement IN ({_HDF_DEPTS_SQL})"
+        )
         rows = con.execute(  # noqa: S608
             f"SELECT code_commune, inscrits, votants, exprimes, taux_participation_pct "
             f"FROM v_participation_commune_pres WHERE annee = ? AND tour = ? {where_zone}",
@@ -155,8 +160,9 @@ def get_evolution_blocs(zone: str) -> pl.DataFrame:
             ).fetchall()
         else:
             rows = con.execute(
-                "SELECT annee, tour, bloc, SUM(voix) AS voix_total "
-                "FROM v_scores_commune_pres GROUP BY annee, tour, bloc ORDER BY annee, tour, bloc"
+                "SELECT annee, tour, bloc, SUM(voix) AS voix_total "  # noqa: S608
+                f"FROM v_scores_commune_pres WHERE code_departement IN ({_HDF_DEPTS_SQL}) "
+                "GROUP BY annee, tour, bloc ORDER BY annee, tour, bloc"
             ).fetchall()
     finally:
         con.close()
