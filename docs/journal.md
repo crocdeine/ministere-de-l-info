@@ -89,3 +89,22 @@ L'historique antérieur au 2026-10-04 est dans `reports/` (voir `reports/README.
 - Corrigés par le directeur : sélecteur CSS de la métrique (ellipse persistante), format du tableau
   par commune (6 décimales), évolution de population absente affichée « +0,0 % ».
 - Mesures : 650 tests réussis, 0 échec ; couverture 77,24 %.
+
+## 2026-10-06 — Jalon J4 (hygiène et durcissement)
+
+- Sauvegarde préalable : `2026-10-06_avant-j4-nettoyage.zip` (41 Mo, vérifiée).
+- **Supprimés** : fichiers d'exploration à la racine (`1_insee.txt` à `5_data_gouv_pib.txt`, `insee_*.html`,
+  `explore_*.py`, `scratch_fetch.py`, `analyze_senators.py`), `scripts/_explore_elections.py`,
+  `scripts/covers/` (script d'un autre projet). Aucune référence dans le code.
+- **Déplacé** : `ODSEN_GENERAL.csv` (Sénat, juin 2026, plus téléchargeable) → `data/exploration/`.
+- **Supprimées** (décision Mathias) : 9 copies de la base (≈ 8 Go) ; base archivée avant
+  (`2026-10-06_base-ministere.zip`, 603 Mo). Restent la base active et `bak-avant-amo`.
+- **Supprimée** (décision Mathias) : tâche planifiée de sauvegarde du Mac, cassée depuis le 1er juin
+  (ancien chemin, accès refusé par macOS) ; archivée dans le dossier de sauvegardes.
+- `.gitignore` : les copies de base (`data/*.duckdb*`) n'étaient pas exclues ; corrigé.
+- 21 rapports historiques ajoutés à git ; seuil de couverture CI 38 % → 60 %.
+- Infra (ingenieur-infra) : port 8501 sur 127.0.0.1, SHA256 obligatoire au téléchargement de la base,
+  actions GitHub épinglées par SHA, images par digest, empreinte de Tectonic vérifiée.
+- Géographie (developpeur-ui) : requêtes en cache (rerun 2,49 s → 0,001 s), connexion DuckDB
+  unique `open_ro`, plus de connexion permanente qui bloquait les rechargements.
+- Mesures : 652 tests, 0 échec ; couverture 77,95 % ; tests shell 55/55.

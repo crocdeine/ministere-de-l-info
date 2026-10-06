@@ -62,3 +62,10 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
 - Niveau de vie médian : euros courants, **mention « non corrigés de l'inflation »** en légende.
 - Indicateurs à zéros fréquents (logements sociaux, emploi industriel, RSA) : **classe « 0 » distincte**.
 - Principe : classes fixes, identiques pour toutes les années ; absence de donnée toujours « n.d. ».
+
+## Décisions du 2026-10-06 (J4)
+
+- Copies de la base : seules la base active et la dernière copie de sécurité restent dans `data/`.
+- **Sauvegardes** : la tâche planifiée du Mac est supprimée ; le directeur de projet en est garant
+  (zip vérifié du projet à chaque grande étape ; zip de la base avant toute écriture importante ou
+  publication ; registre `../ministere-de-l-info-backups/BACKUPS.md`).
