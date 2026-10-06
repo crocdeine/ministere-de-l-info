@@ -324,7 +324,7 @@ dépendance à une installation éditable). ETL, requêtes, pages et scripts l'u
 |-----|--------|
 | **Lint & Format** | `ruff check .` + `ruff format --check .` |
 | **Tests & Coverage** | `uv sync --frozen --group etl`, extension `spatial` installée (cache `~/.duckdb/extensions`), `pytest` avec rapport de couverture en artefact |
-| **Typage** | `uvx pyright@1.1.408` en mode `basic`, non bloquant (`continue-on-error`) |
+| **Typage** | `uvx pyright@1.1.408` en mode `basic`, bloquant (0 erreur) |
 
 `docker-publish.yml` — construit et publie l'image multi-architecture sur GHCR à chaque
 tag `v*`, à partir de `deploy/Dockerfile`.

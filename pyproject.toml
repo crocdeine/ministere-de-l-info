@@ -122,8 +122,8 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.pyright]
-# QA4 : typage vérifié en mode basic, non bloquant en CI dans un premier temps
-# (voir .github/workflows/ci.yml, job typecheck).
+# Typage vérifié en mode basic : 0 erreur, job bloquant en CI
+# (voir .github/workflows/ci.yml, job typecheck). Ne pas baisser les règles.
 typeCheckingMode = "basic"
 pythonVersion = "3.12"
 include = ["src", "pages", "app.py", "scripts", "tests"]

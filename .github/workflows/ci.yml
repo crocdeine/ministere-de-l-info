@@ -86,11 +86,9 @@ jobs:
           retention-days: 30
 
   typecheck:
-    name: Typage (pyright basic, non bloquant)
+    name: Typage (pyright basic)
     runs-on: ubuntu-latest
-    # Non bloquant dans un premier temps (QA4) : le job peut échouer sans faire
-    # échouer le workflow. 178 erreurs relevées le 2026-09-24 (pyright 1.1.408).
-    continue-on-error: true
+    # Bloquant : 0 erreur pyright (1.1.408) depuis le 2026-10-06.
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
