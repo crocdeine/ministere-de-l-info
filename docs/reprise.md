@@ -1,22 +1,21 @@
 # Point de reprise — à lire en premier par toute nouvelle session
 
-Dernière mise à jour : 2026-10-06, branche `claude/exciting-dirac-8mogwe`.
+Dernière mise à jour : 2026-10-06 (fin J4), branche `claude/exciting-dirac-8mogwe`.
 Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), `docs/roadmap.md`.
 
 ## Où on en est
 
-- Phase 0, J1, J2, J3 : terminés et relus (2026-10-06). Base publiée : `db-2026-10-04` ; la base
-  locale contient en plus J2, AMO et nuances des non-inscrits (non publiés).
-- En attente de Mathias : contrôle visuel de J3 dans l'application.
+- Phase 0, J1, J2, J3, J4 : terminés (2026-10-06). Base publiée : `db-2026-10-04` ; la base locale
+  contient en plus J2, AMO et nuances des non-inscrits (non publiés).
+- Sauvegardes : le directeur en est garant (règles dans `../ministere-de-l-info-backups/BACKUPS.md`).
+- En attente de Mathias : contrôle visuel de J3 ; question Dependabot (oui / non).
 
 ## Prochaines étapes, dans l'ordre
 
-1. Retour visuel de Mathias sur J3 (cartes, évolutions en %, palette).
-2. J4 (hygiène et durcissement) : rangement de la racine (après sauvegarde zip), cache Géographie,
-   durcissement infra (ports 127.0.0.1, SHA256 obligatoire, actions épinglées), copies de base
-   en trop dans `data/`.
-3. Republication de la base quand les groupes du Sénat seront connus (voir ci-dessous).
-4. J5 : fusion dans `main` (accord de Mathias).
+1. J5 : fusion de `claude/exciting-dirac-8mogwe` dans `main` par PR squash (accord de Mathias),
+   CI verte sur la PR, puis mise à jour de CLAUDE.md (état des modules, dernier rapport).
+2. Republication de la base quand les groupes du Sénat seront connus (voir ci-dessous) ;
+   zip de la base avant tout rechargement.
 
 ## En attente d'un événement extérieur
 
