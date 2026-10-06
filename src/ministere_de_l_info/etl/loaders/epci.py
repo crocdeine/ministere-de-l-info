@@ -7,6 +7,7 @@ from pathlib import Path
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.data_sources.geo import fetch_admin_express
 from ministere_de_l_info.etl._common import upsert_metadata
 
@@ -67,16 +68,16 @@ def load_epci(
         """)
         logger.debug("Batch inséré : %s", batch_path.name)
 
-    count = con.execute("SELECT COUNT(*) FROM geographies_epci").fetchone()[0]
+    count = ligne_unique(con.execute("SELECT COUNT(*) FROM geographies_epci"))[0]
     if not (1250 <= count <= 1290):
         raise RuntimeError(
             f"Nombre d'EPCI hors fourchette [1250-1290] : {count}. "
             "Vérifier la source IGN ou utiliser --force pour re-télécharger."
         )
 
-    null_types = con.execute(
-        "SELECT COUNT(*) FROM geographies_epci WHERE type_epci IS NULL"
-    ).fetchone()[0]
+    null_types = ligne_unique(
+        con.execute("SELECT COUNT(*) FROM geographies_epci WHERE type_epci IS NULL")
+    )[0]
     if null_types > 0:
         raise RuntimeError(
             f"{null_types} EPCI avec type_epci NULL — une nouvelle valeur 'nature' "
@@ -123,7 +124,9 @@ def update_epci_departement_principal(con: duckdb.DuckDBPyConnection) -> None:
             LIMIT 1
         )
     """)
-    updated = con.execute(
-        "SELECT COUNT(*) FROM geographies_epci WHERE code_departement_principal IS NOT NULL"
-    ).fetchone()[0]
+    updated = ligne_unique(
+        con.execute(
+            "SELECT COUNT(*) FROM geographies_epci WHERE code_departement_principal IS NOT NULL"
+        )
+    )[0]
     logger.info("code_departement_principal renseigné pour %d EPCI.", updated)

@@ -16,6 +16,8 @@ import logging
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
+
 logger = logging.getLogger(__name__)
 
 OVERRIDES_BLOCS: list[dict] = [
@@ -68,5 +70,5 @@ def load_overrides(con: duckdb.DuckDBPyConnection) -> None:
         rows,
     )
 
-    count = con.execute("SELECT COUNT(*) FROM leg_blocs_override").fetchone()[0]
+    count = ligne_unique(con.execute("SELECT COUNT(*) FROM leg_blocs_override"))[0]
     logger.info("leg_blocs_override : %d override(s) chargé(s)", count)

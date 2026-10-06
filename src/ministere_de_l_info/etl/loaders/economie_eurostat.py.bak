@@ -62,7 +62,7 @@ def _download_cache(url: str, dest: Path, force: bool = False) -> Path:
     return dest
 
 
-def _parse_value(val: object) -> float | None:
+def _parse_value(val: str) -> float | None:
     """Convertit une valeur TSV Eurostat en float. ':' ou vide → None."""
     s = str(val).strip()
     if not s or s.startswith(":"):
@@ -131,7 +131,7 @@ def load_economie_chomage_eurostat(
     cache_path = _download_cache(_URL_CHOMAGE, raw_dir / "economie" / _CACHE_CHOMAGE, force=force)
     df = _parse_eurostat_tsv(cache_path)
 
-    col0 = str(df.columns[0])
+    col0 = df.columns[0]
     dim_str = col0.split("\\")[0]
     dims = [d.strip() for d in dim_str.split(",")]
     annee_cols = [c for c in df.columns if c != col0]
@@ -199,7 +199,7 @@ def load_economie_pib_eurostat(
     cache_path = _download_cache(_URL_PIB, raw_dir / "economie" / _CACHE_PIB, force=force)
     df = _parse_eurostat_tsv(cache_path)
 
-    col0 = str(df.columns[0])
+    col0 = df.columns[0]
     dim_str = col0.split("\\")[0]
     dims = [d.strip() for d in dim_str.split(",")]
     annee_cols = [c for c in df.columns if c != col0]

@@ -46,6 +46,7 @@ from pathlib import Path
 import duckdb
 import httpx
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
 
 logger = logging.getLogger(__name__)
@@ -272,9 +273,11 @@ def attribuer_nuances_non_inscrits(
         _charger_amo(con, lire_mandats_amo(amo_zip))
         _remplacants_et_partielles(con, parquet_candidats)
         con.execute("DROP TABLE _amo")
-    n_total, n_ok = con.execute(
-        "SELECT COUNT(*), COUNT(nuance_election) FROM leg_mandats WHERE nuance_source IS NOT NULL"
-    ).fetchone()
+    n_total, n_ok = ligne_unique(
+        con.execute(
+            "SELECT COUNT(*), COUNT(nuance_election) FROM leg_mandats WHERE nuance_source IS NOT NULL"
+        )
+    )
     con.execute("DROP TABLE _ni_resolution")
     con.execute("DROP TABLE _cibles")
     logger.info(

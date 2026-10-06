@@ -33,6 +33,7 @@ from pathlib import Path
 import duckdb
 import httpx
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
 from ministere_de_l_info.etl.legislatif_groupes import (
     journaliser_non_classes,
@@ -296,11 +297,13 @@ def load_legislatif_datan(
             activite_rows,
         )
 
-    nb_elus = con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'datan'").fetchone()[0]
-    nb_actifs = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'datan' AND est_actif = TRUE"
-    ).fetchone()[0]
-    nb_act = con.execute("SELECT COUNT(*) FROM leg_activite WHERE source = 'datan'").fetchone()[0]
+    nb_elus = ligne_unique(con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'datan'"))[0]
+    nb_actifs = ligne_unique(
+        con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'datan' AND est_actif = TRUE")
+    )[0]
+    nb_act = ligne_unique(con.execute("SELECT COUNT(*) FROM leg_activite WHERE source = 'datan'"))[
+        0
+    ]
     logger.info(
         "leg_elus (Datan, AN) : %d total (%d actifs) | leg_activite : %d scores",
         nb_elus,

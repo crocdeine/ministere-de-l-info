@@ -38,6 +38,8 @@ import logging
 
 import duckdb
 
+from ministere_de_l_info._sql import ligne_unique
+
 logger = logging.getLogger(__name__)
 
 # Code INSEE de la région Hauts-de-France (filtrage géographique C2b)
@@ -1179,10 +1181,12 @@ def populate_nuances_municipales(con: duckdb.DuckDBPyConnection) -> int:
     placeholders = ", ".join("?" for _ in _ANNEES_MUNI)
     con.execute("BEGIN TRANSACTION")
     try:
-        n_supprimees = con.execute(
-            f"DELETE FROM nuances_harmonisees WHERE annee IN ({placeholders})",  # noqa: S608
-            list(_ANNEES_MUNI),
-        ).fetchone()[0]
+        n_supprimees = ligne_unique(
+            con.execute(
+                f"DELETE FROM nuances_harmonisees WHERE annee IN ({placeholders})",  # noqa: S608
+                list(_ANNEES_MUNI),
+            )
+        )[0]
         con.executemany(
             "INSERT INTO nuances_harmonisees (nuance, annee, bloc, source_bloc) VALUES (?, ?, ?, ?)",
             _NUANCES_MUNI,

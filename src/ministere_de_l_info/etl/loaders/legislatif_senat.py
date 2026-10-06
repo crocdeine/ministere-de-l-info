@@ -39,6 +39,7 @@ import duckdb
 import httpx
 import polars as pl
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
 from ministere_de_l_info.etl.legislatif_groupes import (
     est_groupe_senat_anterieur_2002,
@@ -421,10 +422,10 @@ def load_legislatif_senat(
     journaliser_non_classes("SENAT", non_classes)
     journaliser_sans_groupe("SENAT", sans_groupe)
 
-    total = con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'").fetchone()[0]
-    actifs = con.execute(
-        "SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND est_actif = TRUE"
-    ).fetchone()[0]
+    total = ligne_unique(con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv'"))[0]
+    actifs = ligne_unique(
+        con.execute("SELECT COUNT(*) FROM leg_elus WHERE source = 'senat_csv' AND est_actif = TRUE")
+    )[0]
     scope = f"filtre={departements}" if departements else "France entière"
     logger.info(
         "leg_elus (Sénat, %s) : %d total (%d actifs, %d anciens)",
