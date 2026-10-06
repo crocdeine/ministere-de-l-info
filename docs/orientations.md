@@ -90,3 +90,10 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
   `.claude/skills/design-system-mi`, ADR-0014 (révise l'ADR-0009). Écarts validés : palette
   d'évolution accessible conservée (J3) ; ADR renuméroté 0014 (0007 = Législatif).
 - La fusion dans `main` (PR #1) est faite le 2026-10-06 après mise à 0 des erreurs de typage.
+
+## Décision du 2026-10-06 (fusions dans main)
+
+- Le directeur **fusionne lui-même dans `main`**, une fois la CI verte, les **petites corrections de bugs
+  et la documentation** qui n'engagent aucun choix de fond. Restent soumis à l'accord explicite de
+  Mathias : nouvelles sources, classements politiques, changements visibles importants, architecture,
+  publications (releases, image Docker).
