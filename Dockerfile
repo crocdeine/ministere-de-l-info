@@ -3,7 +3,8 @@
 # ============================================================
 # Stage 1 — Builder : install Python deps avec uv
 # ============================================================
-FROM python:3.12-slim-bookworm AS builder
+# python:3.12-slim-bookworm (index multi-arch amd64+arm64, relevé le 2026-10-06)
+FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 AS builder
 
 # Install uv depuis l'image officielle Astral
 COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /uvx /bin/
@@ -36,7 +37,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ============================================================
 # Stage 2 — Runtime : image finale légère
 # ============================================================
-FROM python:3.12-slim-bookworm AS runtime
+# python:3.12-slim-bookworm (index multi-arch amd64+arm64, relevé le 2026-10-06)
+FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258 AS runtime
 
 # Dépendances runtime minimales (GDAL pour GeoPandas, curl pour healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -47,16 +49,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Installer Tectonic (compilateur LaTeX moderne, binaire statique ~50 Mo)
 # Détection d'architecture : Apple Silicon = aarch64, Intel = x86_64
+# SHA256 : empreintes publiées par GitHub (champ "digest") pour les assets de la release
+# tectonic@0.16.9 (https://github.com/tectonic-typesetting/tectonic/releases/tag/tectonic%400.16.9).
+# Le projet ne publie pas de fichier de somme séparé. À remettre à jour avec la version.
 ARG TECTONIC_VERSION=0.16.9
+ARG TECTONIC_SHA256_X86_64=60b13a0826ae7ad9ce34b4a2df06bff2cfcfa6dda8a915477c0cbb84e1a4a902
+ARG TECTONIC_SHA256_AARCH64=f9aa39017dbd51f111fdb93dda222178cbe51c8193508fc567b523cc74fff9c1
 RUN ARCH=$(uname -m) \
     && case "$ARCH" in \
-        x86_64) TARGET="x86_64-unknown-linux-musl" ;; \
-        aarch64) TARGET="aarch64-unknown-linux-musl" ;; \
+        x86_64) TARGET="x86_64-unknown-linux-musl"; SHA="$TECTONIC_SHA256_X86_64" ;; \
+        aarch64) TARGET="aarch64-unknown-linux-musl"; SHA="$TECTONIC_SHA256_AARCH64" ;; \
         *) echo "Architecture non supportée: $ARCH" && exit 1 ;; \
     esac \
     && curl --proto '=https' --tlsv1.2 -fsSL \
         "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/tectonic-${TECTONIC_VERSION}-${TARGET}.tar.gz" \
         -o /tmp/tectonic.tar.gz \
+    && echo "$SHA  /tmp/tectonic.tar.gz" | sha256sum -c - \
     && tar -xzf /tmp/tectonic.tar.gz -C /tmp \
     && mv /tmp/tectonic /usr/local/bin/ \
     && rm /tmp/tectonic.tar.gz \

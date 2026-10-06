@@ -1,4 +1,5 @@
-FROM python:3.12-slim
+# python:3.12-slim-bookworm (index multi-arch, aligné sur le Dockerfile racine)
+FROM python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258
 
 # uv depuis l'image officielle — version figée, alignée sur le Dockerfile racine
 COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /uvx /usr/local/bin/
