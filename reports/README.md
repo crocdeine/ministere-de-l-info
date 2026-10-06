@@ -23,6 +23,7 @@ sommaire (`grep -n '^## ' <fichier>`) avant d'ouvrir une section.
 
 | Fichier | Objet | Taille |
 |---|---|---|
+| [poc-interface-web-2026-10-06.md](poc-interface-web-2026-10-06.md) | Maquette web (Vite/React/MapLibre/Plot) d'une page Élections : mesures, limites, effort de portage, 4 questions | 9 Ko |
 | [ui-design-system-v2-2026-10-06.md](ui-design-system-v2-2026-10-06.md) | Design system v2 « direction éditoriale » appliqué sur J1-J4 (ADR-0014, PuOr conservée), points à valider à l'œil | 6 Ko |
 | [session-2026-10-04_design-system-v2.md](session-2026-10-04_design-system-v2.md) | Patch v2 d'origine — remplacé par `ui-design-system-v2-2026-10-06.md` | 2 Ko |
 | [qualite-typage-2026-10-06.md](qualite-typage-2026-10-06.md) | Pyright 212 → 0 erreur, job CI bloquant, liste des ignores | 4 Ko |
