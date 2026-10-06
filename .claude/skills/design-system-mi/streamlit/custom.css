@@ -423,9 +423,8 @@ samp {
 
 [data-testid="stMetricValue"] {
   font-family: var(--font-display);
-  /* 40cqi : le chiffre reste grand (principe « le chiffre est le titre ») ; une valeur
-     textuelle longue (« Extrême droite ») passe à la ligne en colonne étroite */
-  font-size: min(clamp(2.25rem, 3.6vw, 3.5rem), 40cqi);
+  /* 20cqi : une valeur textuelle (« Extrême droite ») tient en colonne étroite */
+  font-size: min(clamp(2.25rem, 3.6vw, 3.5rem), 20cqi);
   font-weight: var(--fw-black);
   line-height: 0.95;
   letter-spacing: -0.04em;
@@ -787,24 +786,4 @@ hr {
 
 [data-testid="stMainBlockContainer"] {
   animation: mdi-fade-in var(--duration-slow) var(--ease-out);
-}
-
-/* ---- Titres dans la sidebar : taille H3, jamais de coupure au milieu d'un mot ---- */
-[data-testid="stSidebar"] [data-testid="stHeading"] h1,
-[data-testid="stSidebar"] [data-testid="stHeading"] h2,
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2 {
-  font-size: var(--type-h3-size);
-  overflow-wrap: normal;
-  word-break: normal;
-  hyphens: none;
-  margin-top: var(--space-6);
-}
-
-/* ---- Cibles tactiles ≥ 44 px : boutons radio, cases à cocher, menus dépliants ---- */
-[data-testid="stRadio"] label,
-[data-testid="stCheckbox"] label,
-[data-testid="stExpander"] summary {
-  min-height: var(--control-h);
-  display: flex;
-  align-items: center;
 }

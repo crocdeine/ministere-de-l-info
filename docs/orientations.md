@@ -79,3 +79,14 @@ Les décisions techniques détaillées sont dans `docs/adr/` ; les décisions de
   avec l'option `--sans-sauvegarde` (le directeur est garant des sauvegardes).
 - Le projet reste sur le disque externe : le disque interne est plein à 97 % (6,2 Go libres).
 - Fusion dans `main` : seulement après correction des erreurs de typage (pyright à 0, rendu bloquant).
+
+## Décisions du 2026-10-06 (cible de production, design system v2)
+
+- **Cible de production : option 2** — interface web moderne, emballée en application Mac (Tauri),
+  publiable à un **public très restreint**. Le cœur de données (ETL Python, DuckDB, classements,
+  tests, licences) est conservé. Révisera l'ADR-0002 (Streamlit) par un nouvel ADR. Étape suivante :
+  maquette d'une page avant toute réécriture.
+- **Design system v2 « direction éditoriale »** (fourni par Mathias) adopté : skill
+  `.claude/skills/design-system-mi`, ADR-0014 (révise l'ADR-0009). Écarts validés : palette
+  d'évolution accessible conservée (J3) ; ADR renuméroté 0014 (0007 = Législatif).
+- La fusion dans `main` (PR #1) est faite le 2026-10-06 après mise à 0 des erreurs de typage.

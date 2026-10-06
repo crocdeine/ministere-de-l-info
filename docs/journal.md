@@ -117,3 +117,11 @@ L'historique antérieur au 2026-10-04 est dans `reports/` (voir `reports/README.
 - Mode d'exécution : analyse rendue (exécution native recommandée, déjà prévue par l'ADR-0012 et
   jamais installée) ; installation reportée par Mathias. Disque interne plein à 97 % : le projet
   reste sur le disque externe.
+
+## 2026-10-06 — Fusion dans main, design system v2, cible de production
+
+- PR #1 fusionnée (squash) dans `main` (`a90a9df`) après correction des 212 erreurs pyright
+  (0 erreur, job bloquant) ; CI verte 6/6 ; branche de travail conservée pour l'historique.
+- Mathias retient l'option 2 (web + Tauri, public restreint) pour la version de production.
+- Design system v2 : skill copié dans `.claude/skills/design-system-mi` ; patch appliqué sur la
+  branche `feat/design-system-v2` (agent developpeur-ui), validation visuelle attendue avant fusion.

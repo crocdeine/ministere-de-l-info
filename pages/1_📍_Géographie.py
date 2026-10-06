@@ -97,7 +97,7 @@ with st.sidebar:
             help="Population municipale (PMUN) issue de DS_POPULATIONS_HISTORIQUES",
         )
         st.caption(
-            f"📊 {len(annees_dispo)} millésime(s) disponible(s) : "
+            f"{len(annees_dispo)} millésime(s) disponible(s) : "
             f"{', '.join(str(a) for a in sorted(annees_dispo))}"
         )
 
@@ -208,7 +208,7 @@ if meta:
         pop_info = f"Population municipale {annee} (INSEE) · "
     else:
         pop_info = ""
-    st.caption(f"📊 {row_count:,} entités · {pop_info}Géométries : data.geopf.fr")
+    st.caption(f"{row_count:,} entités · {pop_info}Géométries : data.geopf.fr")
 else:
     st.caption("⚠️ Aucune métadonnée ETL pour ce niveau.")
 

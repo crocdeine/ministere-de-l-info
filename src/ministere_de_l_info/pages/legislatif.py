@@ -494,10 +494,10 @@ def render() -> None:
 
     tab_composition, tab_elus, tab_activite, tab_evolution = st.tabs(
         [
-            "📊 Composition politique",
-            "👥 Liste des élus",
-            "🏆 Activité parlementaire",
-            "📈 Évolution historique",
+            "Composition politique",
+            "Liste des élus",
+            "Activité parlementaire",
+            "Évolution historique",
         ]
     )
 

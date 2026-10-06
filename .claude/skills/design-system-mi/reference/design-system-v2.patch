@@ -1,0 +1,1616 @@
+From 325e27d7f1fb3999feea1d9ecadb499208d4ddbf Mon Sep 17 00:00:00 2001
+From: crocdeine <bertinotti16@gmail.com>
+Date: Sun, 4 Oct 2026 22:24:56 +0200
+Subject: [PATCH] =?UTF-8?q?feat(ui):=20design=20system=20v2=20=C2=AB=20dir?=
+ =?UTF-8?q?ection=20=C3=A9ditoriale=20=C2=BB?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Nouvelle direction visuelle (ADR-0007) : interface noir et blanc,
+Hanken Grotesk 900 en capitales, filets d'un pixel, sans ombre ni
+arrondi de surface. Bleu France réservé à l'action, Rouge Marianne
+aux alertes. Palettes de nuances et de choroplèthes inchangées.
+
+- custom.css réécrit (tokens v2, alias v1 conservés)
+- _theme.py : en-tête éditorial, render_overline, template Plotly mdi
+- config.toml : fond blanc, encre
+- Accueil : titre display, modules numérotés
+- tests/test_theme.py : 7 tests
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NY5tQA5yPsNbzjzWkDeEDR
+---
+ .streamlit/config.toml                        |   6 +-
+ CLAUDE.md                                     |   5 +-
+ ...0007-design-system-direction-editoriale.md |  64 ++
+ docs/adr/README.md                            |   2 +
+ "pages/0_\360\237\217\240_Accueil.py"         |  19 +-
+ .../session-2026-10-04_design-system-v2.md    |  38 +
+ src/ministere_de_l_info/_theme.py             | 172 +++-
+ src/ministere_de_l_info/custom.css            | 783 ++++++++++--------
+ tests/test_theme.py                           |  57 ++
+ 9 files changed, 765 insertions(+), 381 deletions(-)
+ create mode 100644 docs/adr/0007-design-system-direction-editoriale.md
+ create mode 100644 reports/session-2026-10-04_design-system-v2.md
+ create mode 100644 tests/test_theme.py
+
+diff --git a/.streamlit/config.toml b/.streamlit/config.toml
+index e01fa28..0c580fb 100644
+--- a/.streamlit/config.toml
++++ b/.streamlit/config.toml
+@@ -8,7 +8,7 @@ headless = true
+ [theme]
+ base = "light"
+ primaryColor = "#000091"
+-backgroundColor = "#f7f7f7"
+-secondaryBackgroundColor = "#ffffff"
+-textColor = "#242424"
++backgroundColor = "#ffffff"
++secondaryBackgroundColor = "#f2f2f2"
++textColor = "#0a0a0a"
+ font = "sans serif"
+diff --git a/CLAUDE.md b/CLAUDE.md
+index a6d9d42..e0b8f37 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -44,9 +44,9 @@ Leçon D3.3 : run 27265331430 watché au lieu du vrai run du commit 7f21346 —
+ | 🚀 Déploiement | ✅ v0.4.3 (Mac/OrbStack, testé) | — | install.sh validé sur macOS 26.4.1. Image sur ghcr.io. DB sur GitHub Release. TODO : update.sh test réel, page Paramètres UI. |
+ | 📊 Économie | ✅ Phase E++ complète | — | Sources : Filosofi + RP + logements sociaux + CNAF RSA + DREES APL + URSSAF + Eurostat. 7 indicateurs Phase E, Phase E+ : CNAF RSA + DREES APL + URSSAF (1.15M lignes 2006-2025). 943 déserts médicaux HdF détectés. Phase E++ : economie_contexte (Eurostat chômage BIT 1999-2025 + PIB/hab 2000-2024, HdF vs France). UI Streamlit : carte choroplèthe + évolution HdF + croisement économie×élections. 348 tests, 75.34% coverage. ETL : load_economie.py (cache HdF 40Mo). UI Phase E+ : onglet Désindustrialisation (URSSAF 2006-2025), RSA et APL dans carte + évolution, déserts médicaux carte binaire. UI Phase E++ : Tab 2 section Eurostat. |
+ | 🏛️ Législatif | ✅ Phase F complète | — | Périmètre national (4065 élus, 1945 Sénat + 2120 AN, 2002-présent). Source Datan (scores activité AN, législatures 12-17) + Sénat CSV officiel (data.senat.fr). UI Streamlit : 4 onglets (composition politique, liste élus, activité parlementaire AN, évolution historique). Filtre national + HdF en UI. 3 tables (leg_elus, leg_activite, leg_blocs_override), 2 vues SQL, 10 fonctions requêtes. 381 tests, 75.34% coverage. Limitations connues : pas de scores Sénat (Datan = AN uniquement), pas de votes nominatifs (XML brut non parsé). |
+-| 🎨 Design system | ✅ Terminé | — | Tokens CSS Claude Design (Bleu France, Rouge Marianne, Spectral/Hanken Grotesk/IBM Plex Mono) intégrés dans `custom.css` + `_theme.py::inject_css()`, injection centralisée une seule fois dans `app.py` (routeur). Migration `st.navigation()`/`st.Page()` : icônes Material Symbols sur les 5 entrées de la sidebar (fin de la contrainte "icône = emoji du nom de fichier" de l'ancien système classique `pages/`), Accueil extrait dans `pages/0_🏠_Accueil.py`, URLs propres (`/geographie`, `/elections`...). Accueil = hub de navigation (4 tuiles), micro-animations CSS (boutons, métriques, cards au hover). Filtres Chambre/Département de Législatif déplacés en sidebar (seuls filtres réellement persistants sur plusieurs onglets ; Élections et Économie n'en ont pas — leurs sélecteurs restent inline, contextuels à chaque onglet). Couleurs de blocs politiques réconciliées : source unique `_blocs_politiques.py`, alignée sur les tokens `--nuance-*` et la table `blocs_politiques` (Législatif et Économie avaient chacun une palette divergente). Troncature des libellés de métriques longs (ex. "Extrême gauche") corrigée en CSS. |
++| 🎨 Design system | 🟡 v2 en validation (branche `feat/ds-direction-editoriale`) | — | **v2 « direction éditoriale » (ADR-0007, 2026-10-04)** : noir/blanc, Hanken Grotesk 900 en capitales, filets 1 px, sans ombre ni arrondi de surface, Bleu France = action, Rouge Marianne = alertes ; Spectral retiré ; template Plotly `mdi` par défaut ; alias de tokens v1 conservés. **v1 (historique)** : Tokens CSS Claude Design (Bleu France, Rouge Marianne, Spectral/Hanken Grotesk/IBM Plex Mono) intégrés dans `custom.css` + `_theme.py::inject_css()`, injection centralisée une seule fois dans `app.py` (routeur). Migration `st.navigation()`/`st.Page()` : icônes Material Symbols sur les 5 entrées de la sidebar (fin de la contrainte "icône = emoji du nom de fichier" de l'ancien système classique `pages/`), Accueil extrait dans `pages/0_🏠_Accueil.py`, URLs propres (`/geographie`, `/elections`...). Accueil = hub de navigation (4 tuiles), micro-animations CSS (boutons, métriques, cards au hover). Filtres Chambre/Département de Législatif déplacés en sidebar (seuls filtres réellement persistants sur plusieurs onglets ; Élections et Économie n'en ont pas — leurs sélecteurs restent inline, contextuels à chaque onglet). Couleurs de blocs politiques réconciliées : source unique `_blocs_politiques.py`, alignée sur les tokens `--nuance-*` et la table `blocs_politiques` (Législatif et Économie avaient chacun une palette divergente). Troncature des libellés de métriques longs (ex. "Extrême gauche") corrigée en CSS. |
+ 
+-**Dernier rapport** : `reports/session-2026-08-19_design-system-cloture.md` — Clôture du chantier design system : filtres, couleurs, icônes sidebar (migration st.navigation), troncature métriques
++**Dernier rapport** : `reports/session-2026-10-04_design-system-v2.md` — Design system v2 « direction éditoriale » (en attente de validation visuelle)
+ 
+ ---
+ 
+@@ -78,6 +78,7 @@ Toute décision d'architecture non triviale est documentée dans `docs/adr/`. Ne
+ | [0004](docs/adr/0004-polars-vs-pandas.md) | Polars > Pandas | Colonnaire, expressions paresseuses, API stricte. |
+ | [0005](docs/adr/0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère | 6 blocs officiels (EXG/GAU/DIV/CENT/DTE/EXD), classement "de l'époque", sources tracées. |
+ | [0006](docs/adr/0006-module-economie-sources-et-schema.md) | Module Économie — sources et schéma | Filosofi + RP + Sirene, 5 indicateurs, 2 tables, 3 vues, pièges ETL INSEE. |
++| [0007](docs/adr/0007-design-system-direction-editoriale.md) | Design system v2 — direction éditoriale | Noir/blanc, grotesque 900 capitales, filets 1 px, Bleu France = action, palettes data inchangées. Proposé. |
+ 
+ ---
+ 
+diff --git a/docs/adr/0007-design-system-direction-editoriale.md b/docs/adr/0007-design-system-direction-editoriale.md
+new file mode 100644
+index 0000000..b2c33f7
+--- /dev/null
++++ b/docs/adr/0007-design-system-direction-editoriale.md
+@@ -0,0 +1,64 @@
++# 0007 — Design system v2 : direction éditoriale
++
++Date : 2026-10-04
++Statut : Proposé (en attente de validation visuelle par Mathias)
++Décideurs : Mathias (supervision)
++
++## Contexte
++
++Le design system v1 (août 2026, rapport `session-2026-08-19_design-system-cloture.md`)
++reprend les codes du DSFR : fond gris clair, cartes blanches arrondies avec
++ombre, titres en Spectral (serif), callouts colorés. Le rendu est propre mais
++proche d'un site administratif générique.
++
++Mathias souhaite une identité plus moderne et plus affirmée. Référence fournie :
++le modèle Wix « Artiste (typographie en gras) » — grotesque très gras en
++capitales, noir et blanc, beaucoup de blanc, grille asymétrique, boutons à
++contour fin, flèche diagonale comme signe. Une proposition a été maquettée dans
++un canvas Claude Design (« Ministère de l'Info — Direction éditoriale » :
++planches Fondations, Composants, Exemple d'accueil).
++
++## Décision
++
++Adopter une **direction éditoriale** pour l'interface, en conservant l'ancrage
++républicain et toutes les palettes de données :
++
++- **Couleur** : interface en noir (`#0a0a0a`) et blanc (`#ffffff`). Le Bleu France
++  marque l'action et la sélection (survol des boutons, focus, champ actif, export
++  CSV). Le Rouge Marianne est réservé aux alertes et limites. Palettes de
++  nuances politiques et de choroplèthes **inchangées**.
++- **Typographie** : une seule famille d'interface, Hanken Grotesk (400 → 900) ;
++  titres en capitales, graisse 900, approche serrée (−0,045 em). IBM Plex Mono
++  pour les données et repères de section. **Spectral est retiré.**
++- **Forme** : aucune ombre, aucun arrondi sur les surfaces ; 8 px sur les
++  contrôles ; filets d'un pixel comme structure (au-dessus des cartes, des
++  métriques, des sections, des alertes).
++- **Contrôles** : hauteur minimale 44 px ; champs soulignés ; libellés en
++  capitales 12 px.
++- **Graphiques** : template Plotly `mdi` enregistré par défaut (même police,
++  fond blanc, filets encre, info-bulle noire).
++- **Emoji** : les pages restent nommées avec emoji (nom de fichier), mais
++  l'interface utilise Material Symbols et une numérotation « 01 — ».
++
++Implémentation : `custom.css` réécrit (les **noms** de tokens v1 sont conservés
++comme alias pour ne rien casser), `_theme.py` (en-tête éditorial,
++`render_overline`, template Plotly), `.streamlit/config.toml` (fond blanc,
++encre), page Accueil.
++
++## Alternatives considérées
++
++- **Garder la v1 et ajuster** : ne répond pas à la demande d'une identité plus
++  affirmée.
++- **Garder Spectral pour les titres** : contredit la grammaire swiss
++  (tout en grotesque) ; réintroductible pour les grands chiffres si besoin.
++- **Reproduire la grille en quinconce dans toutes les pages** : impossible
++  proprement avec `st.columns` ; réservée aux maquettes / à l'Accueil.
++
++## Conséquences
++
++- ✅ Identité distinctive, lisibilité accrue des chiffres (métriques en très grand corps).
++- ✅ Aucun changement de données ni de logique ; compatibilité des tokens v1.
++- ✅ Graphiques Plotly harmonisés sans toucher aux pages.
++- ⚠️ Cartes Folium (iframe) et cellules de `st.dataframe` (canvas) non stylables en CSS — inchangées.
++- ⚠️ Sélecteurs `data-testid` dépendants de Streamlit 1.57 : à revérifier à chaque montée de version.
++- ↩️ Réversible : revenir au commit précédent de `custom.css`, `_theme.py`, `config.toml`.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+index 511b929..4476e8c 100644
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -15,6 +15,8 @@ décision est révisée, un nouvel ADR est créé avec le statut "Remplace 000X"
+ | [0003](0003-uv-vs-pip-poetry.md) | uv plutôt que pip / poetry | Accepté |
+ | [0004](0004-polars-vs-pandas.md) | Polars prioritaire, Pandas en fallback | Accepté |
+ | [0005](0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère — 6 blocs | Accepté |
++| [0006](0006-module-economie-sources-et-schema.md) | Module Économie — sources et schéma | Accepté |
++| [0007](0007-design-system-direction-editoriale.md) | Design system v2 — direction éditoriale | Proposé |
+ 
+ ## Format
+ 
+diff --git "a/pages/0_\360\237\217\240_Accueil.py" "b/pages/0_\360\237\217\240_Accueil.py"
+index bdb6fa7..4b0e6fe 100644
+--- "a/pages/0_\360\237\217\240_Accueil.py"
++++ "b/pages/0_\360\237\217\240_Accueil.py"
+@@ -6,21 +6,23 @@ import duckdb
+ import polars as pl
+ import streamlit as st
+ 
+-from ministere_de_l_info._theme import render_page_header
++from ministere_de_l_info._theme import render_overline, render_page_header
+ 
+ render_page_header(
+     icon="flag",
+     title="ministère de l'info",
+-    subtitle="Exploration des données politiques, électorales et territoriales françaises.",
++    subtitle="Les données publiques françaises, de la région à la circonscription.",
++    eyebrow="Accueil",
++    display=True,
+ )
+ 
+-st.markdown("### Modules d'analyse")
++st.markdown("## Modules")
+ 
+ _MODULES: list[dict[str, str]] = [
+     {
+         "page": "pages/1_📍_Géographie.py",
+         "icon": "map",
+-        "label": "Géographie territoriale",
++        "label": "Géographie",
+         "description": "Cartographie choroplèthe multi-niveaux (régions, départements, EPCI, communes) et démographie INSEE.",
+     },
+     {
+@@ -43,14 +45,15 @@ _MODULES: list[dict[str, str]] = [
+     },
+ ]
+ 
+-row1 = st.columns(2)
+-row2 = st.columns(2)
+-for module, col in zip(_MODULES, [*row1, *row2], strict=True):
++row1 = st.columns(2, gap="large")
++row2 = st.columns(2, gap="large")
++for numero, (module, col) in enumerate(zip(_MODULES, [*row1, *row2], strict=True), start=1):
+     with col, st.container(border=True):
++        render_overline(f"{numero:02d} —")
+         st.page_link(module["page"], label=module["label"], icon=f":material/{module['icon']}:")
+         st.caption(module["description"])
+ 
+-st.divider()
++st.caption("Sources : IGN, INSEE, data.gouv.fr, Assemblée nationale, Sénat.")
+ 
+ with st.expander("Diagnostic technique"):
+     col1, col2, col3 = st.columns(3)
+diff --git a/reports/session-2026-10-04_design-system-v2.md b/reports/session-2026-10-04_design-system-v2.md
+new file mode 100644
+index 0000000..916fcd7
+--- /dev/null
++++ b/reports/session-2026-10-04_design-system-v2.md
+@@ -0,0 +1,38 @@
++# Design system v2 — direction éditoriale
++
++**Date** : 2026-10-04
++**Périmètre** : application du canvas Claude Design « Ministère de l'Info — Direction éditoriale » à l'app Streamlit
++**Statut** : 🟡 Implémenté, en attente de validation visuelle (ADR-0007 « Proposé »)
++**Branche** : `feat/ds-direction-editoriale`
++
++---
++
++## Synthèse
++
++Nouvelle direction visuelle inspirée d'une grammaire swiss/éditoriale : noir et
++blanc, grotesque très gras en capitales, filets d'un pixel, aucune ombre, Bleu
++France réservé à l'action. Palettes de données inchangées. Décision : ADR-0007.
++
++## Fichiers
++
++| Fichier | Changement |
++|---|---|
++| `src/ministere_de_l_info/custom.css` | Réécrit. Tokens v2 (`--ink`, `--paper`, `--rule`, échelle typographique `clamp()`), alias v1 conservés. Couche Streamlit : sidebar en liste capitales (page active = encre pleine), titres H1/H2/H3 en capitales (H2 précédé d'un filet), métriques sans carte (filet + chiffre 900), boutons contour/encre (survol Bleu France, export CSV en Bleu France), champs soulignés, onglets capitales, alertes sans fond coloré, cartes `st.container(border=True)` = filet au-dessus. |
++| `src/ministere_de_l_info/_theme.py` | Police Spectral retirée, Hanken Grotesk 900 ajoutée. `render_page_header()` : sur-titre + titre géant + sous-titre décalé avec flèche ↘ (paramètres `eyebrow`, `display`, HTML échappé). Nouveau `render_overline()`. Template Plotly `mdi` activé par défaut dans `inject_css()`. |
++| `.streamlit/config.toml` | Fond `#ffffff`, fond secondaire `#f2f2f2`, texte `#0a0a0a`. |
++| `pages/0_🏠_Accueil.py` | Titre display, modules numérotés « 01 — » à « 04 — », ligne de sources. |
++| `tests/test_theme.py` | 7 tests (tokens, alias v1, absence d'`@import`, polices, template Plotly, échappement HTML). |
++| `docs/adr/0007-…` + index | ADR de la décision. |
++
++## Vérification
++
++- `ruff format --check` / `ruff check` : propres sur `src`, `pages`, `app.py`, `tests/test_theme.py`.
++- `pytest tests/test_theme.py` : 7/7.
++- Suite complète exécutée dans un environnement **sans base ni réseau** : résultats identiques avant / après le changement (les échecs viennent de l'absence de DB / d'accès réseau, pas du thème). **À relancer sur le Mac mini** avec la base.
++- Rendu Accueil vérifié en navigateur headless (1440 px et 390 px).
++
++## À faire (validation Mathias)
++
++1. Lancer `uv run streamlit run app.py` et parcourir les 5 pages.
++2. Points à regarder : lisibilité des métriques en 6 colonnes (Législatif), graphiques Plotly avec le nouveau template, contraste des légendes.
++3. Si validé : ADR-0007 → « Accepté », PR squash-merge.
+diff --git a/src/ministere_de_l_info/_theme.py b/src/ministere_de_l_info/_theme.py
+index 41429b3..5485e19 100644
+--- a/src/ministere_de_l_info/_theme.py
++++ b/src/ministere_de_l_info/_theme.py
+@@ -1,54 +1,128 @@
+-"""Injection du design system (tokens CSS) dans l'application Streamlit.
+-
+-Le CSS fusionné (`custom.css`, à côté de ce module) contient les tokens
+-du design system Ministère de l'Info (couleurs, typographie, spacing,
+-élévation, motion, data-viz) ainsi que la couche de sélecteurs Streamlit
+-qui les applique à l'UI (`data-testid="..."`, cf.
+-`reports/research-streamlit-css-selectors.md`).
+-
+-Les polices Google Fonts (Spectral, Hanken Grotesk, IBM Plex Mono,
+-Material Symbols Outlined) sont chargées via une balise <link> HTML
+-séparée : un `@import` CSS placé dans un bloc injecté dynamiquement par
+-`st.markdown` ne garantit pas un chargement fiable côté navigateur.
++"""Injection du design system v2 « direction éditoriale » dans Streamlit.
++
++Le CSS (`custom.css`, à côté de ce module) contient les tokens du design
++system (couleurs, typographie, espacement, forme, mouvement, data-viz) et
++la couche de sélecteurs Streamlit qui les applique (`data-testid="..."`).
++Décision et principes : `docs/adr/0007-design-system-direction-editoriale.md`.
++
++Les polices Google Fonts (Hanken Grotesk, IBM Plex Mono, Material Symbols
++Outlined) sont chargées via une balise <link> HTML séparée : un `@import`
++CSS dans un bloc injecté par `st.markdown` ne se charge pas de façon fiable.
++
++Le module enregistre aussi un template Plotly (`mdi`) aligné sur le design
++system et l'active par défaut, pour que les graphiques Plotly Express
++adoptent la même typographie et les mêmes filets sans modifier chaque page.
+ """
+ 
+ from __future__ import annotations
+ 
++from html import escape
+ from pathlib import Path
+ 
++import plotly.graph_objects as go
++import plotly.io as pio
+ import streamlit as st
+ 
+ _CSS_PATH = Path(__file__).parent / "custom.css"
+ 
+ _GOOGLE_FONTS_URL = (
+     "https://fonts.googleapis.com/css2?"
+-    "family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500"
+-    "&family=Hanken+Grotesk:wght@400;500;600;700;800"
++    "family=Hanken+Grotesk:wght@400;500;600;700;800;900"
+     "&family=IBM+Plex+Mono:wght@400;500;600"
+     "&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..600,0..1,-25..0"
+     "&display=swap"
+ )
+ 
++# Couleurs reprises de custom.css (Plotly ne lit pas les variables CSS).
++INK = "#0a0a0a"
++PAPER = "#ffffff"
++GREY_600 = "#5c5c5c"
++RULE_SOFT = "#d9d9d9"
++BLEU_FRANCE = "#000091"
++ROUGE_MARIANNE = "#e1000f"
++
++_FONT_SANS = "Hanken Grotesk, Helvetica Neue, Helvetica, sans-serif"
++
++PLOTLY_TEMPLATE_NAME = "mdi"
++
++# Flèche diagonale ↘ — seul signe graphique de la marque.
++_ARROW_SVG = (
++    '<svg class="mdi-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
++    'stroke-width="3" stroke-linecap="square" aria-hidden="true">'
++    '<path d="M6 6 L18 18 M18 8 V18 H8"></path></svg>'
++)
++
+ 
+ def _load_css() -> str:
+     """Charge le contenu de `custom.css`.
+ 
+-    Volontairement non mis en cache (ni `lru_cache`, ni `st.cache_data`) :
+-    le fichier est relu à chaque rerun. Coût négligeable (~15 Ko), et ça
+-    permet de voir les modifications de `custom.css` en rechargeant
+-    simplement le navigateur, sans redémarrer le process Streamlit — un
+-    `lru_cache` figerait le CSS en mémoire pour toute la durée du serveur.
++    Volontairement non mis en cache : le fichier est relu à chaque rerun
++    (coût négligeable) pour voir les modifications CSS en rechargeant
++    simplement le navigateur, sans redémarrer Streamlit.
+     """
+     return _CSS_PATH.read_text(encoding="utf-8")
+ 
+ 
++def build_plotly_template() -> go.layout.Template:
++    """Construit le template Plotly du design system (fond blanc, filets encre, grotesque)."""
++    axis = {
++        "showgrid": True,
++        "gridcolor": RULE_SOFT,
++        "gridwidth": 1,
++        "zeroline": False,
++        "showline": True,
++        "linecolor": INK,
++        "linewidth": 1,
++        "ticks": "outside",
++        "tickcolor": INK,
++        "ticklen": 4,
++        "tickfont": {"family": _FONT_SANS, "size": 12, "color": INK},
++        "title": {"font": {"family": _FONT_SANS, "size": 12, "color": GREY_600}},
++    }
++    return go.layout.Template(
++        layout={
++            "font": {"family": _FONT_SANS, "size": 13, "color": INK},
++            "paper_bgcolor": PAPER,
++            "plot_bgcolor": PAPER,
++            "colorway": [BLEU_FRANCE, INK, ROUGE_MARIANNE, GREY_600, "#3b7dd8", "#f5b800"],
++            "title": {
++                "font": {"family": _FONT_SANS, "size": 18, "color": INK, "weight": 800},
++                "x": 0,
++                "xanchor": "left",
++            },
++            "xaxis": {**axis, "showgrid": False},
++            "yaxis": {**axis, "showline": False, "ticks": ""},
++            "legend": {
++                "font": {"family": _FONT_SANS, "size": 12, "color": INK},
++                "orientation": "h",
++                "yanchor": "bottom",
++                "y": 1.02,
++                "x": 0,
++                "title": {"text": ""},
++            },
++            "hoverlabel": {
++                "bgcolor": INK,
++                "bordercolor": INK,
++                "font": {"family": _FONT_SANS, "size": 13, "color": PAPER},
++            },
++            "margin": {"l": 8, "r": 8, "t": 48, "b": 8},
++            "bargap": 0.25,
++        }
++    )
++
++
++def register_plotly_template() -> None:
++    """Enregistre le template `mdi` et en fait le défaut (idempotent)."""
++    pio.templates[PLOTLY_TEMPLATE_NAME] = build_plotly_template()
++    pio.templates.default = PLOTLY_TEMPLATE_NAME
++
++
+ def inject_css() -> None:
+     """Injecte les polices et le CSS du design system dans la page courante.
+ 
+-    Depuis la migration vers `st.navigation()` (app.py = routeur unique),
+-    un seul appel dans `app.py`, avant `st.navigation(...).run()`, suffit :
+-    ce code s'exécute à chaque interaction quelle que soit la page affichée.
+-    Les fichiers `pages/*.py` n'ont plus besoin de l'appeler individuellement.
++    Un seul appel dans `app.py`, avant `st.navigation(...).run()` : ce code
++    s'exécute à chaque interaction quelle que soit la page affichée. Active
++    aussi le template Plotly du design system.
+     """
+     st.markdown(
+         '<link rel="preconnect" href="https://fonts.googleapis.com">'
+@@ -57,24 +131,42 @@ def inject_css() -> None:
+         unsafe_allow_html=True,
+     )
+     st.markdown(f"<style>{_load_css()}</style>", unsafe_allow_html=True)
+-
+-
+-def render_page_header(icon: str, title: str, subtitle: str | None = None) -> None:
+-    """Affiche un titre de page cohérent (icône Material + H1 Spectral + sous-titre).
+-
+-    Remplace `st.title("🏷️ Titre")` : ni `st.title` ni `st.header` ne permettent
+-    d'associer une icône vectorielle *et* un sous-titre avec le même contrôle de
+-    mise en page. `icon` est un nom d'icône Material Symbols (ex. "account_balance"),
+-    cf. https://fonts.google.com/icons.
++    register_plotly_template()
++
++
++def render_page_header(
++    icon: str,
++    title: str,
++    subtitle: str | None = None,
++    *,
++    eyebrow: str = "Ministère de l'Info",
++    display: bool = False,
++) -> None:
++    """Affiche l'en-tête éditorial d'une page.
++
++    Structure : sur-titre en capitales (icône Material + `eyebrow`), titre
++    géant en capitales, puis sous-titre décalé à droite suivi de la flèche ↘.
++    `icon` est un nom d'icône Material Symbols (ex. "account_balance").
++    `display=True` agrandit encore le titre (page d'accueil).
+     """
+-    subtitle_html = f'<p class="mdi-page-subtitle">{subtitle}</p>' if subtitle else ""
++    title_class = "mdi-page-title mdi-page-title--display" if display else "mdi-page-title"
++    subtitle_html = (
++        f'<div class="mdi-page-subtitle"><span>{escape(subtitle)}</span>{_ARROW_SVG}</div>'
++        if subtitle
++        else ""
++    )
+     st.markdown(
+-        f"""
+-        <div class="mdi-page-header">
+-          <span class="material-symbols-outlined mdi-page-icon" aria-hidden="true">{icon}</span>
+-          <h1>{title}</h1>
+-        </div>
+-        {subtitle_html}
+-        """,
++        f'<header class="mdi-page-header">'
++        f'<p class="mdi-eyebrow">'
++        f'<span class="material-symbols-outlined" aria-hidden="true">{escape(icon)}</span>'
++        f"{escape(eyebrow)}</p>"
++        f'<h1 class="{title_class}">{escape(title)}</h1>'
++        f"{subtitle_html}"
++        f"</header>",
+         unsafe_allow_html=True,
+     )
++
++
++def render_overline(text: str) -> None:
++    """Affiche un numéro ou repère de section en chasse fixe (ex. « 01 — »)."""
++    st.markdown(f'<p class="mdi-overline">{escape(text)}</p>', unsafe_allow_html=True)
+diff --git a/src/ministere_de_l_info/custom.css b/src/ministere_de_l_info/custom.css
+index 1576a03..64e9c15 100644
+--- a/src/ministere_de_l_info/custom.css
++++ b/src/ministere_de_l_info/custom.css
+@@ -1,123 +1,107 @@
+ /* ================================================================
+-   Ministère de l'Info — design system, fusionné pour Streamlit
++   Ministère de l'Info — design system v2 « direction éditoriale »
+    ------------------------------------------------------------
+-   Source : Design System Claude Design (ZIP fourni le 2026-07-30).
+-   Fusionne les 7 fichiers de tokens (tokens/*.css) + les défauts
+-   d'éléments (base.css) en un seul fichier, injecté via
+-   st.markdown(..., unsafe_allow_html=True) par _theme.inject_css().
+-
+-   Le fichier tokens/fonts.css d'origine contient un @import Google
+-   Fonts. Un @import CSS chargé par injection dynamique (st.markdown)
+-   ne déclenche pas toujours le chargement au bon moment côté
+-   navigateur. Le chargement des polices est donc fait séparément
+-   via une balise <link> HTML, ajoutée par inject_css() — voir
+-   _theme.py. Ne pas réintroduire l'@import ici.
+-
+-   Ne pas éditer les fichiers sources (design-system/tokens/*.css) :
+-   ce fichier est un artefact généré/maintenu à la main à partir
+-   d'eux. Toute évolution du design system doit être répercutée ici.
++   Source : canvas Claude Design « Ministère de l'Info — Direction
++   éditoriale » (2026-10-04), inspiré d'une grammaire swiss/éditoriale
++   (grotesque très gras en capitales, noir et blanc, filets d'un pixel,
++   grille asymétrique, flèche diagonale comme signe). Décision : ADR-0007.
++
++   Remplace la v1 (DSFR-like, Spectral). Les NOMS de tokens de la v1
++   sont conservés (alias) pour ne rien casser ; seules leurs valeurs
++   changent. Nouveaux tokens : --ink, --paper, --rule, --type-display-*.
++
++   Injecté via st.markdown(..., unsafe_allow_html=True) par
++   _theme.inject_css(). Les polices sont chargées par une balise <link>
++   séparée (cf. _theme.py) — ne pas réintroduire d'@import ici.
+    ================================================================ */
+ 
+ /* ================================================================
+-   1. TOKENS — variables CSS (:root)
++   1. TOKENS
+    ================================================================ */
+ 
+-/* ---- tokens/colors.css ------------------------------------------------ */
++/* ---- Couleurs ------------------------------------------------------- */
+ 
+ :root {
+-  /* Republic base */
++  /* Fondamentaux v2 */
++  --ink: #0a0a0a; /* texte, filets, boutons primaires */
++  --paper: #ffffff; /* fond unique */
++  --rule: #0a0a0a; /* filet structurant 1 px */
++  --rule-soft: #d9d9d9; /* séparateur de lignes */
++
++  /* République — usage restreint */
+   --blanc: #ffffff;
+-  --bleu-france: #000091; /* official Bleu France */
+-  --rouge-marianne: #e1000f; /* official Rouge Marianne */
++  --bleu-france: #000091; /* action, sélection, lien actif */
++  --rouge-marianne: #e1000f; /* alertes et limites uniquement */
+ 
+-  /* Bleu France ramp (primary) */
++  /* Rampe Bleu France */
+   --blue-900: #00006b;
+-  --blue-800: #000091; /* = bleu-france */
+-  --blue-700: #1212ff; /* hover */
+-  --blue-600: #2323ff; /* active */
+-  --blue-400: #6a6af4;
++  --blue-800: #000091;
++  --blue-700: #1212ff;
++  --blue-600: #2323ff;
+   --blue-200: #cacafb;
+-  --blue-100: #e3e3fd; /* light surface */
++  --blue-100: #e3e3fd;
+   --blue-50: #f0f0fe;
+ 
+-  /* Rouge Marianne ramp */
++  /* Rampe Rouge Marianne */
+   --red-800: #b81b22;
+-  --red-700: #e1000f; /* = rouge-marianne */
+-  --red-600: #f24c54;
+-  --red-200: #fcc6c9;
++  --red-700: #e1000f;
+   --red-100: #fddede;
+   --red-50: #fef4f4;
+ 
+-  /* Neutral ramp (cool administrative grey) */
+-  --grey-1000: #161616; /* ink — primary text */
+-  --grey-900: #242424;
+-  --grey-800: #3a3a3a;
+-  --grey-700: #595959; /* secondary text */
+-  --grey-600: #757575;
+-  --grey-500: #929292; /* muted / disabled text */
+-  --grey-400: #bdbdbd;
+-  --grey-300: #dddddd; /* borders */
+-  --grey-200: #e5e5e5; /* dividers */
+-  --grey-150: #ededed;
+-  --grey-100: #f0f0f0; /* subtle fill */
+-  --grey-50: #f7f7f7; /* page background */
+-  --grey-25: #fbfbfb;
+-
+-  /* Semantic feedback */
+-  --success-700: #18753c;
+-  --success-100: #b8fec9;
+-  --success-50: #dffee6;
++  /* Gris neutres (sans teinte) */
++  --grey-1000: #0a0a0a;
++  --grey-900: #1f1f1f;
++  --grey-800: #3d3d3d; /* texte de légende long */
++  --grey-600: #5c5c5c; /* métadonnées — 6,6:1 sur blanc */
++  --grey-500: #767676; /* désactivé — 4,5:1 sur blanc */
++  --grey-300: #d9d9d9;
++  --grey-100: #f2f2f2; /* zones sans donnée, survols */
+ 
++  /* Retours (sobres : un carré de couleur + texte, jamais un fond plein) */
++  --success-700: #18753c;
+   --warning-700: #b34000;
+-  --warning-100: #ffe9c2;
+-  --warning-50: #fff4e6;
+-
+-  --error-700: #ce0500;
+-  --error-100: #ffe9e9;
+-  --error-50: #fff4f4;
+-
+-  --info-700: #0063cb;
+-  --info-100: #e8edff;
+-  --info-50: #f4f6ff;
+-
+-  /* Semantic aliases */
+-  --text-strong: var(--grey-1000);
+-  --text-body: var(--grey-900);
+-  --text-secondary: var(--grey-700);
+-  --text-muted: var(--grey-500);
+-  --text-on-accent: var(--blanc);
+-  --text-link: var(--bleu-france);
+-  --text-link-hover: var(--blue-700);
+-
+-  --surface-page: var(--grey-50);
+-  --surface-card: var(--blanc);
+-  --surface-raised: var(--blanc);
++  --error-700: #e1000f;
++  --info-700: #000091;
++
++  /* Alias sémantiques (noms v1 conservés) */
++  --text-strong: var(--ink);
++  --text-body: var(--ink);
++  --text-secondary: var(--grey-600);
++  --text-muted: var(--grey-600);
++  --text-caption: var(--grey-800);
++  --text-on-accent: var(--paper);
++  --text-link: var(--ink);
++  --text-link-hover: var(--bleu-france);
++
++  --surface-page: var(--paper);
++  --surface-card: var(--paper);
++  --surface-raised: var(--paper);
+   --surface-sunken: var(--grey-100);
+-  --surface-inverse: var(--grey-1000);
++  --surface-inverse: var(--ink);
+   --surface-accent: var(--bleu-france);
+-  --surface-accent-soft: var(--blue-100);
++  --surface-accent-soft: var(--blue-50);
+ 
+-  --border-default: var(--grey-300);
+-  --border-strong: var(--grey-400);
+-  --border-subtle: var(--grey-200);
++  --border-default: var(--rule);
++  --border-strong: var(--rule);
++  --border-subtle: var(--rule-soft);
+   --border-accent: var(--bleu-france);
+-  --border-focus: var(--blue-700);
++  --border-focus: var(--bleu-france);
+ 
+-  --action: var(--bleu-france);
+-  --action-hover: var(--blue-700);
+-  --action-active: var(--blue-600);
+-  --action-soft: var(--blue-100);
+-  --action-soft-hover: var(--blue-200);
++  --action: var(--ink);
++  --action-hover: var(--bleu-france);
++  --action-active: var(--blue-900);
++  --action-accent: var(--bleu-france);
++  --action-soft: var(--grey-100);
+ 
+-  --focus-ring: 0 0 0 2px var(--blanc), 0 0 0 4px var(--blue-600);
++  --focus-ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--bleu-france);
+ }
+ 
+-/* ---- tokens/typography.css --------------------------------------------- */
++/* ---- Typographie ---------------------------------------------------- */
+ 
+ :root {
+-  --font-display: "Spectral", Georgia, "Times New Roman", serif;
+-  --font-sans: "Hanken Grotesk", "Marianne", -apple-system, BlinkMacSystemFont, "Segoe UI",
+-    system-ui, sans-serif;
++  --font-display: "Hanken Grotesk", "Helvetica Neue", Helvetica, sans-serif;
++  --font-sans: "Hanken Grotesk", "Helvetica Neue", Helvetica, -apple-system, system-ui,
++    sans-serif;
+   --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+ 
+   --fw-regular: 400;
+@@ -125,56 +109,50 @@
+   --fw-semibold: 600;
+   --fw-bold: 700;
+   --fw-extrabold: 800;
+-
+-  /* Type scale (1.200 minor third, 16px base) */
+-  --text-2xs: 0.6875rem; /* 11px — overlines, table meta */
+-  --text-xs: 0.75rem; /* 12px — captions, légendes */
+-  --text-sm: 0.875rem; /* 14px — secondary, dense UI */
+-  --text-base: 1rem; /* 16px — body */
+-  --text-md: 1.125rem; /* 18px — lead body */
+-  --text-lg: 1.375rem; /* 22px — H4 / card titles */
+-  --text-xl: 1.75rem; /* 28px — H3 */
+-  --text-2xl: 2.25rem; /* 36px — H2 / page titles */
+-  --text-3xl: 2.9375rem; /* 47px — H1 */
+-  --text-4xl: 3.75rem; /* 60px — display / hero */
+-  --text-5xl: 4.75rem; /* 76px — big editorial numbers */
+-
+-  --leading-tight: 1.1;
+-  --leading-snug: 1.25;
++  --fw-black: 900;
++
++  --text-2xs: 0.6875rem; /* 11 */
++  --text-xs: 0.75rem; /* 12 — légendes, libellés capitales */
++  --text-sm: 0.8125rem; /* 13 */
++  --text-base: 1rem; /* 16 — courant */
++  --text-md: 1.125rem; /* 18 — valeur de champ */
++  --text-lg: 1.375rem; /* 22 — titre 2 */
++  --text-xl: 2rem; /* 32 */
++  --text-2xl: clamp(2.25rem, 4.5vw, 4.5rem); /* 36→72 — titre 1 */
++  --text-3xl: clamp(3rem, 8vw, 7.5rem); /* 48→120 — titre de page */
++  --text-4xl: clamp(3.5rem, 11vw, 10.5rem); /* 56→168 — display */
++
++  --leading-display: 0.88;
++  --leading-tight: 0.95;
++  --leading-snug: 1.15;
+   --leading-normal: 1.5;
+-  --leading-relaxed: 1.65;
++  --leading-relaxed: 1.55;
+ 
+-  --tracking-tight: -0.02em;
++  --tracking-display: -0.045em;
++  --tracking-tight: -0.035em;
+   --tracking-normal: 0;
+-  --tracking-wide: 0.04em;
+-  --tracking-overline: 0.12em;
++  --tracking-wide: 0.02em;
++  --tracking-overline: 0.04em;
+ 
+-  /* Rôles sémantiques */
+-  --type-hero-family: var(--font-display);
+-  --type-hero-size: var(--text-4xl);
+-  --type-hero-weight: var(--fw-semibold);
+-  --type-hero-leading: var(--leading-tight);
+-  --type-hero-tracking: var(--tracking-tight);
++  /* Rôles */
++  --type-display-size: var(--text-4xl);
++  --type-display-weight: var(--fw-black);
+ 
+   --type-h1-family: var(--font-display);
+   --type-h1-size: var(--text-3xl);
+-  --type-h1-weight: var(--fw-semibold);
++  --type-h1-weight: var(--fw-black);
+ 
+   --type-h2-family: var(--font-display);
+   --type-h2-size: var(--text-2xl);
+-  --type-h2-weight: var(--fw-medium);
++  --type-h2-weight: var(--fw-extrabold);
+ 
+   --type-h3-family: var(--font-sans);
+-  --type-h3-size: var(--text-xl);
+-  --type-h3-weight: var(--fw-bold);
+-
+-  --type-h4-family: var(--font-sans);
+-  --type-h4-size: var(--text-lg);
+-  --type-h4-weight: var(--fw-semibold);
++  --type-h3-size: var(--text-lg);
++  --type-h3-weight: var(--fw-extrabold);
+ 
+   --type-overline-family: var(--font-sans);
+-  --type-overline-size: var(--text-2xs);
+-  --type-overline-weight: var(--fw-semibold);
++  --type-overline-size: var(--text-xs);
++  --type-overline-weight: var(--fw-medium);
+   --type-overline-tracking: var(--tracking-overline);
+ 
+   --type-body-family: var(--font-sans);
+@@ -183,12 +161,12 @@
+   --type-body-leading: var(--leading-relaxed);
+ 
+   --type-caption-family: var(--font-sans);
+-  --type-caption-size: var(--text-xs);
++  --type-caption-size: var(--text-sm);
+ 
+   --type-data-family: var(--font-mono);
+ }
+ 
+-/* ---- tokens/spacing.css -------------------------------------------------- */
++/* ---- Espacement (grille de 4 px) ------------------------------------ */
+ 
+ :root {
+   --space-0: 0;
+@@ -196,120 +174,92 @@
+   --space-2: 0.5rem; /* 8 */
+   --space-3: 0.75rem; /* 12 */
+   --space-4: 1rem; /* 16 */
+-  --space-5: 1.25rem; /* 20 */
+   --space-6: 1.5rem; /* 24 */
+   --space-8: 2rem; /* 32 */
+-  --space-10: 2.5rem; /* 40 */
+   --space-12: 3rem; /* 48 */
+-  --space-16: 4rem; /* 64 */
+   --space-20: 5rem; /* 80 */
+-  --space-24: 6rem; /* 96 */
++  --space-30: 7.5rem; /* 120 */
++  --space-40: 10rem; /* 160 */
+ 
+   --gap-inline: var(--space-2);
+   --gap-control: var(--space-3);
+-  --gap-card: var(--space-6);
+-  --gap-section: var(--space-12);
+-
+-  --pad-control-y: 0.5rem;
+-  --pad-control-x: 0.875rem;
+-  --pad-card: var(--space-6);
+-  --pad-page: var(--space-8);
++  --gap-card: var(--space-8);
++  --gap-section: var(--space-30);
+ 
+   --sidebar-width: 244px;
+-  --content-max: 1180px;
+-  --container-max: 1320px;
++  --content-max: 1440px;
+ 
+-  --control-h-sm: 32px;
+-  --control-h-md: 40px;
+-  --control-h-lg: 48px;
++  --control-h: 44px; /* cible tactile minimale */
+ }
+ 
+-/* ---- tokens/elevation.css ------------------------------------------------ */
++/* ---- Forme ------------------------------------------------------------ */
+ 
+ :root {
+-  --radius-0: 0;
+-  --radius-sm: 4px;
+-  --radius-md: 6px; /* default — contrôles, tags */
+-  --radius-lg: 10px; /* cards, panneaux */
+-  --radius-xl: 16px; /* grandes surfaces, modales */
+-  --radius-pill: 999px;
++  --radius-0: 0; /* surfaces, cartes, images */
++  --radius-md: 8px; /* boutons, champs, étiquettes */
++  --radius-lg: 0; /* alias v1 : les cartes n'ont plus d'arrondi */
+ 
+   --border-w: 1px;
+   --border-w-strong: 2px;
+-  --border-accent-w: 3px; /* barre d'accent gauche/haut */
+ 
+-  --shadow-none: none;
+-  --shadow-xs: 0 1px 2px rgba(22, 22, 22, 0.06);
+-  --shadow-sm: 0 1px 3px rgba(22, 22, 22, 0.08), 0 1px 2px rgba(22, 22, 22, 0.04);
+-  --shadow-md: 0 4px 12px rgba(22, 22, 22, 0.08), 0 1px 3px rgba(22, 22, 22, 0.05);
+-  --shadow-lg: 0 12px 28px rgba(22, 22, 22, 0.12), 0 2px 6px rgba(22, 22, 22, 0.06);
+-  --shadow-overlay: 0 16px 40px rgba(22, 22, 22, 0.18);
+-
+-  --shadow-tile: inset 0 -1px 0 0 var(--grey-200);
++  --shadow-none: none; /* v2 : aucune ombre */
++  --shadow-sm: none;
++  --shadow-md: none;
++  --shadow-lg: none;
+ }
+ 
+-/* ---- tokens/motion.css ---------------------------------------------------- */
++/* ---- Mouvement -------------------------------------------------------- */
+ 
+ :root {
+-  --duration-instant: 80ms;
+   --duration-fast: 140ms;
+   --duration-base: 220ms;
+   --duration-slow: 360ms;
+-
+   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+-  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+-
+   --transition-colors: color var(--duration-fast) var(--ease-standard),
+     background-color var(--duration-fast) var(--ease-standard),
+     border-color var(--duration-fast) var(--ease-standard);
+-  --transition-base: all var(--duration-base) var(--ease-standard);
+ }
+ 
+ @media (prefers-reduced-motion: reduce) {
+   :root {
+-    --duration-instant: 0ms;
+     --duration-fast: 0ms;
+     --duration-base: 0ms;
+     --duration-slow: 0ms;
+   }
+ }
+ 
+-/* ---- tokens/data-viz.css --------------------------------------------------- */
++/* ---- Data-viz (inchangé — source : code de l'app) --------------------- */
+ 
+ :root {
+-  /* Nuances politiques (gauche → droite) */
+-  --nuance-exg: #8b0000; /* Extrême gauche */
+-  --nuance-gau: #e84c61; /* Gauche */
+-  --nuance-div: #9e9e9e; /* Divers / non classé */
+-  --nuance-cent: #f5b800; /* Centre */
+-  --nuance-dte: #3b7dd8; /* Droite */
+-  --nuance-exd: #1f3864; /* Extrême droite */
+-
+-  /* Choroplèthe population (YlOrRd, 5 classes) */
+-  --choro-pop-1: #ffffb2; /* faible */
++  --nuance-exg: #8b0000;
++  --nuance-gau: #e84c61;
++  --nuance-div: #9e9e9e;
++  --nuance-cent: #f5b800;
++  --nuance-dte: #3b7dd8;
++  --nuance-exd: #1f3864;
++
++  --choro-pop-1: #ffffb2;
+   --choro-pop-2: #fecc5c;
+   --choro-pop-3: #fd8d3c;
+   --choro-pop-4: #f03b20;
+-  --choro-pop-5: #bd0026; /* forte */
++  --choro-pop-5: #bd0026;
+ 
+-  /* Choroplèthe évolution (RdYlGn, divergente) */
+-  --choro-evo-1: #d73027; /* forte baisse */
++  --choro-evo-1: #d73027;
+   --choro-evo-2: #fc8d59;
+-  --choro-evo-3: #ffffbf; /* stable */
++  --choro-evo-3: #ffffbf;
+   --choro-evo-4: #91cf60;
+-  --choro-evo-5: #1a9850; /* forte hausse */
++  --choro-evo-5: #1a9850;
+ 
+-  /* Carte */
+-  --map-contour-fill: #f7f7f7; /* niveaux sans données */
+-  --map-contour-stroke: #000091; /* contours bleu France */
+-  --map-tile-bg: #fafafa; /* fond de tuile CartoDB positron */
+-  --map-stroke-on-fill: #ffffff; /* séparateur entre polygones */
+-  --map-secret-fill: #cccccc; /* secret statistique INSEE */
++  --map-contour-fill: #f7f7f7;
++  --map-contour-stroke: #000091;
++  --map-tile-bg: #fafafa;
++  --map-stroke-on-fill: #ffffff;
++  --map-secret-fill: #cccccc;
+ }
+ 
+ /* ================================================================
+-   2. DÉFAUTS D'ÉLÉMENTS — tokens/base.css
++   2. DÉFAUTS D'ÉLÉMENTS
+    ================================================================ */
+ 
+ *,
+@@ -327,119 +277,151 @@ samp {
+ 
+ :focus-visible {
+   outline: 2px solid var(--border-focus);
+-  outline-offset: 2px;
++  outline-offset: 3px;
+ }
+ 
+ ::selection {
+-  background: var(--blue-100);
+-  color: var(--bleu-france);
++  background: var(--ink);
++  color: var(--paper);
+ }
+ 
+-/* figures tabulaires pour les données chiffrées (codes INSEE, tableaux) */
+ .mdi-tnum {
+   font-variant-numeric: tabular-nums;
+ }
+ 
+ /* ================================================================
+-   3. COUCHE D'APPLICATION STREAMLIT
++   3. COUCHE D'APPLICATION STREAMLIT (sélecteurs data-testid, 1.57)
+    ------------------------------------------------------------
+-   Sélecteurs `data-testid`, cf. reports/research-streamlit-css-
+-   selectors.md (Streamlit 1.57.0). On évite volontairement les
+-   classes `.st-emotion-cache-*` (générées dynamiquement, non
+-   pérennes). Limitations connues : le contenu de st.dataframe est
+-   dessiné en <canvas> (glide-data-grid) et n'est pas stylable en
+-   CSS ; les composants encapsulés en <iframe> (streamlit-folium)
+-   ne reçoivent pas ce CSS.
++   Limites connues : st.dataframe est dessiné en <canvas> (cellules non
++   stylables en CSS) ; streamlit-folium vit dans une <iframe>.
+    ================================================================ */
+ 
+-/* ---- Fond de page & typographie globale --------------------------- */
++/* ---- Fond & typographie globale -------------------------------------- */
+ 
+-[data-testid="stAppViewContainer"] {
++[data-testid="stAppViewContainer"],
++[data-testid="stMain"] {
+   background: var(--surface-page);
+   font-family: var(--font-sans);
+   color: var(--text-body);
+ }
+ 
+-[data-testid="stMain"] {
+-  background: var(--surface-page);
++[data-testid="stMainBlockContainer"] {
++  max-width: var(--content-max);
++  padding-top: var(--space-8);
+ }
+ 
+-/* ---- Sidebar / navigation ------------------------------------------ */
++[data-testid="stMarkdownContainer"] a {
++  color: var(--text-link);
++  text-decoration-thickness: 1px;
++  text-underline-offset: 3px;
++}
++
++[data-testid="stMarkdownContainer"] a:hover {
++  color: var(--text-link-hover);
++}
++
++/* ---- Sidebar : liste éditoriale en capitales ------------------------- */
+ 
+ [data-testid="stSidebar"] {
+-  background: var(--surface-card);
+-  border-right: var(--border-w) solid var(--border-subtle);
++  background: var(--paper);
++  border-right: var(--border-w) solid var(--rule);
+ }
+ 
+ [data-testid="stSidebarNavLink"] {
+-  color: var(--text-body) !important;
+-  border-radius: var(--radius-md);
++  color: var(--ink) !important;
++  border-radius: 0;
++  border-bottom: var(--border-w) solid var(--rule-soft);
++  min-height: var(--control-h);
+   transition: var(--transition-colors);
+ }
+ 
+-/* Streamlit rend le libellé dans un noeud enfant (span/p) qui porte
+-   parfois sa propre couleur ; on force l'héritage pour éviter un
+-   texte illisible (ex. blanc sur blanc en thème clair). */
+ [data-testid="stSidebarNavLink"] span,
+ [data-testid="stSidebarNavLink"] p {
+   color: inherit !important;
+ }
+ 
++[data-testid="stSidebarNavLink"] p {
++  font-size: var(--text-xs);
++  font-weight: var(--fw-semibold);
++  letter-spacing: var(--tracking-overline);
++  text-transform: uppercase;
++}
++
++[data-testid="stSidebarNavLink"]:hover {
++  background: var(--grey-100);
++}
++
+ [data-testid="stSidebarNavLink"][aria-current="page"] {
+-  background: var(--action-soft);
+-  color: var(--action) !important;
+-  border-left: var(--border-accent-w) solid var(--bleu-france);
++  background: var(--ink);
++  color: var(--paper) !important;
+ }
+ 
+-/* ---- Titres ---------------------------------------------------------- */
++/* ---- Titres ------------------------------------------------------------ */
+ 
+-[data-testid="stHeading"] h1 {
++[data-testid="stHeading"] h1,
++[data-testid="stMarkdownContainer"] h1 {
+   font-family: var(--type-h1-family);
+   font-size: var(--type-h1-size);
+   font-weight: var(--type-h1-weight);
+-  line-height: var(--leading-tight);
+-  letter-spacing: var(--tracking-tight);
++  line-height: var(--leading-display);
++  letter-spacing: var(--tracking-display);
++  text-transform: uppercase;
+   color: var(--text-strong);
+ }
+ 
+-[data-testid="stHeading"] h2 {
++/* H2 (st.subheader / ##) : filet au-dessus, capitales grasses */
++[data-testid="stHeading"] h2,
++[data-testid="stMarkdownContainer"] h2 {
+   font-family: var(--type-h2-family);
+-  font-size: var(--type-h2-size);
++  font-size: clamp(1.75rem, 3vw, 2.75rem);
+   font-weight: var(--type-h2-weight);
+-  line-height: var(--leading-snug);
++  line-height: var(--leading-tight);
+   letter-spacing: var(--tracking-tight);
++  text-transform: uppercase;
+   color: var(--text-strong);
++  border-top: var(--border-w) solid var(--rule);
++  padding-top: var(--space-6);
++  margin-top: var(--space-12);
+ }
+ 
+-[data-testid="stHeading"] h3 {
++[data-testid="stHeading"] h3,
++[data-testid="stMarkdownContainer"] h3 {
+   font-family: var(--type-h3-family);
+   font-size: var(--type-h3-size);
+   font-weight: var(--type-h3-weight);
+   line-height: var(--leading-snug);
++  text-transform: uppercase;
+   color: var(--text-strong);
+ }
+ 
+-/* ---- Métriques (st.metric) ------------------------------------------- */
++/* ---- Légendes (st.caption) — sources et limites ------------------------ */
+ 
+-[data-testid="stMetric"] {
+-  background: var(--surface-card);
+-  border: var(--border-w) solid var(--border-subtle);
+-  border-radius: var(--radius-lg);
+-  padding: var(--space-4);
+-  box-shadow: var(--shadow-sm);
+-  transition: transform var(--duration-base) var(--ease-out),
+-    box-shadow var(--duration-base) var(--ease-out);
++[data-testid="stCaptionContainer"],
++[data-testid="stCaptionContainer"] p {
++  font-family: var(--font-sans);
++  font-size: var(--type-caption-size);
++  color: var(--text-caption) !important;
++  opacity: 1;
++  line-height: var(--leading-normal);
+ }
+ 
+-[data-testid="stMetric"]:hover {
+-  transform: translateY(-2px);
+-  box-shadow: var(--shadow-lg);
++/* ---- Métriques : le chiffre est le titre ------------------------------- */
++
++[data-testid="stMetric"] {
++  background: transparent;
++  border: none;
++  border-top: var(--border-w) solid var(--rule);
++  border-radius: 0;
++  padding: var(--space-4) 0 var(--space-2);
+ }
+ 
+ [data-testid="stMetricValue"] {
+-  font-family: var(--font-mono);
++  font-family: var(--font-display);
++  font-size: clamp(2.25rem, 3.6vw, 3.5rem);
++  font-weight: var(--fw-black);
++  line-height: 0.95;
++  letter-spacing: -0.04em;
+   font-variant-numeric: tabular-nums;
+-  font-weight: var(--fw-semibold);
+   color: var(--text-strong);
+ }
+ 
+@@ -449,14 +431,10 @@ samp {
+   font-weight: var(--type-overline-weight);
+   letter-spacing: var(--type-overline-tracking);
+   text-transform: uppercase;
+-  color: var(--text-muted);
++  color: var(--ink);
+ }
+ 
+-/* Libellés longs (ex. "Extrême gauche") sur métriques étroites (rangées de 6+
+-   colonnes) : Streamlit tronque par défaut avec ellipsis sur le <p> interne
+-   (stMarkdownContainer > p), pas sur le conteneur — cibler le <p> directement,
+-   overflow/white-space ne s'héritent pas des ancêtres. Vérifié par inspection
+-   DOM live (Streamlit 1.57). */
++/* Libellés longs : le <p> interne porte l'ellipsis (cf. rapport 2026-08-19) */
+ [data-testid="stMetricLabel"] p {
+   overflow: visible !important;
+   white-space: normal !important;
+@@ -465,119 +443,229 @@ samp {
+ 
+ [data-testid="stMetricDelta"] {
+   font-family: var(--font-mono);
+-  font-size: var(--text-sm);
++  font-size: var(--text-xs);
+ }
+ 
+-/* ---- Boutons & contrôles ------------------------------------------------- */
++/* ---- Boutons --------------------------------------------------------------
++   Primaire = encre pleine ; secondaire = contour 1 px ; survol = Bleu France. */
+ 
+-[data-testid="stButton"] button {
++[data-testid="stButton"] button,
++[data-testid="stDownloadButton"] button,
++[data-testid="stFormSubmitButton"] button {
++  min-height: var(--control-h);
++  padding: 0 var(--space-6);
+   font-family: var(--font-sans);
+-  font-weight: var(--fw-medium);
+-  background: var(--action);
+-  color: var(--text-on-accent);
+-  border: none;
++  font-size: var(--text-xs);
++  font-weight: var(--fw-semibold);
++  letter-spacing: var(--tracking-overline);
++  text-transform: uppercase;
++  background: var(--paper);
++  color: var(--ink);
++  border: var(--border-w) solid var(--ink);
+   border-radius: var(--radius-md);
+-  transition: var(--transition-colors), transform var(--duration-instant) var(--ease-standard);
++  box-shadow: none;
++  transition: var(--transition-colors);
+ }
+ 
+-[data-testid="stButton"] button:hover {
+-  background: var(--action-hover);
++[data-testid="stButton"] button p,
++[data-testid="stDownloadButton"] button p,
++[data-testid="stFormSubmitButton"] button p {
++  font-size: inherit;
++  font-weight: inherit;
+ }
+ 
+-[data-testid="stButton"] button:active {
++[data-testid="stButton"] button[kind="primary"],
++[data-testid="stFormSubmitButton"] button[kind="primaryFormSubmit"] {
++  background: var(--ink);
++  color: var(--paper);
++}
++
++[data-testid="stDownloadButton"] button {
++  background: var(--bleu-france);
++  border-color: var(--bleu-france);
++  color: var(--paper);
++}
++
++[data-testid="stButton"] button:hover,
++[data-testid="stDownloadButton"] button:hover,
++[data-testid="stFormSubmitButton"] button:hover {
++  background: var(--bleu-france);
++  border-color: var(--bleu-france);
++  color: var(--paper);
++}
++
++[data-testid="stButton"] button:active,
++[data-testid="stDownloadButton"] button:active {
+   background: var(--action-active);
+-  transform: scale(0.97);
++  transform: translateY(1px);
++}
++
++/* ---- Liens de page (st.page_link) ---------------------------------------- */
++
++[data-testid="stPageLink"] a {
++  min-height: var(--control-h);
++  border-radius: 0;
++}
++
++[data-testid="stPageLink"] a p {
++  font-family: var(--font-display);
++  font-weight: var(--fw-black);
++  font-size: var(--text-lg);
++  letter-spacing: -0.01em;
++  text-transform: uppercase;
++  color: var(--ink);
++}
++
++[data-testid="stPageLink"] a:hover {
++  background: transparent;
++}
++
++[data-testid="stPageLink"] a:hover,
++[data-testid="stPageLink"] a:hover p {
++  color: var(--bleu-france);
++}
++
++/* ---- Champs : libellé capitales, champ souligné ------------------------- */
++
++[data-testid="stWidgetLabel"] p {
++  font-family: var(--font-sans);
++  font-size: var(--text-xs);
++  font-weight: var(--fw-medium);
++  letter-spacing: var(--tracking-overline);
++  text-transform: uppercase;
++  color: var(--grey-600);
+ }
+ 
+-[data-testid="stSelectbox"],
+-[data-testid="stRadio"] {
++[data-testid="stSelectbox"] [data-baseweb="select"] > div,
++[data-testid="stMultiSelect"] [data-baseweb="select"] > div,
++[data-testid="stTextInput"] [data-baseweb="input"],
++[data-testid="stNumberInput"] [data-baseweb="input"] {
++  min-height: var(--control-h);
++  background: var(--paper);
++  border: none;
++  border-bottom: var(--border-w) solid var(--ink);
++  border-radius: 0;
+   font-family: var(--font-sans);
++  font-weight: var(--fw-bold);
+ }
+ 
+-/* ---- Onglets (st.tabs) --------------------------------------------------- */
++[data-testid="stSelectbox"] [data-baseweb="select"] > div:focus-within,
++[data-testid="stMultiSelect"] [data-baseweb="select"] > div:focus-within,
++[data-testid="stTextInput"] [data-baseweb="input"]:focus-within,
++[data-testid="stNumberInput"] [data-baseweb="input"]:focus-within {
++  border-bottom: var(--border-w-strong) solid var(--bleu-france);
++}
++
++/* Étiquettes de st.multiselect : carrées, contour encre */
++[data-testid="stMultiSelect"] [data-baseweb="tag"] {
++  background: var(--paper);
++  color: var(--ink);
++  border: var(--border-w) solid var(--ink);
++  border-radius: var(--radius-md);
++}
++
++/* ---- Onglets : capitales, soulignement encre --------------------------- */
++
++[data-testid="stTabs"] [data-baseweb="tab-list"] {
++  border-bottom: var(--border-w) solid var(--rule);
++  gap: var(--space-6);
++}
+ 
+ [data-testid="stTabs"] [data-testid="stTab"] {
++  min-height: var(--control-h);
+   font-family: var(--font-sans);
+-  color: var(--text-secondary);
++  color: var(--grey-600);
+   transition: var(--transition-colors);
+ }
+ 
++[data-testid="stTabs"] [data-testid="stTab"] p {
++  font-size: var(--text-xs);
++  font-weight: var(--fw-semibold);
++  letter-spacing: var(--tracking-overline);
++  text-transform: uppercase;
++}
++
+ [data-testid="stTabs"] [data-testid="stTab"][aria-selected="true"] {
+-  color: var(--action);
+-  border-bottom: var(--border-accent-w) solid var(--bleu-france);
++  color: var(--ink);
++}
++
++[data-testid="stTabs"] [data-baseweb="tab-highlight"] {
++  background: var(--ink);
++  height: 3px;
+ }
+ 
+-/* ---- Dataframe (cadre uniquement — cellules en <canvas>, non stylables) -- */
++/* ---- Dataframe (cadre uniquement) ---------------------------------------- */
+ 
+ [data-testid="stDataFrame"] {
+-  border: var(--border-w) solid var(--border-default);
+-  border-radius: var(--radius-md);
+-  overflow: hidden;
++  border: none;
++  border-top: var(--border-w) solid var(--rule);
++  border-radius: 0;
+ }
+ 
+-/* ---- Expander ------------------------------------------------------------ */
++/* ---- Expander --------------------------------------------------------------- */
+ 
+-[data-testid="stExpander"] {
+-  border: var(--border-w) solid var(--border-subtle);
+-  border-radius: var(--radius-md);
++[data-testid="stExpander"] details {
++  border: none;
++  border-top: var(--border-w) solid var(--rule);
++  border-radius: 0;
+ }
+ 
+-/* ---- Callouts (st.info / warning / success / error) ----------------------- */
+-
+-[data-testid="stAlertContentInfo"] {
+-  background: var(--info-50);
+-  color: var(--info-700);
++[data-testid="stExpander"] summary p {
++  font-size: var(--text-xs);
++  font-weight: var(--fw-semibold);
++  letter-spacing: var(--tracking-overline);
++  text-transform: uppercase;
+ }
+ 
+-[data-testid="stAlertContentWarning"] {
+-  background: var(--warning-50);
+-  color: var(--warning-700);
++/* ---- Alertes : filet au-dessus + carré de couleur, jamais de boîte pleine -- */
++
++[data-testid="stAlert"] > div {
++  background: transparent !important;
++  border: none;
++  border-top: var(--border-w) solid var(--rule);
++  border-radius: 0;
++  color: var(--ink) !important;
++  padding-left: 0;
++  padding-right: 0;
+ }
+ 
+-[data-testid="stAlertContentSuccess"] {
+-  background: var(--success-50);
+-  color: var(--success-700);
++[data-testid="stAlertContentInfo"] svg,
++[data-testid="stAlertContentInfo"] [data-testid="stAlertDynamicIcon"] {
++  color: var(--bleu-france);
+ }
+ 
+-[data-testid="stAlertContentError"] {
+-  background: var(--error-50);
+-  color: var(--error-700);
++[data-testid="stAlertContentWarning"] svg,
++[data-testid="stAlertContentError"] svg {
++  color: var(--rouge-marianne);
+ }
+ 
+-[data-testid="stAlert"] {
+-  border-radius: var(--radius-md);
++[data-testid="stAlertContentSuccess"] svg {
++  color: var(--success-700);
+ }
+ 
+-/* ---- Cartes de synthèse (st.container(border=True)) ----------------------
+-   Sélecteur vérifié par inspection DOM live (Streamlit 1.57.0) : le
+-   conteneur réellement bordé est le `stVerticalBlock` enfant direct de
+-   `stLayoutWrapper` — PAS `stVerticalBlockBorderWrapper` (ce testid
+-   n'existe pas dans cette version, cf. reports/brainstorm-ui-ux-design-
+-   system.md §5). Ne pas cibler `stVerticalBlock` seul : il est aussi
+-   utilisé pour des blocs non bordés (colonnes, sections). */
++/* ---- Séparateur (st.divider) ---------------------------------------------- */
+ 
+-[data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] {
+-  background: var(--surface-card);
+-  border-color: var(--border-subtle);
+-  border-radius: var(--radius-lg);
+-  box-shadow: var(--shadow-sm);
+-  padding: var(--space-4);
+-  transition: transform var(--duration-base) var(--ease-out),
+-    box-shadow var(--duration-base) var(--ease-out);
++[data-testid="stMarkdownContainer"] hr,
++hr {
++  border: none;
++  border-top: var(--border-w) solid var(--rule);
+ }
+ 
+-[data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]:hover {
+-  transform: translateY(-2px);
+-  box-shadow: var(--shadow-md);
+-  border-color: var(--border-accent);
++/* ---- Cartes (st.container(border=True)) -----------------------------------
++   v2 : pas de boîte — un filet encre au-dessus, fond papier, aucun arrondi.
++   Sélecteur vérifié en 1.57 : stLayoutWrapper > stVerticalBlock. */
++
++[data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] {
++  background: var(--paper);
++  border: none !important;
++  border-top: var(--border-w) solid var(--rule) !important;
++  border-radius: 0 !important;
++  box-shadow: none;
++  padding: var(--space-4) 0 var(--space-6);
+ }
+ 
+ /* ================================================================
+-   4. ICÔNES — Material Symbols Outlined
+-   ------------------------------------------------------------
+-   Remplace les emojis dans les titres de page (cf. _theme.py::
+-   render_page_header). Réglages de base recommandés par Google
+-   Fonts pour ce type de police variable.
++   4. COMPOSANTS HTML MAISON (_theme.py)
+    ================================================================ */
+ 
+ .material-symbols-outlined {
+@@ -596,43 +684,82 @@ samp {
+   vertical-align: middle;
+ }
+ 
+-/* ---- En-tête de page (icône + H1 + sous-titre) — _theme.py::render_page_header */
++/* ---- En-tête de page — render_page_header() ------------------------------- */
+ 
+ .mdi-page-header {
++  padding: var(--space-4) 0 var(--space-12);
++}
++
++.mdi-eyebrow {
+   display: flex;
+   align-items: center;
+-  gap: var(--space-3);
+-  margin-bottom: var(--space-1);
++  gap: var(--space-2);
++  margin: 0 0 var(--space-6);
++  font-family: var(--font-sans);
++  font-size: var(--text-xs);
++  font-weight: var(--fw-semibold);
++  letter-spacing: var(--tracking-overline);
++  text-transform: uppercase;
++  color: var(--ink);
++}
++
++.mdi-eyebrow .material-symbols-outlined {
++  font-size: 1.125rem;
+ }
+ 
+-.mdi-page-header h1 {
++.mdi-page-header .mdi-page-title {
+   margin: 0;
++  padding: 0;
++  font-family: var(--font-display);
++  font-size: var(--text-3xl);
++  font-weight: var(--fw-black);
++  line-height: var(--leading-display);
++  letter-spacing: var(--tracking-display);
++  text-transform: uppercase;
++  color: var(--ink);
+ }
+ 
+-.mdi-page-icon {
+-  font-size: 2.25rem;
+-  color: var(--bleu-france);
++.mdi-page-header .mdi-page-title--display {
++  font-size: var(--text-4xl);
+ }
+ 
+ .mdi-page-subtitle {
++  display: flex;
++  flex-direction: column;
++  gap: var(--space-3);
++  max-width: 22rem;
++  margin: var(--space-8) 0 0 clamp(0px, 40%, 40rem);
+   font-family: var(--font-sans);
+-  font-size: var(--text-md);
+-  color: var(--text-secondary);
+-  margin: 0 0 var(--space-4);
++  font-size: var(--text-sm);
++  line-height: var(--leading-normal);
++  letter-spacing: var(--tracking-wide);
++  text-transform: uppercase;
++  color: var(--ink);
++}
++
++.mdi-arrow {
++  width: 24px;
++  height: 24px;
++  color: var(--ink);
++}
++
++/* ---- Numéro de section (« 01 — ») — render_overline() ---------------------- */
++
++.mdi-overline {
++  margin: 0;
++  font-family: var(--font-mono);
++  font-size: var(--text-sm);
++  color: var(--grey-600);
+ }
+ 
+ /* ================================================================
+-   5. ANIMATIONS
+-   ------------------------------------------------------------
+-   Réutilise les tokens de durée/easing de tokens/motion.css.
+-   Respecte prefers-reduced-motion (durées ramenées à 0ms par les
+-   tokens eux-mêmes dans ce cas, cf. custom.css section 1).
++   5. MOUVEMENT
+    ================================================================ */
+ 
+-@keyframes mdi-fade-in-slide {
++@keyframes mdi-fade-in {
+   from {
+     opacity: 0;
+-    transform: translateY(8px);
++    transform: translateY(6px);
+   }
+   to {
+     opacity: 1;
+@@ -641,5 +768,5 @@ samp {
+ }
+ 
+ [data-testid="stMainBlockContainer"] {
+-  animation: mdi-fade-in-slide var(--duration-slow) var(--ease-out);
++  animation: mdi-fade-in var(--duration-slow) var(--ease-out);
+ }
+diff --git a/tests/test_theme.py b/tests/test_theme.py
+new file mode 100644
+index 0000000..7c6072a
+--- /dev/null
++++ b/tests/test_theme.py
+@@ -0,0 +1,57 @@
++"""Tests du module _theme (design system v2 « direction éditoriale », ADR-0007)."""
++
++from __future__ import annotations
++
++import plotly.io as pio
++
++from ministere_de_l_info import _theme
++
++
++def test_css_contient_tokens_v2() -> None:
++    css = _theme._load_css()
++    for token in ("--ink: #0a0a0a", "--paper: #ffffff", "--bleu-france: #000091"):
++        assert token in css
++
++
++def test_css_conserve_alias_v1() -> None:
++    """Les noms de tokens v1 restent définis (compatibilité)."""
++    css = _theme._load_css()
++    for alias in ("--surface-page:", "--text-strong:", "--radius-lg:", "--nuance-exg:"):
++        assert alias in css
++
++
++def test_css_sans_import() -> None:
++    """Les polices passent par une balise <link>, jamais par @import."""
++    lignes = _theme._load_css().splitlines()
++    assert not any(ligne.lstrip().startswith("@import") for ligne in lignes)
++
++
++def test_polices_sans_spectral() -> None:
++    assert "Spectral" not in _theme._GOOGLE_FONTS_URL
++    assert "Hanken+Grotesk" in _theme._GOOGLE_FONTS_URL
++
++
++def test_template_plotly_enregistre_par_defaut() -> None:
++    _theme.register_plotly_template()
++    assert pio.templates.default == _theme.PLOTLY_TEMPLATE_NAME
++    layout = pio.templates[_theme.PLOTLY_TEMPLATE_NAME].layout
++    assert layout.paper_bgcolor == _theme.PAPER
++    assert "Hanken Grotesk" in layout.font.family
++
++
++def test_page_header_echappe_html(monkeypatch) -> None:
++    captured: list[str] = []
++    monkeypatch.setattr(_theme.st, "markdown", lambda html, **_: captured.append(html))
++    _theme.render_page_header("map", "<b>Titre</b>", "Sous & titre")
++    html = captured[0]
++    assert "&lt;b&gt;Titre&lt;/b&gt;" in html
++    assert "Sous &amp; titre" in html
++    assert "mdi-page-title--display" not in html
++
++
++def test_page_header_display(monkeypatch) -> None:
++    captured: list[str] = []
++    monkeypatch.setattr(_theme.st, "markdown", lambda html, **_: captured.append(html))
++    _theme.render_page_header("flag", "Accueil", display=True)
++    assert "mdi-page-title--display" in captured[0]
++    assert "mdi-page-subtitle" not in captured[0]
+-- 
+2.43.0
+

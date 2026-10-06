@@ -1,0 +1,248 @@
+/* Ministère de l'Info — design system v2 « direction éditoriale » — TOKENS SEULS.
+   Fichier autonome : à lier dans n'importe quelle page HTML/CSS. Version Streamlit complète : streamlit/custom.css. */
+
+
+/* ---- Couleurs ------------------------------------------------------- */
+
+:root {
+  /* Fondamentaux v2 */
+  --ink: #0a0a0a; /* texte, filets, boutons primaires */
+  --paper: #ffffff; /* fond unique */
+  --rule: #0a0a0a; /* filet structurant 1 px */
+  --rule-soft: #d9d9d9; /* séparateur de lignes */
+
+  /* République — usage restreint */
+  --blanc: #ffffff;
+  --bleu-france: #000091; /* action, sélection, lien actif */
+  --rouge-marianne: #e1000f; /* alertes et limites uniquement */
+
+  /* Rampe Bleu France */
+  --blue-900: #00006b;
+  --blue-800: #000091;
+  --blue-700: #1212ff;
+  --blue-600: #2323ff;
+  --blue-200: #cacafb;
+  --blue-100: #e3e3fd;
+  --blue-50: #f0f0fe;
+
+  /* Rampe Rouge Marianne */
+  --red-800: #b81b22;
+  --red-700: #e1000f;
+  --red-100: #fddede;
+  --red-50: #fef4f4;
+
+  /* Gris neutres (sans teinte) */
+  --grey-1000: #0a0a0a;
+  --grey-900: #1f1f1f;
+  --grey-800: #3d3d3d; /* texte de légende long */
+  --grey-600: #5c5c5c; /* métadonnées — 6,6:1 sur blanc */
+  --grey-500: #767676; /* désactivé — 4,5:1 sur blanc */
+  --grey-300: #d9d9d9;
+  --grey-100: #f2f2f2; /* zones sans donnée, survols */
+
+  /* Retours (sobres : un carré de couleur + texte, jamais un fond plein) */
+  --success-700: #18753c;
+  --warning-700: #b34000;
+  --error-700: #e1000f;
+  --info-700: #000091;
+
+  /* Alias sémantiques (noms v1 conservés) */
+  --text-strong: var(--ink);
+  --text-body: var(--ink);
+  --text-secondary: var(--grey-600);
+  --text-muted: var(--grey-600);
+  --text-caption: var(--grey-800);
+  --text-on-accent: var(--paper);
+  --text-link: var(--ink);
+  --text-link-hover: var(--bleu-france);
+
+  --surface-page: var(--paper);
+  --surface-card: var(--paper);
+  --surface-raised: var(--paper);
+  --surface-sunken: var(--grey-100);
+  --surface-inverse: var(--ink);
+  --surface-accent: var(--bleu-france);
+  --surface-accent-soft: var(--blue-50);
+
+  --border-default: var(--rule);
+  --border-strong: var(--rule);
+  --border-subtle: var(--rule-soft);
+  --border-accent: var(--bleu-france);
+  --border-focus: var(--bleu-france);
+
+  --action: var(--ink);
+  --action-hover: var(--bleu-france);
+  --action-active: var(--blue-900);
+  --action-accent: var(--bleu-france);
+  --action-soft: var(--grey-100);
+
+  --focus-ring: 0 0 0 2px var(--paper), 0 0 0 4px var(--bleu-france);
+}
+
+/* ---- Typographie ---------------------------------------------------- */
+
+:root {
+  --font-display: "Hanken Grotesk", "Helvetica Neue", Helvetica, sans-serif;
+  --font-sans: "Hanken Grotesk", "Helvetica Neue", Helvetica, -apple-system, system-ui,
+    sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+  --fw-black: 900;
+
+  --text-2xs: 0.6875rem; /* 11 */
+  --text-xs: 0.75rem; /* 12 — légendes, libellés capitales */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-base: 1rem; /* 16 — courant */
+  --text-md: 1.125rem; /* 18 — valeur de champ */
+  --text-lg: 1.375rem; /* 22 — titre 2 */
+  --text-xl: 2rem; /* 32 */
+  --text-2xl: clamp(2.25rem, 4.5vw, 4.5rem); /* 36→72 — titre 1 */
+  --text-3xl: clamp(3rem, 8vw, 7.5rem); /* 48→120 — titre de page */
+  --text-4xl: clamp(3.5rem, 11vw, 10.5rem); /* 56→168 — display */
+
+  --leading-display: 0.88;
+  --leading-tight: 0.95;
+  --leading-snug: 1.15;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.55;
+
+  --tracking-display: -0.045em;
+  --tracking-tight: -0.035em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-overline: 0.04em;
+
+  /* Rôles */
+  --type-display-size: var(--text-4xl);
+  --type-display-weight: var(--fw-black);
+
+  --type-h1-family: var(--font-display);
+  --type-h1-size: var(--text-3xl);
+  --type-h1-weight: var(--fw-black);
+
+  --type-h2-family: var(--font-display);
+  --type-h2-size: var(--text-2xl);
+  --type-h2-weight: var(--fw-extrabold);
+
+  --type-h3-family: var(--font-sans);
+  --type-h3-size: var(--text-lg);
+  --type-h3-weight: var(--fw-extrabold);
+
+  --type-overline-family: var(--font-sans);
+  --type-overline-size: var(--text-xs);
+  --type-overline-weight: var(--fw-medium);
+  --type-overline-tracking: var(--tracking-overline);
+
+  --type-body-family: var(--font-sans);
+  --type-body-size: var(--text-base);
+  --type-body-weight: var(--fw-regular);
+  --type-body-leading: var(--leading-relaxed);
+
+  --type-caption-family: var(--font-sans);
+  --type-caption-size: var(--text-sm);
+
+  --type-data-family: var(--font-mono);
+}
+
+/* ---- Espacement (grille de 4 px) ------------------------------------ */
+
+:root {
+  --space-0: 0;
+  --space-1: 0.25rem; /* 4 */
+  --space-2: 0.5rem; /* 8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-6: 1.5rem; /* 24 */
+  --space-8: 2rem; /* 32 */
+  --space-12: 3rem; /* 48 */
+  --space-20: 5rem; /* 80 */
+  --space-30: 7.5rem; /* 120 */
+  --space-40: 10rem; /* 160 */
+
+  --gap-inline: var(--space-2);
+  --gap-control: var(--space-3);
+  --gap-card: var(--space-8);
+  --gap-section: var(--space-30);
+
+  --sidebar-width: 244px;
+  --content-max: 1440px;
+
+  --control-h: 44px; /* cible tactile minimale */
+}
+
+/* ---- Forme ------------------------------------------------------------ */
+
+:root {
+  --radius-0: 0; /* surfaces, cartes, images */
+  --radius-md: 8px; /* boutons, champs, étiquettes */
+  --radius-lg: 0; /* alias v1 : les cartes n'ont plus d'arrondi */
+
+  --border-w: 1px;
+  --border-w-strong: 2px;
+
+  --shadow-none: none; /* v2 : aucune ombre */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+/* ---- Mouvement -------------------------------------------------------- */
+
+:root {
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 360ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-colors: color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+
+/* ---- Data-viz (source : code de l'app) --------------------- */
+
+:root {
+  --nuance-exg: #8b0000;
+  --nuance-gau: #e84c61;
+  --nuance-div: #9e9e9e;
+  --nuance-cent: #f5b800;
+  --nuance-dte: #3b7dd8;
+  --nuance-exd: #1f3864;
+
+  --choro-pop-1: #ffffb2;
+  --choro-pop-2: #fecc5c;
+  --choro-pop-3: #fd8d3c;
+  --choro-pop-4: #f03b20;
+  --choro-pop-5: #bd0026;
+
+  /* Évolution de population : PuOr 5 classes, accessible daltonisme (décision J3,
+     identique à viz/_display.py::_COULEURS_EVOLUTION5) */
+  --choro-evo-1: #e66101;
+  --choro-evo-2: #fdb863;
+  --choro-evo-3: #f7f7f7;
+  --choro-evo-4: #b2abd2;
+  --choro-evo-5: #5e3c99;
+
+  --choro-nd: #5f6368; /* donnée non disponible (viz/_display.py::COULEUR_ND) */
+  --choro-zero: #f0ede6; /* classe « 0 » distincte (viz/_display.py::COULEUR_ZERO) */
+
+  --map-contour-fill: #f7f7f7;
+  --map-contour-stroke: #000091;
+  --map-tile-bg: #fafafa;
+  --map-stroke-on-fill: #ffffff;
+  --map-secret-fill: #cccccc;
+}
+

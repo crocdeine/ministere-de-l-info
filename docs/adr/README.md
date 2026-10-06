@@ -18,10 +18,12 @@ décision est révisée, un nouvel ADR est créé avec le statut "Remplace 000X"
 | [0006](0006-module-economie-sources-et-schema.md) | Module Économie — sources, indicateurs et schéma DuckDB | Accepté (note d'exécution 2026-09-24) |
 | [0007](0007-module-legislatif-perimetre-et-sources.md) | Module Législatif — périmètre national, sources Datan + data.senat.fr | Accepté (rédigé a posteriori le 2026-09-24) |
 | [0008](0008-economie-sources-complementaires.md) | Module Économie — sources complémentaires CNAF, DREES, URSSAF, Eurostat | Accepté (rédigé a posteriori le 2026-09-24) |
-| [0009](0009-design-system-et-navigation.md) | Design system et navigation `st.navigation()` / `st.Page()` | Accepté (rédigé a posteriori le 2026-09-24) |
+| [0009](0009-design-system-et-navigation.md) | Design system et navigation `st.navigation()` / `st.Page()` | Accepté (rédigé a posteriori le 2026-09-24) — révisé par 0014 |
 | [0010](0010-revision-nuances-et-blocs.md) | Révision des classements nuances → blocs : grilles 2020/2023/2026, doctrine, reclassements | Accepté — révise 0005 |
 | [0011](0011-legislatif-groupes-par-legislature.md) | Législatif — classement des groupes par législature et modèle de mandats | Accepté (décision Mathias 2026-09-24) |
 | [0012](0012-execution-native-mac.md) | Exécution native sur le Mac mini (uv + LaunchAgent), Docker en repli | Accepté (décision Mathias 2026-09-24) |
+| [0013](0013-licences-et-mentions-des-sources.md) | Licences du projet et mentions des sources | Accepté (décision Mathias 2026-10-04) |
+| [0014](0014-design-system-direction-editoriale.md) | Design system v2 — direction éditoriale | Accepté (2026-10-06) — révise 0009 |
 
 ## Format
 
