@@ -31,6 +31,9 @@ from ministere_de_l_info._theme import (
 from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz._display import (
     _COULEURS_YLORD5,
+    COULEUR_ND,
+    COULEUR_ZERO,
+    INDICATEURS_CLASSE_ZERO,
     NOTE_CLASSES_FIXES,
     _build_legend_html,
     _fmt_fr,
@@ -211,10 +214,19 @@ def _make_choropleth(df: pl.DataFrame, libelle: str, indicateur: str) -> folium.
     }
     a_des_valeurs = any(v is not None for v in valeurs.values())
 
+    classe_zero = indicateur in INDICATEURS_CLASSE_ZERO
+
+    def _couleur(v: float | None) -> str:
+        if v is None:
+            return COULEUR_ND
+        if classe_zero and v == 0:
+            return COULEUR_ZERO
+        return colormap(v)
+
     def _style(f: dict) -> dict:
         v = valeurs.get(f["properties"]["code_commune"])
         return {
-            "fillColor": "#CCCCCC" if v is None else colormap(v),
+            "fillColor": _couleur(v),
             "fillOpacity": 0.75 if v is not None else 0.5,
             "color": "#999999",
             "weight": 0.3,
@@ -230,7 +242,14 @@ def _make_choropleth(df: pl.DataFrame, libelle: str, indicateur: str) -> folium.
                     breaks,
                     _COULEURS_YLORD5,
                     fmt_fn=lambda x: _fmt_fr(x) if x >= 100 else f"{x:g}".replace(".", ","),
-                    note=NOTE_CLASSES_FIXES,
+                    note=NOTE_CLASSES_FIXES
+                    + (
+                        ". Euros courants, non corrigés de l'inflation"
+                        if indicateur == "niveau_vie_median"
+                        else ""
+                    ),
+                    avec_nd=any(v is None for v in valeurs.values()),
+                    avec_zero=classe_zero,
                 )
             )
         )

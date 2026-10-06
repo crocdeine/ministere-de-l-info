@@ -24,6 +24,7 @@ def nouvelle_carte(location: list[float], zoom_start: int) -> folium.Map:
     return m
 
 
+COULEUR_ND: str = "#5F6368"  # gris foncé : donnée non disponible (n.d.)
 _COULEURS_YLORD5: list[str] = ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"]
 _COULEUR_CONTOURS: str = "#4292c6"
 _COULEUR_FOND_CONTOURS: str = "#f7f7f7"
@@ -57,14 +58,20 @@ def _build_legend_html(
     colors: list[str],
     fmt_fn: Callable[[float], str] | None = None,
     note: str | None = None,
+    avec_nd: bool = False,
+    avec_zero: bool = False,
 ) -> str:
-    """Construit le HTML d'une légende discrète à fond blanc (contraste WCAG AA)."""
+    """Construit le HTML d'une légende discrète à fond blanc (contraste WCAG AA).
+
+    ``avec_nd`` ajoute la case grise « n.d. » (donnée non disponible ou secret statistique) ;
+    ``avec_zero`` ajoute la classe « 0 » et la première classe devient « > 0 et < … ».
+    """
     _fmt = fmt_fn if fmt_fn is not None else _fmt_fr
     rows = []
     for i, color in enumerate(colors):
         lo, hi = breaks[i], breaks[i + 1]
         if i == 0:
-            label = f"&lt; {_fmt(hi)}"
+            label = f"&gt; 0 et &lt; {_fmt(hi)}" if avec_zero else f"&lt; {_fmt(hi)}"
         elif i == len(colors) - 1:
             label = f"&ge; {_fmt(lo)}"
         else:
@@ -74,6 +81,23 @@ def _build_legend_html(
             f'<div style="width:20px;height:14px;background:{color};'
             f'border:1px solid #bbb;flex-shrink:0;"></div>'
             f'<span style="white-space:nowrap;">{label}</span>'
+            f"</div>"
+        )
+    if avec_zero:
+        rows.insert(
+            0,
+            f'<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">'
+            f'<div style="width:20px;height:14px;background:{COULEUR_ZERO};'
+            f'border:1px solid #bbb;flex-shrink:0;"></div>'
+            f'<span style="white-space:nowrap;">0 (aucun)</span>'
+            f"</div>",
+        )
+    if avec_nd:
+        rows.append(
+            f'<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;">'
+            f'<div style="width:20px;height:14px;background:{COULEUR_ND};'
+            f'border:1px solid #bbb;flex-shrink:0;"></div>'
+            f'<span style="white-space:nowrap;">n.d. (donnée non disponible)</span>'
             f"</div>"
         )
     rows_html = "\n".join(rows)
@@ -103,7 +127,7 @@ BORNES_FIXES: dict[str, list[float]] = {
     "population_municipale:circonscription": [0, 80e3, 100e3, 120e3, 140e3, _INF],
     "population_municipale:commune": [0, 500, 2e3, 10e3, 50e3, _INF],
     # Économie (communes HdF)
-    "taux_pauvrete": [0, 5, 10, 15, 20, 100],
+    "taux_pauvrete": [0, 10, 15, 20, 25, 100],  # décision Mathias 2026-10-06
     "niveau_vie_median": [0, 16e3, 19e3, 22e3, 25e3, _INF],
     "tx_chomage_dec": [0, 6, 9, 12, 15, 100],
     "part_ouvriers_employes": [0, 30, 40, 50, 60, 100],
@@ -113,6 +137,13 @@ BORNES_FIXES: dict[str, list[float]] = {
     "apl_medecins": [0, 2.5, 3.5, 4.5, 5.5, _INF],
 }
 NOTE_CLASSES_FIXES: str = "Classes fixes, identiques pour toutes les années"
+
+# Indicateurs où « 0 » (aucun logement social, aucun emploi industriel, aucun foyer RSA) est
+# fréquent : classe « 0 » distincte de « peu » (décision Mathias 2026-10-06).
+INDICATEURS_CLASSE_ZERO: frozenset[str] = frozenset(
+    {"part_emploi_industriel", "part_logements_sociaux", "nb_foyers_rsa"}
+)
+COULEUR_ZERO: str = "#F0EDE6"  # beige très clair, distinct de la 1re classe et du gris n.d.
 
 
 def bornes_fixes(cle: str) -> list[float]:

@@ -66,7 +66,7 @@ def test_carte_economie_memes_classes_deux_annees() -> None:
     h1, h2 = h1.get_root().render(), h2.get_root().render()
     for h in (h1, h2):
         assert "Classes fixes, identiques pour toutes les années" in h
-        assert "&lt; 5" in h and "&ge; 20" in h
+        assert "&lt; 10" in h and "&ge; 25" in h  # seuils 10/15/20/25 (Mathias 2026-10-06)
     # une valeur de 12 % reçoit la même couleur d'une année à l'autre
     couleur = re.search(r'"fillColor": "(#[0-9a-f]{6})"[^}]*', h1.split('"N1"')[0][-600:])
     assert couleur is None or couleur.group(1) in h2
@@ -90,7 +90,7 @@ def _couleurs_carte(scores: dict[str, int]) -> set[str]:
 
 
 def test_score_bloc_echelle_fixe_independante_du_maximum() -> None:
-    assert ECHELLE_SCORE_MAX == 60.0
+    assert ECHELLE_SCORE_MAX == 100.0  # 0-100 % à tous les tours (Mathias 2026-10-06)
     seule = _couleurs_carte({"A": 10})
     avec_max = _couleurs_carte({"A": 10, "B": 55})
     assert seule <= avec_max  # 10 % a la même teinte quel que soit le max de la carte
@@ -105,7 +105,7 @@ def test_score_bloc_echelle_fixe_independante_du_maximum() -> None:
         None,
         "t",
     )
-    assert "Échelle fixe 0-60 %" in m.get_root().render()
+    assert "Échelle fixe 0-100 %" in m.get_root().render()
 
 
 @pytest.mark.parametrize(
@@ -136,3 +136,19 @@ def test_trait_centre_assombri_sans_toucher_aux_remplissages() -> None:
     assert {k: v for k, v in t.items() if k != "CENT"} == {
         k: v for k, v in COULEURS_BLOCS.items() if k != "CENT"
     }
+
+
+def test_classe_zero_distincte() -> None:
+    """Indicateurs à zéros fréquents : « 0 » a sa propre couleur et sa ligne de légende."""
+    from ministere_de_l_info.viz._display import COULEUR_ZERO
+
+    html = (
+        economie._make_choropleth(
+            _df_eco([0.0, 3.0]), "Logements sociaux", "part_logements_sociaux"
+        )
+        .get_root()
+        .render()
+    )
+    assert COULEUR_ZERO in html and "0 (aucun)" in html and "&gt; 0 et &lt; 5" in html
+    autre = economie._make_choropleth(_df_eco([0.0, 3.0]), "Pauvreté", "taux_pauvrete")
+    assert "0 (aucun)" not in autre.get_root().render()

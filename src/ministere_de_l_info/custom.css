@@ -293,12 +293,6 @@
   --choro-pop-4: #f03b20;
   --choro-pop-5: #bd0026; /* forte */
 
-  /* Choroplèthe évolution (RdYlGn, divergente) */
-  --choro-evo-1: #d73027; /* forte baisse */
-  --choro-evo-2: #fc8d59;
-  --choro-evo-3: #ffffbf; /* stable */
-  --choro-evo-4: #91cf60;
-  --choro-evo-5: #1a9850; /* forte hausse */
 
   /* Carte */
   --map-contour-fill: #f7f7f7; /* niveaux sans données */

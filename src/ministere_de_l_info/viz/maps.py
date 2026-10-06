@@ -27,6 +27,7 @@ from ministere_de_l_info.viz._display import (
     _COULEURS_EVOLUTION5,
     _COULEURS_YLORD5,
     _SEUILS_EVOLUTION,
+    COULEUR_ND,
     NOTE_CLASSES_FIXES,
     _build_legend_html,
     _fmt_fr,
@@ -118,10 +119,16 @@ def make_choropleth(
     if mode_effectif == "choropleth":
         if is_evolution:
             for code, nom, delta_abs, delta_pct, geojson_str in rows:
-                v = float(delta_pct) if delta_pct is not None else 0.0
-                icon = "↗" if v > 1.0 else ("↘" if v < -1.0 else "→")
-                abs_val = int(delta_abs) if delta_abs is not None else 0
-                abs_str = (f"+{abs_val:,}" if abs_val >= 0 else f"{abs_val:,}").replace(",", " ")
+                v = float(delta_pct) if delta_pct is not None else None
+                if v is None or delta_abs is None:
+                    fmt = "n.d."  # population de référence absente ou nulle : pas de 0 inventé
+                else:
+                    icon = "↗" if v > 1.0 else ("↘" if v < -1.0 else "→")
+                    abs_val = int(delta_abs)
+                    abs_str = (f"+{abs_val:,}" if abs_val >= 0 else f"{abs_val:,}").replace(
+                        ",", " "
+                    )
+                    fmt = f"{icon} {v:+.1f}% ({abs_str} hab)"
                 features.append(
                     {
                         "type": "Feature",
@@ -129,14 +136,14 @@ def make_choropleth(
                             "code": code,
                             "nom": nom,
                             "valeur": v,
-                            "valeur_fmt": f"{icon} {v:+.1f}% ({abs_str} hab)",
+                            "valeur_fmt": fmt,
                         },
                         "geometry": json.loads(geojson_str),
                     }
                 )
         else:
             for code, nom, valeur, geojson_str in rows:
-                v = float(valeur) if valeur is not None else 0.0
+                v = float(valeur) if valeur is not None else None
                 features.append(
                     {
                         "type": "Feature",
@@ -144,7 +151,7 @@ def make_choropleth(
                             "code": code,
                             "nom": nom,
                             "valeur": v,
-                            "valeur_fmt": _fmt_fr(v),
+                            "valeur_fmt": "n.d." if v is None else _fmt_fr(v),
                         },
                         "geometry": json.loads(geojson_str),
                     }
@@ -198,7 +205,9 @@ def make_choropleth(
                 f"{indicateur.replace('_', ' ').capitalize()} :",
             ]
         style_fn = lambda f, _cm=colormap: {  # noqa: E731
-            "fillColor": _cm(f["properties"]["valeur"]),
+            "fillColor": COULEUR_ND
+            if f["properties"]["valeur"] is None
+            else _cm(f["properties"]["valeur"]),
             "fillOpacity": 0.75,
             "color": "white",
             "weight": 0.5,
@@ -241,6 +250,7 @@ def make_choropleth(
                     legend_colors,
                     fmt_fn=_fmt_pct if is_evolution else None,
                     note=None if is_evolution else NOTE_CLASSES_FIXES,
+                    avec_nd=any(f["properties"]["valeur"] is None for f in features),
                 )
             )
         )

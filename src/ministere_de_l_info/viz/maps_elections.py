@@ -9,7 +9,12 @@ import folium
 import folium.features
 import polars as pl
 
-from ministere_de_l_info.viz._display import _build_legend_html, _fmt_fr, nouvelle_carte
+from ministere_de_l_info.viz._display import (
+    COULEUR_ND,
+    _build_legend_html,
+    _fmt_fr,
+    nouvelle_carte,
+)
 
 _SOURCE_HTML: str = (
     '<div style="position:fixed;bottom:12px;right:12px;z-index:1000;background:white;'
@@ -193,8 +198,7 @@ def make_choropleth_legi_circos_bloc_dominant(
     return m
 
 
-ECHELLE_SCORE_MAX: float = 60.0  # % exprimés : borne haute fixe de l'échelle du score d'un bloc
-_COULEUR_ND = "#5F6368"  # gris foncé : donnée non disponible
+ECHELLE_SCORE_MAX: float = 100.0  # % exprimés : borne haute fixe de l'échelle du score d'un bloc
 
 
 def make_choropleth_elections_score_bloc(
@@ -225,8 +229,8 @@ def make_choropleth_elections_score_bloc(
     # commune sans ligne pour ce bloc : 0 voix si ses exprimés sont connus, sinon n.d.
     exprimes_ok = set(participation_df.filter(pl.col("exprimes") > 0)["code_commune"].to_list())
 
-    # Échelle FIXE 0-60 % (et non 0-max de la carte) : un bloc à 8 % ne doit pas paraître aussi
-    # saturé qu'un bloc à 60 %. Au-delà de 60 %, la couleur reste au maximum (annoncé en légende).
+    # Échelle FIXE 0-100 % (et non 0-max de la carte) : un bloc à 8 % ne doit pas paraître aussi
+    # saturé qu'un bloc à 60 % ; même échelle aux deux tours (décision Mathias 2026-10-06).
     max_val = ECHELLE_SCORE_MAX
     colormap = cm.LinearColormap(colors=["#ffffff", couleur_bloc], vmin=0.0, vmax=max_val)
 
@@ -257,7 +261,7 @@ def make_choropleth_elections_score_bloc(
     folium.GeoJson(
         {"type": "FeatureCollection", "features": features},
         style_function=lambda f, _cm=colormap: {
-            "fillColor": _COULEUR_ND
+            "fillColor": COULEUR_ND
             if f["properties"]["_pct"] is None
             else _cm(f["properties"]["_pct"]),
             "fillOpacity": 0.85,
@@ -284,7 +288,7 @@ def make_choropleth_elections_score_bloc(
                 breaks,
                 legend_colors,
                 fmt_fn=lambda x: f"{x:.0f}%",
-                note="Échelle fixe 0-60 % (au-delà : couleur maximale)",
+                note="Échelle fixe 0-100 %, identique pour tous les scrutins et tours",
             )
         )
     )
@@ -292,7 +296,7 @@ def make_choropleth_elections_score_bloc(
         folium.Element(
             '<div style="position:fixed;bottom:24px;left:12px;z-index:9999;background:#fff;'
             'padding:4px 8px;border:1px solid #8A8F98;font:12px sans-serif">'
-            f'<span style="display:inline-block;width:14px;height:14px;background:{_COULEUR_ND};'
+            f'<span style="display:inline-block;width:14px;height:14px;background:{COULEUR_ND};'
             'border:1px solid #8A8F98;vertical-align:middle;margin-right:6px"></span>'
             "n.d. (exprimés non disponibles)</div>"
         )
