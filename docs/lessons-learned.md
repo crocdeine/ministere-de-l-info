@@ -113,8 +113,8 @@ E / E+ / E++ (Économie), F (Législatif), du chantier design system, puis de l'
   de l'Assemblée nationale).
 - **Valider le contenu, pas l'en-tête HTTP** (2026-10-06) : data.senat.fr a servi une
   page HTML avec le type `text/csv` à la place d'ODSEN_GENERAL. Un loader doit vérifier
-  la structure attendue (en-tête, colonnes) avant d'écrire en base. Correctif sur la
-  branche `fix/senat-csv-html`, non fusionné au 2026-10-06.
+  la structure attendue (en-tête, colonnes) avant d'écrire en base. Correctif : PR #5,
+  fusionnée dans `main` (contrôle des premiers octets du fichier).
 - **Garder une copie datée des fichiers qui disparaissent** : le fichier Sénat de juin
   2026 n'est plus téléchargeable ; il est conservé dans `data/exploration/`.
 - **Charger national, filtrer en UI** quand l'unité d'analyse est nationale (composition

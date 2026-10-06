@@ -313,8 +313,9 @@ historiques encore présents (ex. CRCE, avant CRCE-K) sont classés dans
 2026-10-04 mis de côté (`data/raw/legislatif/senat-odsen-general-2026-10-04.csv`).
 
 **Incident** : data.senat.fr a servi une page HTML avec un type `text/csv` à la place du
-fichier. Le refus de ce contenu au chargement est sur la branche `fix/senat-csv-html`,
-non fusionnée dans `main` au 2026-10-06.
+fichier. Depuis la PR #5 (fusionnée dans `main`), le loader et le script de veille
+vérifient les premiers octets (pas de `<html`, présence de `Matricule`) et refusent
+une page HTML au lieu de l'écrire en cache.
 
 **Veille** : `scripts/veille_groupes_senat.py` compte les sénateurs actifs sans groupe
 après le renouvellement du 27/09/2026 (lecture seule, code de sortie 0 quand tous ont un
