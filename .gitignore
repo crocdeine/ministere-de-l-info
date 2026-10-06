@@ -115,3 +115,9 @@ nohup.out
 
 # Graphe du code (graphify), régénérable : graphify update .
 graphify-out/
+
+# ===== Maquette web (web/) =====
+web/node_modules/
+web/dist/
+# Données générées par scripts/export_web.py
+web/public/data/
