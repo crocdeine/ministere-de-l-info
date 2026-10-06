@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, Literal
+
 import streamlit as st
 from streamlit_folium import st_folium
 
@@ -123,18 +125,21 @@ with st.sidebar:
         depts = get_referentiel_geo("departement")
         dept_labels = {d[0]: f"{d[0]} — {d[1]}" for d in depts}
 
+        def _lib_dept(x: str | None) -> str:
+            return "Tous" if x is None else dept_labels.get(x, x)
+
         if niveau == "commune":
             st.warning("⚠️ Un département doit être sélectionné pour les communes.")
             filtre_departement = st.selectbox(
                 "Département",
                 options=[d[0] for d in depts],
-                format_func=lambda x: dept_labels.get(x, x),
+                format_func=_lib_dept,
             )
         else:
             choix = st.selectbox(
                 "Département (optionnel)",
                 options=[None] + [d[0] for d in depts],
-                format_func=lambda x: "Tous" if x is None else dept_labels.get(x, x),
+                format_func=_lib_dept,
             )
             filtre_departement = choix
 
@@ -143,15 +148,20 @@ with st.sidebar:
     if niveau in _FILTRE_REGION_COL:
         regions = get_referentiel_geo("region")
         region_labels = {r[0]: r[1] for r in regions}
+
+        def _lib_region(x: str | None) -> str:
+            return "Toutes" if x is None else region_labels.get(x, x)
+
         choix = st.selectbox(
             "Région (optionnelle)",
             options=[None] + [r[0] for r in regions],
-            format_func=lambda x: "Toutes" if x is None else region_labels.get(x, x),
+            format_func=_lib_region,
         )
         filtre_region = choix
 
     with st.expander("Options avancées"):
-        mode = st.radio("Mode de rendu", ["auto", "choropleth", "contours"], index=0)
+        modes: list[Literal["auto", "choropleth", "contours"]] = ["auto", "choropleth", "contours"]
+        mode = st.radio("Mode de rendu", modes, index=0)
 
 # ── Carte ────────────────────────────────────────────────────────────────────
 
@@ -175,7 +185,7 @@ try:
         titre=titre_carte,
         mode=mode,
     )
-    st_folium(carte, width="100%", height=600, returned_objects=[])
+    st_folium(carte, width="100%", height=600, returned_objects=[])  # pyright: ignore[reportArgumentType] # stub streamlit-folium : width typé int, '100%' accepté
 except ValueError as e:
     st.error(f"Paramètres invalides : {e}")
     st.stop()
@@ -217,7 +227,7 @@ tableau = get_tableau_territoires_cache(
 col_pop = f"Population municipale {annee}"
 col_evol_abs = f"Évolution {annee_ref}→{annee} (hab.)"
 col_evol_pct = f"Évolution {annee_ref}→{annee} (%)"
-column_config: dict[str, object] = {}
+column_config: dict[str, Any] = {}
 
 if niveau in _VUE_POP:
     renommage = {"code": "Code", "nom": "Nom", "population": col_pop}

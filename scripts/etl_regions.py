@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "src"))  # noqa: E402
 
 from ministere_de_l_info.config import get_settings  # noqa: E402, I001
 from ministere_de_l_info.data_sources.geo import POPULATION_2024, fetch_regions_geojson  # noqa: E402, I001
+from ministere_de_l_info._sql import ligne_unique  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(message)s")
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ def load_into_duckdb() -> None:
           ON CAST(src.code AS VARCHAR) = pop.code
     """)
 
-    count = con.execute("SELECT COUNT(*) FROM geographies_regions").fetchone()[0]
+    count = ligne_unique(con.execute("SELECT COUNT(*) FROM geographies_regions"))[0]
     logger.info("Table geographies_regions : %d lignes chargées", count)
     con.close()
 

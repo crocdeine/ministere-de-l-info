@@ -14,6 +14,7 @@ import logging
 
 import branca.colormap as cm
 import folium
+import folium.features
 import plotly.express as px
 import polars as pl
 import streamlit as st
@@ -37,6 +38,7 @@ from ministere_de_l_info.viz._display import (
     NOTE_CLASSES_FIXES,
     _build_legend_html,
     _fmt_fr,
+    ajouter_html,
     bornes_fixes,
     nouvelle_carte,
 )
@@ -157,12 +159,13 @@ def _make_desert_map(df: pl.DataFrame) -> folium.Map:
         f'border:1px solid #8A8F98;margin-right:6px;vertical-align:middle"></span>{lib}</div>'
         for c, lib in _ETATS_DESERT.values()
     )
-    m.get_root().html.add_child(
+    ajouter_html(
+        m,
         folium.Element(
             '<div style="position:fixed;bottom:24px;right:12px;z-index:9999;background:#fff;'
             'padding:8px 10px;border:1px solid #8A8F98;font:12px sans-serif;color:#1a1a1a">'
             f"<b>Désert médical</b>{items}</div>"
-        )
+        ),
     )
     return m
 
@@ -235,7 +238,8 @@ def _make_choropleth(df: pl.DataFrame, libelle: str, indicateur: str) -> folium.
     tooltip_target = folium.GeoJson(geo_json, style_function=_style)
     tooltip_target.add_to(m)
     if a_des_valeurs:
-        m.get_root().html.add_child(
+        ajouter_html(
+            m,
             folium.Element(
                 _build_legend_html(
                     libelle,
@@ -251,7 +255,7 @@ def _make_choropleth(df: pl.DataFrame, libelle: str, indicateur: str) -> folium.
                     avec_nd=any(v is None for v in valeurs.values()),
                     avec_zero=classe_zero,
                 )
-            )
+            ),
         )
     tooltip_target.add_child(
         folium.features.GeoJsonTooltip(
@@ -668,7 +672,7 @@ def _render_croisement_tab() -> None:
     # Taille des bulles = actifs de 15-64 ans (RP). Communes sans effectif connu :
     # taille médiane, signalée en légende (plus de valeur arbitraire cachée).
     n_sans_pop = scatter_df.filter(pl.col("pop_active").is_null()).height
-    pop_mediane = scatter_df["pop_active"].median()
+    pop_mediane = scatter_df.select(pl.col("pop_active").median()).item()
     taille_defaut = int(pop_mediane) if pop_mediane is not None else 1
     scatter_pd = scatter_df.with_columns(
         pl.col("pop_active").fill_null(taille_defaut).alias("taille_bulle")

@@ -30,6 +30,7 @@ import duckdb
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from ministere_de_l_info._sql import ligne_unique  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.etl.legislatif_groupes import populate_groupes_blocs  # noqa: E402
 from ministere_de_l_info.etl.schema_legislatif import (  # noqa: E402
@@ -57,7 +58,7 @@ def appliquer_migration(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
     inseres = 0
     for source, granularite in _GRANULARITE_PAR_SOURCE.items():
         deja = con.execute("SELECT COUNT(*) FROM leg_mandats WHERE source = ?", [source])
-        if deja.fetchone()[0]:
+        if ligne_unique(deja)[0]:
             continue
         con.execute(
             """
@@ -74,9 +75,9 @@ def appliquer_migration(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
             """,
             [granularite, source],
         )
-        inseres += con.execute(
-            "SELECT COUNT(*) FROM leg_mandats WHERE source = ?", [source]
-        ).fetchone()[0]
+        inseres += ligne_unique(
+            con.execute("SELECT COUNT(*) FROM leg_mandats WHERE source = ?", [source])
+        )[0]
 
     con.execute(
         "UPDATE leg_elus SET date_fin_mandat = NULL "
@@ -104,7 +105,7 @@ def appliquer_migration(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
             legislature,
             n,
         )
-    n_mandats = con.execute("SELECT COUNT(*) FROM leg_mandats").fetchone()[0]
+    n_mandats = ligne_unique(con.execute("SELECT COUNT(*) FROM leg_mandats"))[0]
     logger.info(
         "Migration 0008 : %d mandats (%d insérés), %d groupe(s) non classé(s)",
         n_mandats,

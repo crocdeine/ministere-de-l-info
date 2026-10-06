@@ -157,7 +157,7 @@ def _render_vue_hdf(
             carte = make_choropleth_legi_circos_bloc_dominant(
                 scores_df, geo_df, blocs_meta, bounds, "Bloc dominant"
             )
-            st_folium(carte, width="100%", height=550, returned_objects=[])
+            st_folium(carte, width="100%", height=550, returned_objects=[])  # pyright: ignore[reportArgumentType] # stub streamlit-folium : width typé int, '100%' accepté
         except Exception as exc:
             st.error(f"Erreur carte : {exc}")
 
@@ -249,7 +249,7 @@ def _render_vue_circo(
             carte = make_choropleth_elections_bloc_dominant(
                 scores_df, geo_df, blocs_meta, bounds, f"Blocs — {code_circo}"
             )
-            st_folium(carte, width="100%", height=450, returned_objects=[])
+            st_folium(carte, width="100%", height=450, returned_objects=[])  # pyright: ignore[reportArgumentType] # stub streamlit-folium : width typé int, '100%' accepté
         except Exception as exc:
             st.error(f"Erreur carte : {exc}")
 
@@ -359,7 +359,7 @@ def _render_vue_circo(
             for col in ["Inscrits", "Votants", "Exprimés"] + list(_BLOCS_ORDERED):
                 fmt[col] = "{:,}"
             st.dataframe(
-                bv_display.to_pandas().style.format(fmt, na_rep="n.d."),
+                bv_display.to_pandas().style.format(fmt, na_rep="n.d."),  # pyright: ignore[reportArgumentType] # stub pandas : ExtFormatter n'admet pas les formats str
                 width="stretch",
                 hide_index=True,
                 height=400,

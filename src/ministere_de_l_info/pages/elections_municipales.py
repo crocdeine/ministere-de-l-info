@@ -154,7 +154,7 @@ def _render_carte_hdf(
         carte = make_choropleth_muni_communes_bloc_dominant(
             geo_df, blocs_meta, bounds, "Bloc dominant"
         )
-        st_folium(carte, width="100%", height=580, returned_objects=[])
+        st_folium(carte, width="100%", height=580, returned_objects=[])  # pyright: ignore[reportArgumentType] # stub streamlit-folium : width typé int, '100%' accepté
     except Exception as exc:
         st.error(f"Erreur carte : {exc}")
 

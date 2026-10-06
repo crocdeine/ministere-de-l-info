@@ -163,7 +163,7 @@ def render() -> None:
                 bounds,
                 f"Score {bloc_sel}",
             )
-        st_folium(carte, width="100%", height=600, returned_objects=[])
+        st_folium(carte, width="100%", height=600, returned_objects=[])  # pyright: ignore[reportArgumentType] # stub streamlit-folium : width typé int, '100%' accepté
     except Exception as exc:
         st.error(f"Erreur carte : {exc}")
 
@@ -364,7 +364,7 @@ def render() -> None:
             for col in ["Inscrits", "Votants", "Exprimés"] + list(_BLOCS_ORDERED):
                 fmt[col] = "{:,}"
             st.dataframe(
-                bv_display.to_pandas().style.format(fmt, na_rep="n.d."),
+                bv_display.to_pandas().style.format(fmt, na_rep="n.d."),  # pyright: ignore[reportArgumentType] # stub pandas : ExtFormatter n'admet pas les formats str
                 width="stretch",
                 hide_index=True,
                 height=400,

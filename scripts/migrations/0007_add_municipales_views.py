@@ -24,6 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
+from ministere_de_l_info._sql import ligne_unique  # noqa: E402
 from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
@@ -224,7 +225,7 @@ def main() -> None:
         ]
         print("\n── Migration 0007 — vérification vues ────────────────────────────────────")
         for name, sql in checks:
-            n = con.execute(sql).fetchone()[0]
+            n = ligne_unique(con.execute(sql))[0]
             status = "✓" if n > 0 else "✗ VIDE"
             print(f"  {name:<35s} {n:>8,} lignes  {status}")
         print("──────────────────────────────────────────────────────────────────────────\n")
