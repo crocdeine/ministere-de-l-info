@@ -9,6 +9,7 @@ import duckdb
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.viz._config import (
     _CLE_JOIN,
@@ -48,10 +49,12 @@ def _check_population_disponible(con: duckdb.DuckDBPyConnection, niveau: str, an
     vue = _VUE_PAR_NIVEAU.get(niveau)
     if vue is None:
         return False
-    count = con.execute(
-        f"SELECT COUNT(*) FROM {vue} WHERE annee = ?",  # noqa: S608
-        [annee],
-    ).fetchone()[0]
+    count = ligne_unique(
+        con.execute(
+            f"SELECT COUNT(*) FROM {vue} WHERE annee = ?",  # noqa: S608
+            [annee],
+        )
+    )[0]
     return int(count) > 0
 
 

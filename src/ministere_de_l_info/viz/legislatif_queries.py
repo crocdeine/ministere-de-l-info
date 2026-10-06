@@ -28,6 +28,7 @@ import duckdb
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.viz._queries import open_ro
 
@@ -75,8 +76,10 @@ def is_data_loaded() -> bool:
     """Vérifie que leg_elus contient des données pour AN et SENAT."""
     con = _open_ro()
     try:
-        n_an = con.execute("SELECT COUNT(*) FROM leg_elus WHERE chambre = 'AN'").fetchone()[0]
-        n_senat = con.execute("SELECT COUNT(*) FROM leg_elus WHERE chambre = 'SENAT'").fetchone()[0]
+        n_an = ligne_unique(con.execute("SELECT COUNT(*) FROM leg_elus WHERE chambre = 'AN'"))[0]
+        n_senat = ligne_unique(
+            con.execute("SELECT COUNT(*) FROM leg_elus WHERE chambre = 'SENAT'")
+        )[0]
         return int(n_an) > 0 and int(n_senat) > 0
     finally:
         con.close()

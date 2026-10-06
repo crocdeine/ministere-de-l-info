@@ -34,6 +34,7 @@ from ministere_de_l_info.viz._display import (
     _build_legend_html,
     _fmt_fr,
     _fmt_pct,
+    ajouter_html,
     bornes_fixes,
     nouvelle_carte,
 )
@@ -85,7 +86,7 @@ def make_choropleth(
     is_evolution = annee_ref is not None and niveau in _VUE_PAR_NIVEAU
 
     if mode_effectif == "choropleth":
-        if is_evolution:
+        if annee_ref is not None and is_evolution:
             sql, params = _build_query_evolution(
                 niveau,
                 annee,
@@ -245,7 +246,8 @@ def make_choropleth(
                 if is_evolution
                 else f"{indicateur.replace('_', ' ').capitalize()} — {annee}"
             )
-        m.get_root().html.add_child(
+        ajouter_html(
+            m,
             folium.Element(
                 _build_legend_html(
                     titre,
@@ -255,7 +257,7 @@ def make_choropleth(
                     note=None if is_evolution else NOTE_CLASSES_FIXES,
                     avec_nd=any(f["properties"]["valeur"] is None for f in features),
                 )
-            )
+            ),
         )
 
     if mode_effectif == "choropleth" and is_evolution:
@@ -270,12 +272,13 @@ def make_choropleth(
         else f"{_SOURCE} — {LO2}"
     )
     source_txt = f"{source}{source_suffix}"
-    m.get_root().html.add_child(
+    ajouter_html(
+        m,
         folium.Element(
             '<div style="position:fixed;bottom:12px;right:12px;z-index:1000;background:white;'
             f"color:#555;padding:4px 10px;border-radius:4px;font-size:11px;border:1px solid #ddd;"
             f'pointer-events:none;">{source_txt}</div>'
-        )
+        ),
     )
 
     return m

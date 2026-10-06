@@ -28,6 +28,7 @@ import duckdb
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.config import get_settings
 from ministere_de_l_info.viz._queries import open_ro
 
@@ -81,8 +82,8 @@ def is_data_loaded() -> bool:
     except duckdb.Error:
         return False
     try:
-        n_f = con.execute("SELECT COUNT(*) FROM economie_filosofi").fetchone()[0]
-        n_r = con.execute("SELECT COUNT(*) FROM economie_rp").fetchone()[0]
+        n_f = ligne_unique(con.execute("SELECT COUNT(*) FROM economie_filosofi"))[0]
+        n_r = ligne_unique(con.execute("SELECT COUNT(*) FROM economie_rp"))[0]
         return int(n_f) > 0 and int(n_r) > 0
     except duckdb.Error:
         return False
@@ -95,7 +96,7 @@ def is_contexte_loaded() -> bool:
     """Vérifie que economie_contexte contient des données."""
     con = _open_ro()
     try:
-        n = con.execute("SELECT COUNT(*) FROM economie_contexte").fetchone()[0]
+        n = ligne_unique(con.execute("SELECT COUNT(*) FROM economie_contexte"))[0]
         return int(n) > 0
     except duckdb.CatalogException:
         return False

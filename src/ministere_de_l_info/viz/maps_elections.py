@@ -13,6 +13,7 @@ from ministere_de_l_info.viz._display import (
     COULEUR_ND,
     _build_legend_html,
     _fmt_fr,
+    ajouter_html,
     nouvelle_carte,
 )
 
@@ -118,8 +119,8 @@ def make_choropleth_elections_bloc_dominant(
         ),
     ).add_to(m)
 
-    m.get_root().html.add_child(folium.Element(_legend_blocs_html(blocs_meta, titre)))
-    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    ajouter_html(m, folium.Element(_legend_blocs_html(blocs_meta, titre)))
+    ajouter_html(m, folium.Element(_SOURCE_HTML))
     return m
 
 
@@ -193,8 +194,8 @@ def make_choropleth_legi_circos_bloc_dominant(
         ),
     ).add_to(m)
 
-    m.get_root().html.add_child(folium.Element(_legend_blocs_html(blocs_meta, titre)))
-    m.get_root().html.add_child(folium.Element(_SOURCE_HTML_CIRCOS))
+    ajouter_html(m, folium.Element(_legend_blocs_html(blocs_meta, titre)))
+    ajouter_html(m, folium.Element(_SOURCE_HTML_CIRCOS))
     return m
 
 
@@ -281,7 +282,8 @@ def make_choropleth_elections_score_bloc(
     step = max_val / n
     breaks = [i * step for i in range(n + 1)]
     legend_colors = [colormap((i + 0.5) * step)[:7] for i in range(n)]
-    m.get_root().html.add_child(
+    ajouter_html(
+        m,
         folium.Element(
             _build_legend_html(
                 f"{titre} (% exprimés)",
@@ -290,18 +292,19 @@ def make_choropleth_elections_score_bloc(
                 fmt_fn=lambda x: f"{x:.0f}%",
                 note="Échelle fixe 0-100 %, identique pour tous les scrutins et tours",
             )
-        )
+        ),
     )
-    m.get_root().html.add_child(
+    ajouter_html(
+        m,
         folium.Element(
             '<div style="position:fixed;bottom:24px;left:12px;z-index:9999;background:#fff;'
             'padding:4px 8px;border:1px solid #8A8F98;font:12px sans-serif">'
             f'<span style="display:inline-block;width:14px;height:14px;background:{COULEUR_ND};'
             'border:1px solid #8A8F98;vertical-align:middle;margin-right:6px"></span>'
             "n.d. (exprimés non disponibles)</div>"
-        )
+        ),
     )
-    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    ajouter_html(m, folium.Element(_SOURCE_HTML))
     return m
 
 
@@ -454,6 +457,6 @@ def make_choropleth_muni_communes_bloc_dominant(
             name="communes_non_classees",
         ).add_to(m)
 
-    m.get_root().html.add_child(folium.Element(_legend_muni_html(blocs_meta, titre)))
-    m.get_root().html.add_child(folium.Element(_SOURCE_HTML))
+    ajouter_html(m, folium.Element(_legend_muni_html(blocs_meta, titre)))
+    ajouter_html(m, folium.Element(_SOURCE_HTML))
     return m

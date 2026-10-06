@@ -5,6 +5,7 @@ from __future__ import annotations
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.viz.elections_queries import DB_PATH, _open_ro  # noqa: PLC2701
 
 _HDF_DEPTS_SQL: str = "'02', '59', '60', '62', '80'"
@@ -35,9 +36,11 @@ def is_muni_data_loaded() -> bool:
     """Vérifie que les résultats municipaux sont chargés."""
     con = _open_ro()
     try:
-        n = con.execute(
-            "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_muni_%'"
-        ).fetchone()[0]
+        n = ligne_unique(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_muni_%'"
+            )
+        )[0]
         return int(n) > 0
     finally:
         con.close()
@@ -225,26 +228,30 @@ def get_metrics_commune_muni(annee: int, tour: int, code_commune: str) -> dict:
     """Métriques agrégées d'une commune (inscrits/votants/taux/bloc_dominant/nb_listes/est_nuancee)."""
     con = _open_ro()
     try:
-        part_row = con.execute(
-            """
+        part_row = ligne_unique(
+            con.execute(
+                """
             SELECT SUM(rp.inscrits), SUM(rp.votants), SUM(rp.exprimes),
                    ROUND(100.0 * SUM(rp.votants) / NULLIF(SUM(rp.inscrits), 0), 2)
             FROM resultats_participation rp
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'muni' AND e.annee = ? AND e.tour = ? AND rp.code_commune = ?
             """,
-            [annee, tour, code_commune],
-        ).fetchone()
+                [annee, tour, code_commune],
+            )
+        )
 
-        nb_listes = con.execute(
-            """
+        nb_listes = ligne_unique(
+            con.execute(
+                """
             SELECT COUNT(DISTINCT rc.nuance) AS nb
             FROM resultats_candidats rc
             JOIN elections e ON e.id_election = rc.id_election
             WHERE e.type_scrutin = 'muni' AND e.annee = ? AND e.tour = ? AND rc.code_commune = ?
             """,
-            [annee, tour, code_commune],
-        ).fetchone()[0]
+                [annee, tour, code_commune],
+            )
+        )[0]
 
         # est_nuancee : au moins 1 nuance avec bloc mappé (excluant NC/LNC → bloc NULL ; LMAJ 2008 = DTE depuis ADR-0010)
         nuancee_row = con.execute(

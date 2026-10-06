@@ -152,3 +152,9 @@ def bornes_fixes(cle: str) -> list[float]:
         return list(BORNES_FIXES[cle])
     except KeyError:
         raise ValueError(f"Pas de bornes fixes définies pour « {cle} »") from None
+
+
+def ajouter_html(m: folium.Map, element: folium.Element) -> None:
+    """Ajoute un élément HTML (légende, source) au corps de la carte."""
+    # stub folium : ``Element.html`` non déclaré (attribut présent à l'exécution)
+    m.get_root().html.add_child(element)  # pyright: ignore[reportAttributeAccessIssue]

@@ -5,6 +5,7 @@ from __future__ import annotations
 import polars as pl
 import streamlit as st
 
+from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.viz.elections_queries import DB_PATH, _open_ro  # noqa: PLC2701
 
 _HDF_DEPTS_SQL: str = "'02', '59', '60', '62', '80'"
@@ -52,9 +53,11 @@ def is_legi_data_loaded() -> bool:
     """Vérifie que les résultats législatifs sont chargés."""
     con = _open_ro()
     try:
-        n = con.execute(
-            "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%'"
-        ).fetchone()[0]
+        n = ligne_unique(
+            con.execute(
+                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%'"
+            )
+        )[0]
         return int(n) > 0
     finally:
         con.close()
@@ -381,16 +384,18 @@ def get_metrics_commune_legi(annee: int, tour: int, code_commune: str) -> dict:
     """Métriques agrégées d'une commune (inscrits/votants/taux/bloc_dominant) — législatives."""
     con = _open_ro()
     try:
-        row = con.execute(
-            """
+        row = ligne_unique(
+            con.execute(
+                """
             SELECT SUM(rp.inscrits), SUM(rp.votants), SUM(rp.exprimes),
                    ROUND(100.0 * SUM(rp.votants) / NULLIF(SUM(rp.inscrits), 0), 2)
             FROM resultats_participation rp
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'legi' AND e.annee = ? AND e.tour = ? AND rp.code_commune = ?
             """,
-            [annee, tour, code_commune],
-        ).fetchone()
+                [annee, tour, code_commune],
+            )
+        )
         bloc_row = con.execute(
             """
             SELECT bloc FROM v_resultats_candidats_avec_bloc
