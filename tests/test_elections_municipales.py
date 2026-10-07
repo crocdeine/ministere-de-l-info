@@ -31,9 +31,9 @@ _MUNI_SCRUTINS = [f"{a}_muni_t{t}" for a in (2008, 2014, 2020, 2026) for t in (1
 _VOLUMES_BV = {
     "2008_muni_t1": 1_240,
     "2008_muni_t2": 500,
-    "2014_muni_t1": 6_434,
-    "2014_muni_t2": 2_051,
-    "2020_muni_t1": 6_514,
+    "2014_muni_t1": 6_487,  # 6 434 + 53 BV de communes fusionnées rattachées (2026-10-07)
+    "2014_muni_t2": 2_056,  # + 5 BV rattachés
+    "2020_muni_t1": 6_522,  # + 8 BV rattachés
     "2020_muni_t2": 1_383,
     "2026_muni_t1": 6_546,
     "2026_muni_t2": 1_193,
@@ -44,7 +44,7 @@ _VOLUMES_COMMUNES = {
     "2008_muni_t1": 164,
     "2008_muni_t2": 50,
     "2014_muni_t1": 3_778,
-    "2014_muni_t2": 778,
+    "2014_muni_t2": 783,  # communes d'accueil de communes fusionnées
     "2020_muni_t1": 3_779,
     "2020_muni_t2": 560,
     "2026_muni_t1": 3_779,

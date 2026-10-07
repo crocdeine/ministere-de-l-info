@@ -28,6 +28,7 @@ from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.etl.schema_economie import create_economie_views  # noqa: E402
 from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
+    create_elections_schema,
     create_elections_views,
     create_municipales_views,
     retirer_cles_primaires_resultats,
@@ -41,6 +42,7 @@ logger = logging.getLogger(__name__)
 def appliquer(con: duckdb.DuckDBPyConnection) -> list[str]:
     """Retire les clés primaires puis recrée les vues dépendantes. Idempotent."""
     tables = retirer_cles_primaires_resultats(con)
+    create_elections_schema(con)  # colonnes ajoutées depuis (code_commune_origine…)
     create_elections_views(con)
     create_municipales_views(con)
     create_economie_views(con)

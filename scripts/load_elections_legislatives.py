@@ -103,7 +103,7 @@ def _load_participation(con, perimetre: str) -> int:
             p.exprimes,
             CASE
                 WHEN p.code_circonscription IS NOT NULL
-                THEN {code_departement_sql("p")} || '-' || LPAD(p.code_circonscription, 2, '0')
+                THEN p.code_departement_scrutin || '-' || LPAD(p.code_circonscription, 2, '0')
                 ELSE NULL
             END AS code_circo,
             p.code_commune_origine

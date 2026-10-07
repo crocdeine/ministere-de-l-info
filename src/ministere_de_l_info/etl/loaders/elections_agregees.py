@@ -103,7 +103,9 @@ def source_rattachee_sql(parquet: Path | str) -> str:
             CASE WHEN cp.code_actuel IS NULL THEN s.code_bv
                  ELSE s.code_commune || '-' || s.code_bv END AS code_bv
         ),
-        CASE WHEN cp.code_actuel IS NOT NULL THEN s.code_commune END AS code_commune_origine
+        CASE WHEN cp.code_actuel IS NOT NULL THEN s.code_commune END AS code_commune_origine,
+        -- département du scrutin (avant rattachement) : clé des circonscriptions
+        {code_departement_sql("s")} AS code_departement_scrutin
         FROM read_parquet('{parquet}') s
         LEFT JOIN communes_passage cp ON cp.code_ancien = s.code_commune
         LEFT JOIN geographies_communes g2 ON g2.code_insee = cp.code_actuel
