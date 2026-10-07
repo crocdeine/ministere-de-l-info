@@ -25,7 +25,7 @@
 set -euo pipefail
 
 VERSION="1.0.0"
-DB_TAG="db-2026-10-04"      # release GitHub de la base (asset ministere.duckdb.gz + .sha256)
+DB_TAG="db-2026-10-07"      # release GitHub de la base (asset ministere.duckdb.gz + .sha256)
 VERSION_UV="0.11.16"        # même version que deploy/native/install-native.sh
 DEPOT="crocdeine/ministere-de-l-info"
 NOM_APP="Ministère de l'Info"
