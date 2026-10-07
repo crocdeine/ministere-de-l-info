@@ -120,15 +120,28 @@ def _reconstruct_code_circo_spatial(con, perimetre: str) -> None:
     Centroïde de la commune ∈ polygone de circonscription. Une commune → une circo
     (celle qui contient son centroïde). Les communes coupées entre plusieurs circos
     sont assignées à la circo de leur centroïde (approximation documentée).
+
+    Correctif vague B (2026-10-06) : la circo est cherchée dans le département de la
+    commune, la plus proche du centroïde (distance nulle si elle le contient). Avant, un
+    centroïde tombant dans une circo d'un département voisin (imprécision des contours :
+    Coyolles et Haramont, Aisne → circos de l'Oise) y était rattaché, et un centroïde hors
+    de tout polygone (Forest-sur-Marque) restait sans circo.
     """
     con.execute(f"""
         CREATE OR REPLACE TEMP TABLE _commune_circo AS
-        SELECT gc.code_insee AS code_commune, circ.code AS code_circo
-        FROM geographies_communes gc
-        JOIN geographies_circonscriptions circ
-          ON ST_Within(ST_Centroid(gc.geometry), circ.geometry)
-         AND circ.code_departement = gc.code_departement
-        WHERE {filtre_perimetre(perimetre)}
+        SELECT code_commune, code_circo FROM (
+            SELECT gc.code_insee AS code_commune, circ.code AS code_circo,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY gc.code_insee
+                       ORDER BY ST_Distance(ST_Centroid(gc.geometry), circ.geometry), circ.code
+                   ) AS rang
+            FROM geographies_communes gc
+            JOIN geographies_circonscriptions circ
+              ON circ.code_departement = CASE WHEN gc.code_insee LIKE '97%'
+                                              THEN LEFT(gc.code_insee, 3)
+                                              ELSE gc.code_departement END
+            WHERE {filtre_perimetre(perimetre)}
+        ) WHERE rang = 1
     """)
     n_map = con.execute("SELECT COUNT(*) FROM _commune_circo").fetchone()[0]
     logger.info("Table d'assignation commune→circo (centroïde) : %d communes", n_map)
