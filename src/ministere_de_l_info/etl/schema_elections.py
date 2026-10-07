@@ -1481,6 +1481,10 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("ALTER TABLE candidats_presidentielle ADD COLUMN IF NOT EXISTS parti VARCHAR")
     con.execute("ALTER TABLE candidats_presidentielle ADD COLUMN IF NOT EXISTS source_bloc VARCHAR")
 
+    # Vague B (2026-10-07) : rattachement des communes fusionnées (code d'origine conservé)
+    con.execute(PASSAGE_DDL)
+    for table in CLES_RESULTATS:
+        con.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS code_commune_origine VARCHAR(5)")
     # Vague B (2026-10-07) : lignes de la source non chargées, par scrutin et catégorie
     con.execute(ECARTS_DDL)
 
@@ -1506,6 +1510,17 @@ ECARTS_DDL = """
         pct_exprimes   DOUBLE
     )
 """
+
+# Communes fusionnées → commune actuelle (INSEE COG, etl/loaders/communes_passage.py)
+PASSAGE_DDL = """
+    CREATE TABLE IF NOT EXISTS communes_passage (
+        code_ancien    VARCHAR(5) PRIMARY KEY,
+        code_actuel    VARCHAR(5) NOT NULL,
+        date_effet     DATE,         -- date de la dernière fusion de la chaîne
+        type_evenement VARCHAR       -- code MOD INSEE de cette fusion
+    )
+"""
+
 
 # Clés logiques des tables de résultats (unicité contrôlée au chargement, sans index)
 CLES_RESULTATS: dict[str, tuple[str, ...]] = {
@@ -2013,6 +2028,7 @@ def _create_v_listes_commune_muni(con: duckdb.DuckDBPyConnection) -> None:
                 rc.libelle_etendu_liste,
                 rc.nom_tete_liste,
                 rc.prenom_tete_liste,
+                rc.code_commune_origine,
                 rc.voix
             FROM resultats_candidats rc
             JOIN elections e
@@ -2041,6 +2057,8 @@ def _create_v_listes_commune_muni(con: duckdb.DuckDBPyConnection) -> None:
             ON ex.id_election = l.id_election AND ex.code_commune = l.code_commune
         GROUP BY
             l.annee, l.tour, l.code_commune, l.no_panneau, l.nuance, l.bloc,
+            -- commune absorbée depuis (rattachement COG) : ses listes restent distinctes
+            l.code_commune_origine,
             -- 2008 (no_panneau NULL) : la liste est identifiée par ses descripteurs
             CASE WHEN l.no_panneau IS NULL THEN l.libelle_abrege_liste END,
             CASE WHEN l.no_panneau IS NULL THEN l.libelle_etendu_liste END,

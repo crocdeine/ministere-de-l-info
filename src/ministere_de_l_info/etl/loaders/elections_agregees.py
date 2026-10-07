@@ -21,7 +21,7 @@ from pathlib import Path
 import duckdb
 
 from ministere_de_l_info._sql import ligne_unique
-from ministere_de_l_info.etl.schema_elections import CLES_RESULTATS, ECARTS_DDL
+from ministere_de_l_info.etl.schema_elections import CLES_RESULTATS, ECARTS_DDL, PASSAGE_DDL
 from ministere_de_l_info.perimetre import DEPTS_HDF_SQL
 
 logger = logging.getLogger(__name__)
@@ -35,11 +35,15 @@ TYPES_VAGUE_B: tuple[str, ...] = ("euro", "regi", "dpmt")
 # Part maximale des exprimés d'un scrutin écartée hors étranger et Pacifique (« reste »)
 SEUIL_ECART_RESTE_PCT: float = 3.0
 
-# Catégorie d'une ligne de la source dont la commune est absente du référentiel
+# Catégorie d'une ligne de la source dont la commune est absente du référentiel :
+# étranger ; collectivités d'outre-mer hors référentiel (Pacifique 98x, Saint-Martin et
+# Saint-Barthélemy, codés 97123/97127 avant 2007 puis 977/978) ; reste.
 _CATEGORIE_ECART_SQL = """CASE
     WHEN p.code_departement = 'ZZ' THEN 'etranger'
-    WHEN p.code_commune LIKE '98%' OR p.code_departement IN ('ZN', 'ZP', 'ZW', 'ZX')
-        THEN 'pacifique'
+    WHEN p.code_commune LIKE '98%' OR p.code_commune LIKE '977%' OR p.code_commune LIKE '978%'
+         OR p.code_commune IN ('97123', '97127')
+         OR p.code_departement IN ('ZN', 'ZP', 'ZW', 'ZX', 'ZT', 'ZY')
+        THEN 'outremer_hors_referentiel'
     ELSE 'reste' END"""
 
 
@@ -63,6 +67,47 @@ def code_departement_sql(alias: str) -> str:
         f"CASE WHEN {alias}.code_departement LIKE 'Z%' "
         f"THEN LEFT({alias}.code_commune, 3) ELSE {alias}.code_departement END"
     )
+
+
+def preparer_rattachement(con: duckdb.DuckDBPyConnection) -> int:
+    """Garantit communes_passage et code_commune_origine ; avertit si la table est vide.
+
+    Retourne le nombre de codes anciens disponibles pour le rattachement.
+    """
+    con.execute(PASSAGE_DDL)
+    for table in CLES_RESULTATS:
+        con.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS code_commune_origine VARCHAR(5)")
+    n = int(ligne_unique(con.execute("SELECT COUNT(*) FROM communes_passage"))[0])
+    if n == 0:
+        logger.warning(
+            "communes_passage vide : les communes fusionnées seront écartées "
+            "(lancer scripts/load_communes_passage.py)"
+        )
+    return n
+
+
+def source_rattachee_sql(parquet: Path | str) -> str:
+    """Sous-requête sur un Parquet de la source, communes fusionnées rattachées.
+
+    Une commune absente du référentiel et présente dans communes_passage prend le code
+    de la commune actuelle (décision Mathias 2026-10-07) ; son code d'origine est gardé
+    dans code_commune_origine et préfixe son code de bureau (« 74011-0001 ») pour éviter
+    toute collision avec les bureaux de la commune d'accueil. Les codes « Z* » de
+    l'outre-mer sont normalisés (code_departement_sql).
+    """
+    return f"""(
+        SELECT s.* REPLACE (
+            CASE WHEN cp.code_actuel IS NULL THEN {code_departement_sql("s")}
+                 ELSE g2.code_departement END AS code_departement,
+            COALESCE(cp.code_actuel, s.code_commune) AS code_commune,
+            CASE WHEN cp.code_actuel IS NULL THEN s.code_bv
+                 ELSE s.code_commune || '-' || s.code_bv END AS code_bv
+        ),
+        CASE WHEN cp.code_actuel IS NOT NULL THEN s.code_commune END AS code_commune_origine
+        FROM read_parquet('{parquet}') s
+        LEFT JOIN communes_passage cp ON cp.code_ancien = s.code_commune
+        LEFT JOIN geographies_communes g2 ON g2.code_insee = cp.code_actuel
+    )"""
 
 
 def _ids(type_scrutin: str) -> str:
@@ -105,16 +150,18 @@ def load_scrutins_listes(
     Retourne (lignes participation, lignes candidats) du type après chargement.
     """
     ids = _ids(type_scrutin)
+    preparer_rattachement(con)
     where = filtre_perimetre(perimetre)
     con.execute(f"DELETE FROM resultats_participation WHERE id_election IN {ids}")
     con.execute(f"DELETE FROM resultats_candidats WHERE id_election IN {ids}")
     con.execute(f"""
         INSERT INTO resultats_participation
             (id_election, code_departement, code_commune, code_bv,
-             inscrits, abstentions, votants, blancs, nuls, exprimes, code_circo)
+             inscrits, abstentions, votants, blancs, nuls, exprimes, code_circo, code_commune_origine)
         SELECT p.id_election, {code_departement_sql("p")}, p.code_commune, p.code_bv,
-               p.inscrits, p.abstentions, p.votants, p.blancs, p.nuls, p.exprimes, NULL
-        FROM read_parquet('{parquet_participation}') p
+               p.inscrits, p.abstentions, p.votants, p.blancs, p.nuls, p.exprimes, NULL,
+            p.code_commune_origine
+        FROM {source_rattachee_sql(parquet_participation)} p
         JOIN geographies_communes gc ON gc.code_insee = p.code_commune
         WHERE {where} AND p.id_election IN {ids}
     """)
@@ -123,15 +170,16 @@ def load_scrutins_listes(
             (id_election, code_departement, code_commune, code_bv,
              no_panneau, nuance, sexe, nom, prenom, voix,
              liste, libelle_abrege_liste, libelle_etendu_liste,
-             nom_tete_liste, prenom_tete_liste)
+             nom_tete_liste, prenom_tete_liste, code_commune_origine)
         SELECT c.id_election, {code_departement_sql("c")}, c.code_commune, c.code_bv,
                COALESCE(c.no_panneau, CAST(ROW_NUMBER() OVER (
                    PARTITION BY c.id_election, c.code_departement, c.code_commune, c.code_bv
                    ORDER BY c.nuance, c.voix DESC) AS INTEGER)),
                c.nuance, c.sexe, COALESCE(c.nom, c.binome, c.nom_tete_liste), c.prenom, c.voix,
                c.liste, c.libelle_abrege_liste, c.libelle_etendu_liste,
-               c.nom_tete_liste, NULL
-        FROM read_parquet('{parquet_candidats}') c
+               c.nom_tete_liste, NULL,
+            c.code_commune_origine
+        FROM {source_rattachee_sql(parquet_candidats)} c
         JOIN geographies_communes gc ON gc.code_insee = c.code_commune
         WHERE {where} AND c.id_election IN {ids}
     """)
@@ -157,7 +205,7 @@ def controler_chargement(
     """Contrôles après chargement (vague B, durcissement du 2026-10-07).
 
     1. Lignes de la source écartées (commune absente de geographies_communes), par
-       scrutin et catégorie (etranger, pacifique, reste) : écrites dans
+       scrutin et catégorie (rattachee, etranger, outremer_hors_referentiel, reste) : écrites dans
        elections_ecarts_chargement et journalisées (warning) ; RuntimeError si la
        catégorie « reste » dépasse seuil_reste_pct des exprimés d'un scrutin.
     2. Hors municipales, bureaux où la somme des voix diffère des exprimés : warning avec
@@ -165,6 +213,7 @@ def controler_chargement(
     """
     filtre_perimetre(perimetre)  # valide la valeur (liste blanche)
     con.execute(ECARTS_DDL)
+    con.execute(PASSAGE_DDL)
     src = f"read_parquet('{parquet_participation}')"
     perim_src = "TRUE" if perimetre == "france" else f"p.code_departement IN ({DEPTS_HDF_SQL})"
     con.execute(
@@ -176,9 +225,13 @@ def controler_chargement(
         INSERT INTO elections_ecarts_chargement
         WITH src AS (
             SELECT p.id_election, p.code_commune, p.exprimes,
-                   gc.code_insee IS NULL AS ecartee, {_CATEGORIE_ECART_SQL} AS categorie
+                   gc.code_insee IS NULL OR cp.code_actuel IS NOT NULL AS ecartee,
+                   CASE WHEN gc.code_insee IS NOT NULL THEN 'rattachee'
+                        ELSE {_CATEGORIE_ECART_SQL} END AS categorie
             FROM {src} p
-            LEFT JOIN geographies_communes gc ON gc.code_insee = p.code_commune
+            LEFT JOIN communes_passage cp ON cp.code_ancien = p.code_commune
+            LEFT JOIN geographies_communes gc
+                ON gc.code_insee = COALESCE(cp.code_actuel, p.code_commune)
             WHERE p.id_election IN {ids_sql} AND {perim_src}
         ),
         tot AS (SELECT id_election, SUM(exprimes) AS t FROM src GROUP BY 1)

@@ -54,6 +54,8 @@ from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
     code_departement_sql,
     controler_chargement,
     filtre_perimetre,
+    preparer_rattachement,
+    source_rattachee_sql,
     verifier_unicite_resultats,
 )
 from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
@@ -92,7 +94,7 @@ def _load_participation(con, perimetre: str) -> int:
     con.execute(f"""
         INSERT INTO resultats_participation
             (id_election, code_departement, code_commune, code_bv,
-             inscrits, abstentions, votants, blancs, nuls, exprimes, code_circo)
+             inscrits, abstentions, votants, blancs, nuls, exprimes, code_circo, code_commune_origine)
         SELECT
             p.id_election,
             {code_departement_sql("p")},
@@ -104,8 +106,9 @@ def _load_participation(con, perimetre: str) -> int:
             p.blancs,
             p.nuls,
             p.exprimes,
-            NULL AS code_circo
-        FROM '{parquet}' p
+            NULL AS code_circo,
+            p.code_commune_origine
+        FROM {source_rattachee_sql(parquet)} p
         INNER JOIN geographies_communes gc ON gc.code_insee = p.code_commune
         WHERE {filtre_perimetre(perimetre)}
           AND p.id_election IN {_MUNI_IDS}
@@ -136,7 +139,7 @@ def _load_candidats(con, perimetre: str) -> int:
             (id_election, code_departement, code_commune, code_bv,
              no_panneau, nuance, sexe, nom, prenom, voix,
              liste, libelle_abrege_liste, libelle_etendu_liste,
-             nom_tete_liste, prenom_tete_liste)
+             nom_tete_liste, prenom_tete_liste, code_commune_origine)
         SELECT
             c.id_election,
             {code_departement_sql("c")},
@@ -158,8 +161,9 @@ def _load_candidats(con, perimetre: str) -> int:
             c.libelle_abrege_liste,
             c.libelle_etendu_liste,
             c.nom_tete_liste,
-            NULL AS prenom_tete_liste
-        FROM '{parquet}' c
+            NULL AS prenom_tete_liste,
+            c.code_commune_origine
+        FROM {source_rattachee_sql(parquet)} c
         INNER JOIN geographies_communes gc ON gc.code_insee = c.code_commune
         WHERE {filtre_perimetre(perimetre)}
           AND c.id_election IN {_MUNI_IDS}
@@ -239,6 +243,7 @@ def main() -> None:
     logger.info("Chargement municipales HdF → %s", _DB_PATH)
     con = open_connection(_DB_PATH)
     try:
+        preparer_rattachement(con)
         _delete_municipales(con)
         populate_nuances_municipales(con)
         _load_participation(con, args.perimetre)

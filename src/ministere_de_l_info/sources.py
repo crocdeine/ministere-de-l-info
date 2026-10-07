@@ -53,6 +53,13 @@ SOURCES: dict[str, Source] = {
         "https://www.insee.fr/fr/information/2381863",
         ("populations_2013", "populations_2018", "populations_2023"),
     ),
+    "insee_cog": Source(
+        "Code officiel géographique : mouvements des communes (rattachement des fusions)",
+        "INSEE",
+        LO2,
+        "https://www.insee.fr/fr/information/8740218",
+        ("communes_passage",),
+    ),
     "insee_filosofi_rp": Source(
         "Filosofi et recensement (fichier republié)",
         "INSEE, republié par T. Szczurek-Gayant",

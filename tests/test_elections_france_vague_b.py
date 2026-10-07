@@ -356,7 +356,7 @@ class TestDurcissement:
         rows = con.execute(
             "SELECT categorie, exprimes, pct_exprimes FROM elections_ecarts_chargement ORDER BY 1"
         ).fetchall()
-        assert rows == [("etranger", 10, 1.0), ("pacifique", 20, 2.0)]
+        assert rows == [("etranger", 10, 1.0), ("outremer_hors_referentiel", 20, 2.0)]
 
     def test_voix_differentes_des_exprimes_signalees(self, con, tmp_path, caplog) -> None:
         cand, part = _parquets(tmp_path)
@@ -368,4 +368,55 @@ class TestDurcissement:
             controler_chargement(con, part, "('2024_euro_t1')", "france")
         assert any(
             "somme des voix" in r.getMessage() and "75056" in r.getMessage() for r in caplog.records
+        )
+
+
+class TestCommunesFusionnees:
+    """Rattachement des communes fusionnées (décision Mathias 2026-10-07)."""
+
+    _MVT = (
+        '"MOD","DATE_EFF","TYPECOM_AV","COM_AV","TNCC_AV","NCC_AV","NCCENR_AV","LIBELLE_AV",'
+        '"TYPECOM_AP","COM_AP","TNCC_AP","NCC_AP","NCCENR_AP","LIBELLE_AP"\n'
+        # fusion en deux étapes : 59997 → 59998 (2016), puis 59998 → 59350 (2019)
+        '"32","2016-01-01","COM","59997","0","A","A","A","COM","59998","0","B","B","B"\n'
+        '"32","2016-01-01","COM","59997","0","A","A","A","COMD","59997","0","A","A","A"\n'
+        '"32","2019-01-01","COM","59998","0","B","B","B","COM","59350","0","L","L","L"\n'
+        # changement de code : 59999 → 59350
+        '"41","2018-01-01","COM","59999","0","C","C","C","COM","59350","0","L","L","L"\n'
+        # rétablissement (scission) : jamais utilisé pour rattacher
+        '"21","2020-01-01","COMD","75100","0","D","D","D","COM","75100","0","D","D","D"\n'
+        '"21","2020-01-01","COM","75056","0","P","P","P","COM","75100","0","D","D","D"\n'
+    )
+
+    def _passage(self, con, tmp_path) -> int:
+        from ministere_de_l_info.etl.loaders.communes_passage import construire_passage
+
+        csv = tmp_path / "mvt.csv"
+        csv.write_text(self._MVT, encoding="utf-8")
+        return construire_passage(con, csv)
+
+    def test_chaines_resolues_scissions_ignorees(self, con, tmp_path) -> None:
+        assert self._passage(con, tmp_path) == 3
+        rows = con.execute(
+            "SELECT code_ancien, code_actuel FROM communes_passage ORDER BY 1"
+        ).fetchall()
+        assert rows == [("59997", "59350"), ("59998", "59350"), ("59999", "59350")]
+
+    def test_resultats_rattaches_avec_origine_et_bv_prefixe(self, con, tmp_path) -> None:
+        self._passage(con, tmp_path)
+        cand, part = _parquets(tmp_path)
+        load_scrutins_listes(con, "euro", cand, part, "hdf")
+        rows = con.execute(
+            "SELECT code_commune, code_bv, code_commune_origine FROM resultats_participation "
+            "WHERE id_election = '2024_euro_t1' ORDER BY code_bv"
+        ).fetchall()
+        assert rows == [("59350", "0001", None), ("59350", "59999-0001", "59999")]
+        ecarts = con.execute(
+            "SELECT categorie, nb_communes, exprimes FROM elections_ecarts_chargement "
+            "WHERE id_election = '2024_euro_t1'"
+        ).fetchall()
+        assert ecarts == [("rattachee", 1, 5)]
+        assert (
+            _n(con, "SELECT COUNT(*) FROM resultats_candidats WHERE code_commune_origine = '59999'")
+            == 1
         )
