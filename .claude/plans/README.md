@@ -10,7 +10,7 @@ Format repris de `/ecc:plan` (plugin ECC) et complété par les règles du proje
 
 ## Modèle
 
-```markdown
+~~~markdown
 # Mission : {nom}
 
 **Agent** : {type} · **Branche** : {branche} · **Base** : origin/main {sha}
@@ -63,4 +63,4 @@ uv run pytest -m "not slow and not network"
 - [ ] Documentation à jour
 - [ ] Questions fermées listées pour Mathias
 - [ ] Rapport `reports/…` (résumé ≤ 10 lignes)
-```
+~~~
