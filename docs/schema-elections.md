@@ -15,8 +15,20 @@ Les nuances servent aussi au module Législatif : un député non inscrit est cl
 la nuance préfectorale de son élection, convertie par `nuances_harmonisees`
 (`etl/loaders/legislatif_nuances_ni.py`, voir [architecture.md](architecture.md)).
 
-**Périmètre géographique** : Hauts-de-France uniquement (code_region = `'32'`).
-Le filtrage est appliqué au chargement des résultats (C2b), pas dans ce schéma.
+**Périmètre géographique** : paramètre `--perimetre` des scripts de chargement
+(vague B, 2026-10-06) : `hdf` (défaut, code_region = `'32'`) ou `france` (toutes les
+communes de `geographies_communes`), granularité bureau de vote dans les deux cas. Les
+vues et requêtes « HdF » de l'interface filtrent explicitement les 5 départements
+(`v_evolution_blocs_hdf_legi`, `v_evolution_blocs_hdf_muni`, `v_croisement_eco_elections`,
+`viz/elections_*queries.py`). Codes département de la source « ZA », « ZB », « ZC »,
+« ZD », « ZM », « ZS » (outre-mer, certaines années) normalisés en `971`…`976` au
+chargement. Les communes absentes du référentiel (fusionnées depuis, Français de
+l'étranger, Pacifique) sont écartées.
+
+**Scrutins chargés** : présidentielles, législatives, municipales (2002-2026) et, depuis
+la vague B, européennes (1999-2024), régionales (2004-2021) et départementales (2015,
+2021) via `scripts/load_elections_autres.py`. Cantonales (2001-2011) non chargées.
+Départementales : le nom du binôme (`binome` dans la source) est stocké dans `nom`.
 
 ---
 
@@ -179,14 +191,22 @@ Mapping `(nuance, annee) → bloc` pour les scrutins **avec nuances** dans le Pa
 | `bloc` | `VARCHAR` NN | FK → `blocs_politiques.bloc` |
 | `source_bloc` | `VARCHAR` | Justification courte du classement (1 ligne, modèle `candidats_presidentielle`) |
 
-**Couverture** : **229 entrées**, source unique `schema_elections.py` (listes
-`_NUANCES_PRES`, `_NUANCES_LEGI`, `_NUANCES_MUNI`) :
+**Couverture** : **378 entrées**, source unique `schema_elections.py` (listes
+`_NUANCES_PRES`, `_NUANCES_LEGI`, `_NUANCES_MUNI`, `_NUANCES_EURO_REGI_DPMT`) :
 
 | Jeu | Années | Entrées |
 |-----|--------|---------|
 | Présidentielles (codes-candidats) | 2002 (16), 2007 (12), 2012 (10) | 38 |
 | Législatives (codes partisans) | 2002 (22), 2007 (17), 2012 (17), 2017 (17), 2022 (16), 2024 (22) | 111 |
 | Municipales (codes de liste) | 2008 (15), 2014 (17), 2020 (23), 2026 (25) | 80 |
+| Européennes, régionales, départementales — **proposition vague B, à valider** | euro 1999 (13), 2004 euro+regi (15), euro 2009 (12), regi 2010 (13), regi 2015 (20), regi 2021 (20), dpmt 2015 (19), dpmt 2021 (23), euro 2024 (14) | 149 |
+
+Vague B : les européennes 2014 utilisent les codes des municipales 2014 (même année,
+même sens) ; les codes de liste 2004 sont communs aux européennes et aux régionales.
+Codes ambigus **non insérés** (bloc NULL) en attendant la décision de Mathias : `LDR`
+2004, `LUCD` / `LECO` 2021, `BC-UCD` / `BC-UCG` / `BC-ECO` 2021
+(`_CODES_VAGUE_B_NON_CLASSES`, détail : `reports/etl-elections-france-2026-10-06.md`).
+`populate_nuances_vague_b()` écrit ces entrées par `INSERT OR REPLACE` ciblé.
 
 Les listes municipales 2020 et 2026 reprennent intégralement les codes de liste des
 grilles officielles (INTA1931378J et INTP2602966C, annexes 3) ; celles de 2008 et 2014,
@@ -228,7 +248,11 @@ Chaque entrée porte le parti d'appartenance et la justification sourcée du cla
 | `libelle` | `VARCHAR` | Nom complet lisible (`'Marine Le Pen'`) |
 | `source_bloc` | `VARCHAR` | Justification datée du classement (circulaire ou décision CE) |
 
-**Couverture** : 11 candidats 2017 + 12 candidats 2022 = 23 entrées.
+**Couverture** : 11 candidats 2017 + 12 candidats 2022 = 23 entrées, plus 32 listes
+**européennes 2019** (nuance NULL dans la source, même mécanisme ; proposition vague B) :
+pour ce scrutin, `resultats_candidats.nom` reçoit `nom_tete_liste` de la source
+(ex. `'BARDELLA Jordan'`) et la clé `nom` de cette table a le même format. Listes non
+classées (bloc NULL) : Philippot, Vauclin.
 
 ---
 
@@ -419,8 +443,13 @@ modifie la ventilation 2002 sans changer le bloc dominant.)
 
 Législatives : voix par `(id_election, annee, tour, ancien_decoupage, code_circo, bloc)`,
 participation par circonscription (`taux_participation_pct`), puis agrégat HdF par
-`(annee, tour, ancien_decoupage, bloc)`. Seuls les bureaux dont `code_circo` est renseigné
-sont comptés. `ancien_decoupage` = TRUE pour 2002/2007 (avant le redécoupage de 2010).
+`(annee, tour, ancien_decoupage, bloc)`, borné aux 5 départements HdF. Seuls les bureaux
+dont `code_circo` est renseigné sont comptés. `ancien_decoupage` = TRUE pour 2002/2007
+(avant le redécoupage de 2010). Pour 2002, 2007 et 2024 (`code_circo` absent de la
+source), la circonscription est reconstruite : circonscription du département de la
+commune la plus proche de son centroïde (correctif vague B ; avant, un centroïde pouvait
+tomber dans une circonscription d'un département voisin). Une commune coupée entre
+plusieurs circonscriptions (Paris, Marseille…) est entièrement affectée à une seule.
 
 ### `v_scores_commune_muni`
 
@@ -429,7 +458,7 @@ Municipales : `(annee, tour, code_commune, bloc)` → `voix`, `pct_exprimes`
 
 ### `v_evolution_blocs_hdf_muni`
 
-Municipales, agrégat HdF : `(annee, tour, bloc)` → `voix`, `pct_exprimes`
+Municipales, agrégat HdF (filtre explicite sur les 5 départements) : `(annee, tour, bloc)` → `voix`, `pct_exprimes`
 (voix / exprimés HdF, NULL si bloc NULL).
 
 ### `v_listes_commune_muni`
