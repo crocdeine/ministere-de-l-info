@@ -6,7 +6,7 @@
 - Installation dans `~/Library/Application Support/Ministere-de-l-Info/`, icône locale
   `~/Applications/Ministère de l'Info.app`, journaux `~/Library/Logs/Ministere-de-l-Info/`.
 - Sans sudo ni jeton ; uv 0.11.16 et Python 3.12 installés dans le dossier d'installation.
-- Base : release `DB_TAG` (actuellement `db-2026-10-04`), SHA-256 vérifié, reprise, conservée si inchangée.
+- Base : release `DB_TAG` = `db-2026-10-07` (vague B), SHA-256 vérifié, reprise, conservée si inchangée.
 - Scénario local vert : installation 87 s (131 s au premier essai), 1,6 Go installés, lancement 2 s,
   HTTP 200, mise à jour 5 s (base conservée), désinstallation complète, aucun processus résiduel.
 - Testés en plus : port 8501 occupé → 8502 ; empreinte fausse → échec, base existante intacte ;
@@ -14,7 +14,22 @@
 - shellcheck propre, ruff propre, pytest 303 réussis (base absente du worktree : 363 ignorés).
 - Version 1.0.0 (`pyproject.toml`, `uv.lock` : seule la ligne de version), `CHANGELOG.md`,
   `docs/release-notes-v1.0.md` (brouillon).
-- Rien n'a été poussé ni publié. Reste : base de la vague B (`DB_TAG`), tag `v1.0.0`, test réel.
+- Test réel (base téléchargée depuis GitHub) : 100 s, 1,9 Go, empreinte fa93c418… conforme, page
+  Élections rendue sans erreur. Rien poussé ni tagué. Reste : PR, tag `v1.0.0`, test via la vraie commande.
+
+## Test réel du 2026-10-07 (après rebase sur `main`, vague B incluse)
+
+Code : `git archive` de `release/v1.0` (`MI_SOURCE_ARCHIVE`, le tag n'existe pas encore) ; base :
+**téléchargée depuis la release `db-2026-10-07`** (vraie URL, pas de `MI_DB_ARCHIVE`).
+
+| Étape | Résultat |
+|---|---|
+| Installation complète | 100 s ; base 1 294 217 216 octets ; empreinte installée `fa93c4184b1b…cb18` = publiée ; 1,9 Go au total |
+| Lancement par l'icône | 2 s ; `/` et `/elections` HTTP 200 ; 0 erreur dans `application.log` |
+| Page Élections (AppTest, venv et base installés) | aucune exception ni erreur ; 3 onglets, 4 métriques, 2 listes |
+| Mise à jour (2e passage) | 11 s, « Base déjà à jour, conservée », serveur relancé, HTTP 200 |
+| Désinstallation `--oui` | dossiers supprimés, aucun processus résiduel |
+| shellcheck / ruff / pytest | propres ; 329 réussis, 363 ignorés (sans base) |
 
 ## Changements
 
@@ -63,10 +78,8 @@ Test réel, après publication (sur un compte utilisateur macOS de test de préf
 
 ## Liste de publication (directeur, après accord de Mathias)
 
-1. Fusionner la vague B ; publier la base v1.0 (`scripts/publish_db.sh`, tag `db-AAAA-MM-JJ`,
-   assets `ministere.duckdb.gz` et `ministere.duckdb.gz.sha256` = empreinte de l'archive).
-2. Mettre `DB_TAG` à jour dans `install.sh` ; compléter les commentaires « Directeur : » de
-   `CHANGELOG.md` et `docs/release-notes-v1.0.md` ; date de la 1.0.0 dans le CHANGELOG.
+1. ~~Vague B fusionnée, base `db-2026-10-07` publiée~~ (fait).
+2. ~~`DB_TAG`, CHANGELOG, notes de version, date 2026-10-07~~ (fait, commits 8c36444, de08b15).
 3. Refaire le scénario local sur le commit final ; fusionner `release/v1.0` dans `main` (PR squash),
    CI verte sur le `headSha` du commit fusionné.
 4. Tag `v1.0.0` sur ce commit, pousser le tag (la commande lit `install.sh` à ce tag et télécharge
@@ -79,7 +92,7 @@ Test réel, après publication (sur un compte utilisateur macOS de test de préf
 | Risque | Parade / état |
 |---|---|
 | Le tag `v1.0.0` ne doit plus bouger : la commande `v1.0.0` réinstalle toujours la 1.0.0 | Nouvelle version = nouveau tag et nouvelle commande à communiquer |
-| `DB_TAG` oublié | Étape 2 de la liste ; la base actuelle `db-2026-10-04` ne contient pas J2/AMO |
+| Nouvelle base publiée plus tard | Mettre `DB_TAG` à jour : nécessite un nouveau tag de code (la commande lit `install.sh` au tag) |
 | Mac Intel | Non testé (dit dans la doc) |
 | Serveur tournant jusqu'à la fermeture de session (≈ 300-500 Mo de mémoire) | Accepté ; pas d'arrêt automatique |
 | Autre application Streamlit sur le port mémorisé | Le lanceur vérifie aussi que le PID mémorisé est vivant |

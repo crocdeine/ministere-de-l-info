@@ -23,8 +23,9 @@ Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), 
 - Installateur en une commande (`install.sh`, `uninstall.sh`), version 1.0.0, `CHANGELOG.md`,
   brouillon `docs/release-notes-v1.0.md`. Scénario local vert (rapport
   `reports/release-v1-installateur-2026-10-07.md`, avec la liste de publication).
-- Reste : base v1.0 (vague B, tag `db-AAAA-MM-JJ`) → mettre `DB_TAG` à jour dans `install.sh`,
-  test réel depuis GitHub après publication, accord de Mathias pour le tag `v1.0.0`.
+- Base `db-2026-10-07` (vague B) branchée (`DB_TAG`) ; test réel avec téléchargement GitHub vert
+  (100 s, 1,9 Go). Reste : PR vers `main`, accord de Mathias pour le tag `v1.0.0`, test via la
+  vraie commande `curl | bash` après le tag.
 
 ## Prochaines étapes, dans l'ordre
 
