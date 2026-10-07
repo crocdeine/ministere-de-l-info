@@ -290,7 +290,7 @@ cd "$INSTALL_DIR/code"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Démarrage sur le port $PORT" >>"$JOURNAL"
 MINISTERE_DB_PATH="$INSTALL_DIR/ministere.duckdb" nohup "$INSTALL_DIR/venv/bin/python" \
   -m streamlit run app.py --server.address 127.0.0.1 --server.port "$PORT" \
-  --server.headless true --server.runOnSave false \
+  --server.headless true --server.runOnSave false --server.fileWatcherType none \
   </dev/null >>"$JOURNAL" 2>&1 &
 echo $! >"$FICHIER_PID"
 
