@@ -51,7 +51,25 @@ Liste complète, intermédiaires et état de vérification : [docs/sources.md](
 - **Base de données** : licence ODbL 1.0 ([LICENSE-DONNEES.md](LICENSE-DONNEES.md)), imposée par les données URSSAF.
 - **Téléchargement de la base** : [releases GitHub](https://github.com/crocdeine/ministere-de-l-info/releases), dernière base publiée : [`db-2026-10-04`](https://github.com/crocdeine/ministere-de-l-info/releases/tag/db-2026-10-04) (fichier `ministere.duckdb.gz`, environ 630 Mo).
 
-## Installation et lancement
+## Installation (Mac)
+
+Ouvrir l'application Terminal, coller cette commande, appuyer sur Entrée :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/install.sh | bash
+```
+
+L'icône « Ministère de l'Info » apparaît dans le dossier Applications de votre dossier personnel
+(`~/Applications`) ; un double-clic ouvre l'application dans le navigateur. Environ 3 Go d'espace
+libre requis, 1,6 Go occupés ensuite. Mise à jour : relancer la même commande. Désinstallation :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/uninstall.sh | bash
+```
+
+Testé sur Mac Apple Silicon ; Mac Intel non testé. Détails : [guide utilisateur](docs/guide-utilisateur.md).
+
+## Installation pour le développement
 
 Prérequis : Python 3.12 et [uv](https://docs.astral.sh/uv/) (gestionnaire de paquets du projet ; pip et poetry ne sont pas utilisés).
 
