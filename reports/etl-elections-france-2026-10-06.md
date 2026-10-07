@@ -2,7 +2,17 @@
 
 Date : 2026-10-06 (exécution 2026-10-07) — branche `feat/elections-france-entiere` — agent `ingenieur-etl`.
 
-## Résumé exécutif
+## Résumé exécutif (mis à jour le 2026-10-07, après les décisions de Mathias)
+
+1. Mathias a validé toutes les propositions le 2026-10-07 (Q1 à Q11) ; les cas ambigus sont tranchés (§ 5 bis) ; addendum ADR-0010 rédigé.
+2. Clés primaires retirées des tables de résultats (migration 0009) ; unicité contrôlée par les loaders (erreur si doublon).
+3. Rejeu sur la copie : base **1 266 Mo compactée** (1 460 Mo avant compactage), **728 Mo en gzip** (contre 2,1 Go / 861 Mo avec clés primaires).
+4. Voix non classées : 0 % sur tous les scrutins euro/regi/dpmt, sauf les européennes 2009 (11 voix : résidus LPC/LDD/LDV).
+5. Temps : migration 0009 20 s, puis init 5 s, présidentielles 7 s, législatives 14 s, municipales 13 s, euro/regi/dpmt 14 s.
+6. Tests : ruff OK ; 333 réussis en hermétique (363 ignorés faute de base) ; 681 réussis sur la copie France. pyright non exécuté (PyPI injoignable).
+
+### Résumé initial (2026-10-06)
+
 
 1. **Étude d'impact** : la France entière au bureau de vote (48 scrutins) = 2,87 M BV × scrutin et 26,0 M lignes candidats ; base 2,1 Go (921 Mo aujourd'hui), **0,86 Go compressée** (limite GitHub 2 Go : respectée). Le niveau commune hors HdF ne réduit le volume que de ~15 % : **recommandation BV partout** (à valider, Q1).
 2. **Implémenté** : paramètre `--perimetre hdf|france` sur les 3 loaders existants (défaut `hdf`, comportement inchangé) + `scripts/load_elections_autres.py` (euro 1999-2024, régionales 2004-2021, départementales 2015-2021). Chargement complet ≈ 80 s.
@@ -102,6 +112,10 @@ Bornées aux 5 départements : `v_evolution_blocs_hdf_legi`, `v_evolution_blocs_
 
 Après décision : addendum à l'ADR-0010 (classement des scrutins euro/regi/dpmt) et retrait de la mention « proposition » des `source_bloc`.
 
+## 5 bis. Décisions de Mathias (2026-10-07)
+
+Q1 bureau de vote partout ; Q2 suppression des clés primaires (contrôle d'unicité au chargement) ; Q3 unions 100 % gauche → GAU ; Q4 LDR 2004 → DTE (mélange UDF mentionné) ; Q5 LUCD/BC-UCD 2021 → DTE ; Q6 BC-UCG 2021 → DIV ; Q7 LECO/BC-ECO 2021 → GAU ; Q8 Philippot → EXD, Vauclin → DIV, listes 2019 conservées dans `candidats_presidentielle` ; Q9 CPNT 1999/2004 et Asselineau 2019 → DIV ; Q10 cantonales plus tard ; Q11 limite des communes coupées acceptée et documentée (`docs/schema-elections.md` ; l'avertissement de l'interface ne couvre que 2002/2007, à étendre à 2024 en vague A). Le tableau complet des classements est dans l'addendum de l'ADR-0010. `nuances_harmonisees` : 384 entrées ; `candidats_presidentielle` : 57.
+
 ## 6. Limites et anomalies relevées
 
 - Lignes écartées (commune absente du référentiel géographique COG actuel) : ~2 000 BV par scrutin avant 2017 (communes fusionnées), ~900 ensuite (Français de l'étranger, Pacifique). Comportement historique conservé ; une table de passage COG serait nécessaire pour les récupérer.
@@ -114,6 +128,7 @@ Après décision : addendum à l'ADR-0010 (classement des scrutins euro/regi/dpm
 ```bash
 cd "/Volumes/le gros stockage/ministere-de-l-info"   # après fusion de la branche
 cp data/ministere.duckdb "../ministere-de-l-info-backups/ministere-avant-vagueB-$(date +%F).duckdb"
+uv run python scripts/migrations/0009_resultats_sans_cle_primaire.py
 uv run python scripts/init_elections_schema.py
 uv run python scripts/migrations/0007_add_municipales_views.py
 uv run python scripts/load_elections_presidentielles.py --perimetre france
@@ -123,10 +138,15 @@ uv run python scripts/load_elections_autres.py --perimetre france
 uv run python -c "from ministere_de_l_info.etl._common import open_connection; \
 from ministere_de_l_info.etl.schema_economie import create_economie_views; \
 c = open_connection(); create_economie_views(c); c.execute('CHECKPOINT'); c.close()"
-uv run pytest -q        # 665 tests attendus verts sur la base France
+# Compactage (récupère ~200 Mo de blocs libérés), puis remplacement du fichier
+uv run python -c "import duckdb; c = duckdb.connect(); c.execute('LOAD spatial'); \
+c.execute(\"ATTACH 'data/ministere.duckdb' AS s (READ_ONLY)\"); \
+c.execute(\"ATTACH 'data/ministere-compact.duckdb' AS d\"); c.execute('COPY FROM DATABASE s TO d')"
+mv data/ministere-compact.duckdb data/ministere.duckdb
+uv run pytest -q        # 681 tests attendus verts sur la base France
 ```
 
-Retour arrière : restaurer la sauvegarde, ou relancer les trois loaders sans `--perimetre` et supprimer les scrutins euro/regi/dpmt (`DELETE ... WHERE id_election IN (SELECT id_election FROM elections WHERE type_scrutin IN ('euro','regi','dpmt'))`).
+Retour arrière : restaurer la sauvegarde.
 
 ## 8. Requêtes de contrôle
 
@@ -134,7 +154,7 @@ Retour arrière : restaurer la sauvegarde, ou relancer les trois loaders sans `-
 -- Volumes par type
 SELECT e.type_scrutin, COUNT(DISTINCT rp.id_election), COUNT(*), COUNT(DISTINCT rp.code_commune)
 FROM resultats_participation rp JOIN elections e USING (id_election) GROUP BY 1 ORDER BY 1;
--- Part des voix sans bloc (attendu : 0 sauf regi 2004, regi/dpmt 2021, euro 2019)
+-- Part des voix sans bloc (attendu : 0, sauf 11 voix aux européennes 2009)
 SELECT id_election, ROUND(100.0 * SUM(voix) FILTER (WHERE bloc IS NULL) / SUM(voix), 2)
 FROM v_resultats_candidats_avec_bloc WHERE type_scrutin IN ('euro','regi','dpmt') GROUP BY 1 ORDER BY 1;
 -- Non-régression HdF : 50 circonscriptions, vues d'évolution inchangées
