@@ -16,7 +16,7 @@ nécessaires) :
 2. Coller la commande ci-dessous, appuyer sur Entrée :
 
    ```
-   curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/install.sh | bash
    ```
 
 3. Attendre le message « Installation terminée ». Aucun mot de passe n'est demandé.
@@ -31,7 +31,7 @@ rouvrent simplement la page. L'application fonctionne uniquement sur votre Mac, 
 **Désinstaller** : coller dans le Terminal, puis répondre `o` :
 
 ```
-curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/uninstall.sh | bash
 ```
 
 **En cas de problème** : le message d'erreur indique le journal à transmettre

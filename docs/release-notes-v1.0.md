@@ -1,4 +1,4 @@
-# Ministère de l'Info 1.0 — notes de version (2026-10-07)
+# Ministère de l'Info 1.0.1 — notes de version (2026-10-07)
 
 ## Pour qui
 
@@ -21,7 +21,7 @@ indicateurs économiques et la composition du Parlement, sans compétence techni
 Ouvrir le Terminal (Applications > Utilitaires), coller, appuyer sur Entrée :
 
 ```
-curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/install.sh | bash
 ```
 
 Une icône « Ministère de l'Info » apparaît dans le dossier Applications de votre dossier
