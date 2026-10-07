@@ -11,6 +11,7 @@ Mathias (GitHub : crocdeine) développe ministere-de-l-info comme projet personn
 - Aucun agent ne tranche une décision structurante ou méthodologique (classement politique, architecture, périmètre, stack) : il instruit et formule des questions fermées ; le directeur les regroupe pour Mathias.
 - Le directeur peut engager sans attendre les correctifs de bugs avérés et la maintenance (documentation, tests, outillage) qui n'engagent aucun choix de fond.
 - Chaque vague d'agents se termine par un rapport de synthèse dans `reports/`.
+- Toute mission d'agent qui modifie du code ou la base part d'une **fiche de mission** commitée dans `.claude/plans/` (modèle dans `.claude/plans/README.md`, format `/ecc:plan` complété par nos règles) ; relecture avant fusion par `ecc:python-reviewer` (ou `ecc:typescript-reviewer`/`ecc:react-reviewer`/`ecc:rust-reviewer` selon le code) et, pour l'ETL, `ecc:silent-failure-hunter`.
 
 Toujours communiquer en français, ton neutre, sans blabla.
 
