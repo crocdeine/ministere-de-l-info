@@ -1,4 +1,5 @@
-// Diagnostic jetable : captures d'écran (WebKit sans fenêtre).
+// Captures d'écran du build (WebKit sans fenêtre : aucune fenêtre ouverte à l'écran).
+// Usage : node perf/captures.mjs DOSSIER   (bureau, mobile 390 px, municipales, page non portée)
 import { spawn } from "node:child_process";
 import { webkit } from "playwright-core";
 

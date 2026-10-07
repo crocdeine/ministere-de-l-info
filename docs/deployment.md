@@ -25,6 +25,13 @@ branche `poc/tauri`, hors `main`) reste une piste ultérieure ; ce document ne l
 La publication des releases (image + base) est décrite dans
 [`deploy/README-deploy.md`](../deploy/README-deploy.md).
 
+## Application Mac (Tauri, en construction — ADR-0015)
+
+Distribution prévue : `.app` / `.dmg` non signés, Apple Silicon seul. Construction locale
+uniquement (pas en CI) ; données exportées dans `web/public/data/` puis embarquées dans l'app
+(un paquet de données séparé vérifié par SHA256 est décidé mais pas encore réalisé). Commandes et
+mesures : `web/README.md`. Ouverture d'une copie téléchargée : clic droit › Ouvrir (Gatekeeper).
+
 ## 0. Installateur de la version 1.0 (destinataires)
 
 Commande (épinglée sur le tag, jamais sur `main`) :

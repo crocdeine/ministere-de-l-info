@@ -108,3 +108,75 @@ jobs:
       # Configuration dans pyproject.toml ([tool.pyright]) ; version figée.
       - name: Pyright
         run: uvx pyright@1.1.408
+
+  web:
+    name: Application web (tsc, vitest, build, budget, WebKit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # tippecanoe (felt, BSD-2) compilé depuis les sources, version figée par SHA (2.79.0).
+      - name: Cache tippecanoe
+        id: cache-tippecanoe
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/tippecanoe/tippecanoe
+          key: tippecanoe-68ab8dcc229f95b8b25877697d5e8d66783af503-${{ runner.os }}
+
+      - name: Build tippecanoe
+        if: steps.cache-tippecanoe.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          sudo apt-get install -y --no-install-recommends libsqlite3-dev zlib1g-dev
+          git clone --quiet https://github.com/felt/tippecanoe.git ~/tippecanoe
+          git -C ~/tippecanoe checkout --quiet 68ab8dcc229f95b8b25877697d5e8d66783af503
+          make -C ~/tippecanoe -j4 tippecanoe
+
+      # Données : export de l'échantillon (Somme), base reconstruite depuis tests/fixtures/sample.
+      - name: Export de l'échantillon
+        working-directory: .
+        run: |
+          uv sync --frozen
+          uv run python -c "import duckdb; duckdb.connect().install_extension('spatial')"
+          uv run python -c "import sys; sys.path.insert(0, 'tests'); from fixtures.sample_db import construire_base; construire_base('echantillon.duckdb').close()"
+          uv run python scripts/export_web.py --db echantillon.duckdb --out web/public/data --tippecanoe ~/tippecanoe/tippecanoe
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npm run build
+      - name: Budget du JS initial (< 450 Ko gzip)
+        run: node perf/budget.mjs
+      - run: npm audit --audit-level=high
+
+      # Test de fumée et mesures dans WebKit (temps indicatifs : exécuteur Linux sans GPU).
+      - name: WebKit (Playwright)
+        run: npx playwright-core install --with-deps webkit
+      - name: Mesures WebKit
+        run: |
+          node perf/mesure.mjs --changements 10
+          node perf/mesure.mjs --changements 5 --mouvement-reduit
+      - name: Résultats des mesures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mesures-webkit
+          path: web/test-results/
+          retention-days: 30

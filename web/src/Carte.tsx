@@ -53,7 +53,9 @@ function apresRecalcul(m: CarteML, source: string, rappel: () => void): void {
     rappel();
   };
   const donnees = (e: MapSourceDataEvent) => {
-    if (e.sourceId === source && e.tile && m.isSourceLoaded(source)) m.once("render", fin);
+    if (e.sourceId !== source || !e.tile || !m.isSourceLoaded(source)) return;
+    m.once("render", fin);
+    m.triggerRepaint(); // garantit un rendu même si la carte n'en prévoyait plus
   };
   m.on("sourcedata", donnees);
   m.once("idle", fin);

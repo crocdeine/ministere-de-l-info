@@ -33,7 +33,9 @@ let resultat;
 try {
   const page = await nav.newPage({ viewport: { width: 1280, height: 860 }, reducedMotion: REDUIT ? "reduce" : "no-preference" });
   page.on("pageerror", (e) => erreurs.push(String(e)));
-  page.on("console", (m) => m.type() === "error" && !m.text().includes("data.geopf.fr") && erreurs.push(m.text()));
+  // Erreurs HTTP relevées par URL (le fond Plan IGN, réseau externe, est ignoré).
+  page.on("console", (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && erreurs.push(m.text()));
+  page.on("response", (r) => r.status() >= 400 && !r.url().includes("data.geopf.fr") && erreurs.push(`${r.status()} ${r.url()}`));
   page.on("requestfinished", async (req) => {
     const debut = req.timing().startTime; // horloge murale (ms), comme performance.timeOrigin
     const url = req.url();

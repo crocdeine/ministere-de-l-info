@@ -55,3 +55,5 @@ c'était déjà le cas avant cette session, rien n'a été réinstallé.
 | — | aucun ajout en Phase 0 | — | — |
 | 2026-10-04 (J1) | **gitleaks** (hook pre-commit) + `detect-private-key` | `.pre-commit-config.yaml` | Détection de secrets, exigée par les contraintes |
 | 2026-10-06 | **pyright 1.1.408** (`uvx`, job CI bloquant) | `.github/workflows/ci.yml`, `[tool.pyright]` | Typage vérifié, 0 erreur |
+| 2026-10-07 (A1) | **tippecanoe 2.79.0** (felt, licence BSD-2) | compilé depuis les sources (`make`, ≈ 1 min, sqlite3 et zlib du système) dans `/Volumes/le gros stockage/outils/tippecanoe-src` ; en CI : commit `68ab8dcc` compilé puis mis en cache | Tuiles vectorielles PMTiles des communes (`scripts/export_web.py`, ADR-0015, prototype A0) |
+| 2026-10-07 (A1) | **Playwright** (`playwright-core` 1.63, WebKit 26.6) | dépendance de développement de `web/` ; navigateurs dans `/Volumes/le gros stockage/outils/playwright-navigateurs` (`PLAYWRIGHT_BROWSERS_PATH`) | Test de fumée et mesures de performance (`web/perf/mesure.mjs`) |
