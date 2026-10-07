@@ -1,7 +1,7 @@
 # Zone « About » de la page GitHub — propositions
 
 Propositions à appliquer par le directeur de projet (Settings du dépôt ou `gh repo edit`).
-Rédigé le 2026-10-06, non appliqué.
+Rédigé le 2026-10-06. Appliqué : description et 13 sujets identiques sur GitHub (vérifié le 2026-10-07 avec `gh repo view`), site web vide.
 
 ## Description
 

@@ -5,7 +5,15 @@ Référence des 6 tables électorales créées par `create_elections_schema()` d
 `scripts/migrations/0006_add_municipales_schema.py` (colonnes de liste) et
 `0007_add_municipales_views.py` (vues municipales).
 
-Mis à jour le 2026-09-24 sur la base du code (ADR-0010).
+Mis à jour le 2026-09-24 sur la base du code (ADR-0010). Chiffres revérifiés le
+2026-10-06 sur la base locale (lecture seule) : 56 scrutins au référentiel, 30 avec des
+résultats chargés (10 présidentielles, 12 législatives, 8 municipales), 162 469 lignes
+de participation, 1 093 836 lignes candidats, 229 entrées `nuances_harmonisees`
+(117 codes distincts), 23 entrées `candidats_presidentielle`, 11 vues électorales.
+
+Les nuances servent aussi au module Législatif : un député non inscrit est classé selon
+la nuance préfectorale de son élection, convertie par `nuances_harmonisees`
+(`etl/loaders/legislatif_nuances_ni.py`, voir [architecture.md](architecture.md)).
 
 **Périmètre géographique** : Hauts-de-France uniquement (code_region = `'32'`).
 Le filtrage est appliqué au chargement des résultats (C2b), pas dans ce schéma.

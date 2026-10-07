@@ -1,11 +1,25 @@
 # Déploiement et exploitation
 
-Deux modes d'exécution coexistent :
+État au 2026-10-06 (orientations de Mathias, `docs/orientations.md`) :
 
 | Mode | Rôle | Référence |
 |---|---|---|
-| **Natif** (uv + LaunchAgent macOS) | **Mode principal**, seul mode réellement installé sur le Mac mini de Mathias | [ADR-0012](adr/0012-execution-native-mac.md), §1 à §3 |
-| **Docker / OrbStack** | Non déployé actuellement (constat du 25/09/2026) ; conservé comme repli possible et pour la distribution à d'éventuels tiers (`deploy/install.sh`) | §4 |
+| **Natif** (uv + LaunchAgent macOS) | **Mode recommandé** sur le Mac mini. Scripts prêts et testés, mais **pas installé** : installation reportée par Mathias le 2026-10-06, à reproposer avec l'option `--sans-sauvegarde` | [ADR-0012](adr/0012-execution-native-mac.md), §1 à §3 |
+| **Docker / OrbStack** | Non déployé sur le Mac (constat du 25/09/2026, confirmé le 2026-10-06). Fichiers conservés pour une éventuelle distribution (`deploy/install.sh`), **sans maintenance active** | §4 |
+
+En attendant l'installation native, l'application se lance à la main depuis le dossier
+du projet : `uv run streamlit run app.py` (adresse `http://localhost:8501`).
+
+**Sauvegardes** : la tâche planifiée de sauvegarde du Mac (LaunchAgent
+`com.crocdeine.ministere-info.backup`, cassée depuis le 1er juin) a été supprimée le
+2026-10-06. Le directeur de projet est garant des sauvegardes : zip vérifié du projet à
+chaque grande étape, zip de la base avant toute écriture importante ou publication,
+registre `../ministere-de-l-info-backups/BACKUPS.md`. La sauvegarde quotidienne décrite
+au §2.5 reste disponible dans `install-native.sh`, mais n'est pas active.
+
+**Cible de production** (décision du 2026-10-06) : interface web emballée en application
+Mac (Tauri), pour un public très restreint. Prototype en cours sur la branche
+`poc/tauri`, hors `main` ; ce document ne le couvre pas.
 
 La publication des releases (image + base) est décrite dans
 [`deploy/README-deploy.md`](../deploy/README-deploy.md).
@@ -70,7 +84,7 @@ Adapter cette ligne si le projet est ailleurs, puis copier les blocs suivants te
 | Configuration enregistrée | `~/.config/ministere-info/native.conf` (projet, base, port, sauvegarde) |
 | LaunchAgent application | `~/Library/LaunchAgents/com.crocdeine.ministere-info.native.plist` (généré depuis `deploy/native/ministere-info.plist`) |
 | Script lancé par ce LaunchAgent | `~/.config/ministere-info/lancer-app.sh` (disque interne ; généré depuis `deploy/native/lancer-app.sh`, attend le montage du disque du projet) |
-| LaunchAgent sauvegarde | `~/Library/LaunchAgents/com.crocdeine.ministere-info.backup.plist` (généré depuis `scripts/com.crocdeine.ministere-info.backup.plist`) |
+| LaunchAgent sauvegarde | `~/Library/LaunchAgents/com.crocdeine.ministere-info.backup.plist` (généré depuis `scripts/com.crocdeine.ministere-info.backup.plist` ; absent du Mac depuis le 2026-10-06) |
 | Anciens LaunchAgents désactivés | `~/Library/LaunchAgents/desactives/` (archivés par `install-native.sh`, jamais supprimés) |
 | Journaux | `~/Library/Logs/ministere-info/` : `app.err.log`, `app.out.log`, `backup.log` (visibles dans l'app Console) |
 | Base | `MINISTERE_DB_PATH`, défaut `<projet>/data/ministere.duckdb` |
@@ -89,10 +103,9 @@ Adapter cette ligne si le projet est ailleurs, puis copier les blocs suivants te
 Priorité : option de `install-native.sh` > variable d'environnement > `native.conf` > défaut.
 Les valeurs retenues sont enregistrées dans `native.conf` et réutilisées aux relances.
 
-`MINISTERE_DB_PATH` n'est lue par l'application qu'à partir de l'intégration de
-`src/ministere_de_l_info/config.py` ; avant, l'application lit toujours
-`<projet>/data/ministere.duckdb`, qui est aussi la valeur par défaut. Ne pas utiliser
-`install-native.sh --base` avant cette intégration.
+`MINISTERE_DB_PATH` est lue par l'application via `src/ministere_de_l_info/config.py`
+(environnement, puis `.env`) ; `install-native.sh --base <chemin>` peut donc désigner une
+autre base.
 
 ---
 
@@ -155,8 +168,12 @@ Une sauvegarde lancée pendant un ETL s'abandonne d'elle-même (code 4) sans rie
 
 ### 2.5 Sauvegardes
 
+État au 2026-10-06 : aucune sauvegarde automatique n'est active sur le Mac (voir l'en-tête
+de ce document). Ce qui suit décrit l'outil disponible.
+
 **Automatique** : chaque jour à 3 h (au réveil si le Mac dormait ; sautée s'il était
-éteint). Installée par `install-native.sh`.
+éteint). Installée par `install-native.sh`, sauf avec l'option `--sans-sauvegarde`
+(option à retenir tant que le directeur de projet est garant des sauvegardes).
 
 **Manuelle** :
 
@@ -247,6 +264,10 @@ Vérification : l'app répond et les pages affichent des données. Supprimer ens
 ---
 
 ## 3. Installation directe (pas de Docker sur le Mac)
+
+**Non réalisée au 2026-10-06** : installation reportée par Mathias. Lors de sa reprise,
+lancer `install-native.sh --sans-sauvegarde` à l'étape 5 et sauter l'étape 6, sauf
+nouvelle décision sur les sauvegardes automatiques.
 
 Constat du 25/09/2026 : aucun conteneur ni image Docker de l'application n'existe sur
 le Mac mini. La période de double fonctionnement natif/Docker prévue par l'ADR-0012
@@ -415,8 +436,10 @@ l'étape 7 validée.
 
 ## 4. Mode Docker / OrbStack (repli, distribution)
 
-Ce mode reste fonctionnel mais **n'est pas déployé actuellement** (constat du
-25/09/2026 : aucun conteneur ni image sur le Mac mini). Il sert de repli possible et de
+Ce mode **n'est pas déployé** (constat du 25/09/2026 : aucun conteneur ni image sur le
+Mac mini) et **n'est plus maintenu activement** (décision du 2026-10-06). Les ports sont
+publiés sur `127.0.0.1` uniquement (`127.0.0.1:8501:8501`) : l'application n'est pas
+visible depuis le réseau local. Il sert de repli possible et de
 canal de distribution pour un éventuel tiers (`deploy/install.sh`, voir
 `deploy/README-deploy.md`). Deux configurations existent :
 
@@ -445,7 +468,10 @@ curl http://localhost:8501/_stcore/health
 La dernière commande doit répondre `ok`.
 
 Sans base locale : `./scripts/download_db.sh` (release la plus récente contenant
-`ministere.duckdb.gz`, `GITHUB_TOKEN` requis dans `.env`), ou exécution de l'ETL sur
+`ministere.duckdb.gz`, `GITHUB_TOKEN` requis dans `.env`). L'empreinte SHA256
+(`ministere.duckdb.gz.sha256`) est **obligatoire** : sans empreinte exploitable, ou si
+elle ne correspond pas, rien n'est installé (même règle dans `deploy/install.sh` et
+`deploy/update.sh`). Autre possibilité : exécution de l'ETL sur
 l'hôte (`uv sync --frozen --group etl`, puis les scripts `scripts/etl_*.py` et `load_*.py`).
 L'ETL s'exécute toujours sur l'hôte, jamais dans le conteneur.
 
@@ -509,11 +535,14 @@ la base du projet et ses sauvegardes sont à jour.
 ### 4.5 Publication de la base
 
 Toujours via le script, voir [`deploy/README-deploy.md`](../deploy/README-deploy.md)
-(convention d'empreinte : SHA256 de l'archive `.gz`) :
+(convention d'empreinte : SHA256 de l'archive `.gz`). Publication soumise à l'accord de
+Mathias ; zip de la base avant publication. Les releases de base portent un tag
+`db-AAAA-MM-JJ` (hors `v*`, pour ne pas déclencher la publication de l'image) ; dernière
+en date : `db-2026-10-04`. La release doit exister avant `gh release upload`.
 
 ```bash
-./scripts/publish_db.sh v0.X-description
-gh release upload v0.X-description --clobber data/ministere.duckdb.gz data/ministere.duckdb.gz.sha256
+./scripts/publish_db.sh db-AAAA-MM-JJ
+gh release upload db-AAAA-MM-JJ --clobber data/ministere.duckdb.gz data/ministere.duckdb.gz.sha256
 ```
 
 ### 4.6 Dépannage Docker

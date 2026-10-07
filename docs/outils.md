@@ -12,8 +12,8 @@ c'était déjà le cas avant cette session, rien n'a été réinstallé.
 
 ## Points d'attention
 
-- **graphify** : la sortie est dans `graphify-out/` (exclue localement via `.git/info/exclude`). À ajouter à
-  `.gitignore` et `.dockerignore` en Phase 1. Le libellé des communautés (`cluster-only`) a consommé ~52 000
+- **graphify** : la sortie est dans `graphify-out/`, exclue par `.gitignore` et `.dockerignore`
+  (vérifié le 2026-10-07). Le libellé des communautés (`cluster-only`) a consommé ~52 000
   jetons d'un modèle : utiliser `graphify update .` (sans modèle) pour les mises à jour courantes.
 - **omniroute** :
   - le serveur écoute sur **toutes les interfaces réseau** (`*:20128`), donc visible des autres appareils du
@@ -40,8 +40,11 @@ c'était déjà le cas avant cette session, rien n'a été réinstallé.
 
 ## Outils projet déjà présents
 
-- Skills projet (`.claude/skills/`) : `data-viz-politique`, `economie-tokens`, `insee-duckdb-loader`,
-  `latex-rapport-fr`, `projet-conventions`, `streamlit-duckdb-patterns`, `verifier-nuances-2008-2014`.
+- Skills projet (`.claude/skills/`, relevé du 2026-10-07) : `canvas-design`, `code-review-excellence`,
+  `data-viz-politique`, `design-system-mi` (design system v2, ADR-0014), `economie-tokens`,
+  `frontend-design`, `insee-duckdb-loader`, `latex-rapport-fr`, `projet-conventions`, `skill-creator`,
+  `streamlit-duckdb-patterns`.
+- Commande projet (`.claude/commands/`) : `verifier-nuances-2008-2014`. Hook : `.claude/hooks/session-start.sh`.
 - Agents projet (`.claude/agents/`) : voir `docs/equipe.md`.
 - Autres plugins actifs sur la machine : caveman (réponses concises), ruflo/claude-flow (non utilisé ici).
 
@@ -50,6 +53,5 @@ c'était déjà le cas avant cette session, rien n'a été réinstallé.
 | Date | Outil | Source | Raison |
 |---|---|---|---|
 | — | aucun ajout en Phase 0 | — | — |
-
-Proposé pour Phase 1 (dans les critères, sans compte ni paiement) : **gitleaks** via pre-commit
-(détection de secrets, exigée par les contraintes).
+| 2026-10-04 (J1) | **gitleaks** (hook pre-commit) + `detect-private-key` | `.pre-commit-config.yaml` | Détection de secrets, exigée par les contraintes |
+| 2026-10-06 | **pyright 1.1.408** (`uvx`, job CI bloquant) | `.github/workflows/ci.yml`, `[tool.pyright]` | Typage vérifié, 0 erreur |

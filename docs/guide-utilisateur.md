@@ -3,15 +3,24 @@
 Ce guide s'adresse à une personne qui utilise l'application sans connaître son
 fonctionnement technique. Il décrit chaque page et la façon de lire ce qu'elle affiche.
 
+Mis à jour le 2026-10-06 : interface « direction éditoriale » (design system v2). Des
+captures d'écran sont rangées dans `docs/captures/design-v2/` (Accueil, Élections,
+Législatif).
+
 ## Accéder à l'application
 
-- **Installation Mac (OrbStack)** : après le script d'installation, l'application démarre
-  toute seule ; ouvrir **http://localhost:8501** dans un navigateur.
-- **Depuis les sources** : lancer `uv run streamlit run app.py`, puis ouvrir la même adresse.
+- **Depuis le dossier du projet** (cas actuel sur le Mac) : lancer
+  `uv run streamlit run app.py` dans le Terminal, puis ouvrir **http://localhost:8501**
+  dans un navigateur.
+- **Démarrage automatique** : une installation « native » (l'application démarre seule à
+  l'ouverture de session) est prête mais pas encore installée ; voir `docs/deployment.md`.
+- L'application n'est visible que depuis l'ordinateur où elle tourne, pas depuis le
+  réseau local.
 
 La **barre latérale** (à gauche) sert à passer d'une page à l'autre : Accueil,
-Géographie, Élections, Législatif, Économie. Sur certaines pages, elle contient aussi des
-**paramètres** qui s'appliquent à toute la page.
+Géographie, Élections, Législatif, Économie. La page ouverte y apparaît en noir. Sur
+certaines pages (Géographie, Législatif), elle contient aussi des **paramètres** qui
+s'appliquent à toute la page.
 
 ### Vocabulaire commun
 
@@ -23,15 +32,33 @@ Géographie, Élections, Législatif, Économie. Sur certaines pages, elle conti
   attribué à la date de l'élection. Un même parti peut donc changer de bloc d'une
   élection à l'autre (par exemple LFI : gauche jusqu'en 2024, extrême gauche aux
   municipales 2026, selon les circulaires officielles).
+- **Origine du classement** : sous chaque carte électorale, une ligne indique la source
+  des résultats et l'origine du classement en blocs pour ce scrutin. Seules les
+  municipales 2020 et 2026 suivent telle quelle une grille officielle du ministère ; pour
+  les autres scrutins, le classement est reconstruit par le projet à partir de la grille
+  officielle la plus proche, et la légende le dit.
+- **« n.d. »** (non disponible) : la donnée n'existe pas ou est couverte par le secret
+  statistique. Une valeur absente n'est jamais affichée comme un zéro. Sur les cartes,
+  ces territoires sont en **gris foncé**, avec une case « n.d. » dans la légende.
+- **Fond de carte** : Plan IGN, atténué pour laisser ressortir les couleurs des données.
+- **Sources** : chaque graphique ou carte cite son producteur et sa licence.
 - **HdF** : région Hauts-de-France (Aisne, Nord, Oise, Pas-de-Calais, Somme).
 
 ---
 
 ## Accueil
 
-Page de départ. Quatre tuiles présentent les modules ; cliquer sur le titre d'une tuile
-ouvre la page correspondante. En bas, un encadré repliable « Diagnostic technique »
-affiche les versions des logiciels (utile seulement en cas de problème).
+Page de départ. La section **Modules** présente quatre tuiles numérotées (01 à 04) ;
+cliquer sur le titre d'une tuile ouvre la page correspondante. Chaque tuile précise le
+périmètre du module (France entière ou Hauts-de-France, années couvertes).
+
+La section **Sources, licences et dates** liste chaque jeu de données : nom, producteur,
+licence, date du dernier chargement dans l'outil (« Chargées le ») et lien vers la source.
+La base distribuée avec l'outil est placée sous licence ODbL (partage à l'identique),
+imposée par les données URSSAF.
+
+En bas, un encadré repliable « Diagnostic technique » affiche les versions des logiciels
+(utile seulement en cas de problème).
 
 ---
 
@@ -63,8 +90,12 @@ Le menu **« Niveau territorial »** propose 6 découpages :
 ### Lire la carte
 
 - Carte de population : **jaune clair** = faible population, **rouge foncé** = forte
-  population. Carte d'évolution : du rouge (baisse) au vert (hausse).
-- La **légende** indique les seuils. **Survoler** un territoire affiche son nom et sa valeur.
+  population. Carte d'évolution : de l'**orange** (baisse) au **violet** (hausse), en
+  passant par le blanc (stable, entre −1 % et +1 %). Ces couleurs restent lisibles par les
+  personnes daltoniennes.
+- La **légende** indique les seuils. Ils sont **fixes** : identiques pour toutes les
+  années, pour que deux cartes soient comparables. **Survoler** un territoire affiche son
+  nom et sa valeur.
 - Sous la carte, un **tableau** liste tous les territoires correspondant aux filtres, triés
   par population décroissante. Cliquer sur un en-tête de colonne le trie ; « n.d. » signale
   une donnée non disponible. Le bouton **Télécharger le tableau en CSV** l'exporte.
@@ -91,11 +122,14 @@ propres sélecteurs, placés au-dessus de la carte.
 - Choisir l'**année**, le **tour**, la **zone** (21e circonscription du Nord — Valenciennes,
   20 communes ; ou Hauts-de-France entière, plus lente à afficher) et le **mode de carte** :
   - **Bloc dominant** : chaque commune prend la couleur du bloc arrivé en tête ;
-  - **Score d'un bloc** : choisir un bloc, la carte montre son pourcentage par commune.
-- La métrique **Participation** est le taux de la zone : total des votants divisé par le
-  total des inscrits (chaque commune pèse selon son nombre d'inscrits).
-- **Évolution des blocs sur 25 ans** : graphique par tour, en voix ou en part des
-  suffrages exprimés.
+  - **Score d'un bloc** : choisir un bloc, la carte montre son pourcentage des suffrages
+    exprimés par commune, sur une échelle fixe de **0 à 100 %** (identique pour tous les
+    scrutins et tous les tours).
+- Quatre chiffres clés : nombre de **communes**, **inscrits**, **participation** et
+  **bloc majoritaire** de la zone. La participation est le total des votants divisé par
+  le total des inscrits (chaque commune pèse selon son nombre d'inscrits).
+- **Évolution des blocs politiques sur 25 ans** : graphique par tour, en « Part des
+  exprimés (%) » ou en « Voix totales ».
 - **Détail par commune** puis **Détail par bureau de vote** : choisir une commune dans la
   liste pour voir les résultats de chacun de ses bureaux.
 
@@ -117,7 +151,10 @@ propres sélecteurs, placés au-dessus de la carte.
   classé »** (gris) sont celles dont les listes ne reçoivent pas de nuance politique
   officielle (communes de moins de 3 500 habitants, sauf exceptions).
 - Un encadré d'information rappelle les limites propres à chaque scrutin.
-- **Détail par commune** : liste nominative des listes candidates et de leurs résultats.
+- **Évolution des blocs** : en « Part des exprimés (%) », calculée sur les seules
+  communes dont les listes sont nuancées, ou en « Voix totales ».
+- **Détail par commune** : répartition par bloc, puis détail des listes candidates et de
+  leurs résultats.
 
 ### Limites à connaître
 
@@ -146,15 +183,20 @@ Ces deux filtres s'appliquent aux quatre onglets.
 |--------|-----------------|
 | **Composition politique** | Répartition des élus en fonction par bloc (graphique en secteurs ; deux graphiques côte à côte si « toutes » les chambres), avec le nombre d'élus par bloc |
 | **Liste des élus** | Tableau des élus en fonction (nom, chambre, département, circonscription, groupe, bloc, profession), avec une recherche par nom |
-| **Activité parlementaire** | Assemblée nationale uniquement : classement des 20 premiers députés selon l'indicateur choisi (participation, loyauté au groupe, proximité avec la majorité, participation spécialisée), puis moyennes par bloc |
-| **Évolution historique** | Composition de l'Assemblée par législature (12e à 17e) |
+| **Activité parlementaire** | Assemblée nationale uniquement : recherche d'un député et sa **fiche** (scores, rang, mandats, bloc), classement des 20 premiers selon l'indicateur choisi (participation, loyauté au groupe, proximité avec la majorité, participation spécialisée), classement complet repliable, puis moyennes par bloc |
+| **Évolution historique** | Assemblée nationale uniquement : députés par législature (12e à 17e), avec un tableau « Détail par législature » repliable. Pour le Sénat, un message explique que la source ne date pas les groupes |
 
 ### Comprendre les données
 
 - Les **scores d'activité** sont calculés par le site Datan à partir des données de
   l'Assemblée ; il n'existe pas d'équivalent pour le Sénat dans l'application.
-- Le **bloc** d'un élu est déduit de son groupe parlementaire. Quelques exceptions sont
-  corrigées manuellement (par exemple des sénateurs RN siégeant parmi les non-inscrits).
+- Le **bloc** d'un élu est déduit de son groupe parlementaire, selon le classement du
+  groupe dans la législature concernée.
+- **Députés non inscrits** (sans groupe) : ils sont classés selon la nuance attribuée par
+  la préfecture à leur élection (ou à celle du député qu'ils remplacent). Si cette nuance
+  n'est pas publiée (élections partielles), ils sont classés « Divers ».
+- Deux sénateurs non inscrits élus sur une liste RN sont classés à l'extrême droite par
+  une correction manuelle documentée.
 - **Évolution historique** : chaque député est compté dans sa **dernière** législature ;
   le graphique est donc une approximation pour les députés réélus plusieurs fois.
 - Les votes nominatifs (qui a voté quoi) ne sont pas disponibles.
@@ -177,8 +219,13 @@ onglets.
 | Allocataires du RSA (nombre de foyers, pas un taux) | CNAF | 2020-2024 |
 | Accessibilité aux médecins généralistes (APL) | DREES | 2023 |
 
-- Les communes en **gris** n'ont pas de donnée (secret statistique de l'INSEE pour les
-  très petites communes, ou valeur manquante).
+- Les communes en **gris foncé** (« n.d. ») n'ont pas de donnée (secret statistique de
+  l'INSEE pour les très petites communes, ou valeur manquante).
+- Les **classes de couleur sont fixes** (par exemple 10, 15, 20 et 25 % pour le taux de
+  pauvreté), identiques pour toutes les années.
+- Pour les logements sociaux, l'emploi industriel et le RSA, une **classe « 0 »** (beige
+  très clair) distingue les communes qui n'en ont aucun de celles qui en ont peu.
+- Le niveau de vie médian est exprimé en euros courants, **non corrigés de l'inflation**.
 - La carte du RSA montre un **nombre** de foyers : les communes les plus peuplées
   ressortent mécaniquement.
 - **Détail d'une commune** (encadré repliable sous la carte) : choisir une commune pour
@@ -188,7 +235,7 @@ onglets.
 
 Trois vues au choix :
 
-- **Revenus & emploi (INSEE)** : agrégats régionaux calculés depuis les communes. Le taux
+- **Revenus & emploi (INSEE 2017-2021)** : agrégats régionaux calculés depuis les communes. Le taux
   de chômage est pondéré par le nombre d'actifs (≈ chômeurs / actifs de la région,
   2015-2021) ; le taux de pauvreté est une moyenne simple des communes et le niveau de
   vie une médiane des médianes communales (2017-2021) : ce ne sont pas les valeurs
@@ -219,7 +266,8 @@ de 15 à 64 ans.
   et la période 2020-2021.
 - **Détail d'une commune** : même courbe pour une commune.
 - **Déserts médicaux** : carte des communes où l'accessibilité aux médecins généralistes
-  est inférieure à 2,5 consultations par habitant et par an (seuil DREES), en rouge.
+  est inférieure à 2,5 consultations par habitant et par an (seuil DREES), en rouge ; les
+  autres communes en gris-bleu, les communes sans donnée en gris foncé (« n.d. »).
 
 ---
 
@@ -231,9 +279,13 @@ de 15 à 64 ans.
 | Populations | INSEE — populations légales (population municipale) |
 | Résultats électoraux | Ministère de l'Intérieur, publiés sur data.gouv.fr |
 | Classement politique | Circulaires de nuançage du ministère de l'Intérieur (voir `docs/sources-officielles/nuances/`) |
-| Députés | Datan (data.gouv.fr) |
+| Députés | Datan (data.gouv.fr) ; Assemblée nationale (historique des mandats, pour les non-inscrits) |
 | Sénateurs | Sénat (data.senat.fr) |
+| Fond de carte | IGN — Plan IGN |
 | Économie | INSEE (Filosofi, Recensement), CNAF, DREES, URSSAF, Eurostat |
+
+Le détail (producteur, licence, date de chargement, lien) est affiché sur l'Accueil,
+section « Sources, licences et dates ».
 
 ### Codes INSEE vs codes postaux
 
@@ -279,11 +331,14 @@ prend quelques secondes ; les suivants sont plus rapides dans la même session.
 
 ---
 
-**Q : Une page affiche « Données non chargées » ou « Base de données absente ».**
+**Q : Une page affiche « Données … non disponibles ».**
 
-R : La base locale ne contient pas encore les données de ce module. La commande à lancer
-est affichée sur la page ; en installation Mac, relancer le script de mise à jour ou
-réinstaller la base (voir `deploy/README-deploy.md`).
+R : Deux cas. « La base de données est introuvable » : le fichier de la base manque.
+« Ne contient pas encore ces données » : la base existe mais pas les données de ce
+module. Le message propose de lancer la mise à jour (script `update.sh`, installation
+Docker). Un encadré repliable « Informations pour les développeurs » donne la commande à
+lancer depuis le dossier du projet (Législatif : message « Données législatives non
+chargées » suivi de la commande).
 
 ---
 

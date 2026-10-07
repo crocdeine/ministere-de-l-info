@@ -2,9 +2,10 @@
 
 Consolidation des gotchas et leçons tirées de chaque phase. Mise à jour à chaque clôture de phase.
 
-Dernière mise à jour : 2026-09-24 — consolidation des phases D (élections complètes),
-E / E+ / E++ (Économie), F (Législatif) et du chantier design system, à partir des
-rapports de `reports/` et du code. Les sections ajoutées indiquent leur phase d'origine.
+Dernière mise à jour : 2026-10-06 — consolidation des phases D (élections complètes),
+E / E+ / E++ (Économie), F (Législatif), du chantier design system, puis de l'audit du
+2026-10-04 et des jalons J1 à J5, à partir des rapports de `reports/`, de
+`docs/journal.md` et du code. Les sections ajoutées indiquent leur phase d'origine.
 
 ---
 
@@ -28,7 +29,7 @@ rapports de `reports/` et du code. Les sections ajoutées indiquent leur phase d
 - **Nuances NULL** : colonne `nuance` absente pour présidentielles 2017/2022 et européennes 2019. Pour les présidentielles, résoudre via table `candidats_presidentielle` (jointure sur `nom`). Pour les européennes 2019, à traiter en Phase D selon le besoin.
 - **Codes nuances présidentielles 2002/2007/2012** : les nuances sont des abréviations de nom de candidat (`CHIR`, `JOSP`, `SARK`), pas des codes partisans comme dans les autres scrutins. La table `nuances_harmonisees` gère les deux conventions via la clé `(nuance, annee)`.
 - **Évolution des nuances dans le temps** : `DVG` en 2002 ≠ `DVG` en 2022. Ne jamais joindre sur `nuance` seul sans filtrer sur `annee`.
-- **Blocs officiels depuis 2023 seulement** : le regroupement officiel en 6 blocs de clivages n'existe que depuis la circulaire IOMA2322276J (sénatoriales 2023). Pour les scrutins antérieurs, reconstruction rétroactive selon la logique officielle datée — voir ADR-0005.
+- **Blocs officiels depuis 2020** : la première grille officielle de blocs de clivages est l'annexe 3 de INTA1931378J (municipales 2020), puis IOMA2322276J (2023) et INTP2602966C (2026) ; les circulaires législatives 2022 et 2024 n'en contiennent pas. Pour les scrutins sans grille : doctrine de l'ADR-0010 (grille la plus proche dans le temps, même famille politique). L'ancienne formule « blocs depuis 2023 » de l'ADR-0005 est révisée.
 - **Classement "de l'époque"** : un parti est classé selon le bloc qui lui était attribué à la date du scrutin. Ne jamais appliquer une grille rétroactivement (ex. : LFI = GAU en 2017/2022, pas EXG — ce basculement n'arrive qu'en 2026 avec INTP2602966C).
 
 ### Géographie électorale
@@ -103,7 +104,19 @@ rapports de `reports/` et du code. Les sections ajoutées indiquent leur phase d
   masquent l'appartenance réelle (cas de sénateurs RN) → table d'overrides avec
   justification, appliquée à la lecture.
 - **Une table de correspondance groupe → bloc sans dimension temporelle contredit le
-  classement « de l'époque »** (ADR-0005) : constat ouvert, voir ADR-0007 § Points ouverts.
+  classement « de l'époque »** (ADR-0005) : constat de l'ADR-0007, résolu par l'ADR-0011
+  (référentiel `leg_groupes_blocs` par législature).
+- **Un non-inscrit n'a pas de bloc « par défaut »** (J2, 2026-10-04 à 10-06) : le classer
+  « Divers » masque son orientation. Règle retenue : nuance préfectorale de son élection,
+  retrouvée sans deviner (appariement strict, motif explicite en cas d'échec) ; les
+  remplaçants et les élus de partielles exigent une source des causes de mandat (AMO30
+  de l'Assemblée nationale).
+- **Valider le contenu, pas l'en-tête HTTP** (2026-10-06) : data.senat.fr a servi une
+  page HTML avec le type `text/csv` à la place d'ODSEN_GENERAL. Un loader doit vérifier
+  la structure attendue (en-tête, colonnes) avant d'écrire en base. Correctif : PR #5,
+  fusionnée dans `main` (contrôle des premiers octets du fichier).
+- **Garder une copie datée des fichiers qui disparaissent** : le fichier Sénat de juin
+  2026 n'est plus téléchargeable ; il est conservé dans `data/exploration/`.
 - **Charger national, filtrer en UI** quand l'unité d'analyse est nationale (composition
   d'une assemblée) : quelques milliers de lignes seulement.
 
@@ -116,14 +129,19 @@ rapports de `reports/` et du code. Les sections ajoutées indiquent leur phase d
 - **Named volumes isolent du host** : un named volume Docker est opaque depuis le filesystem macOS. Les scripts ETL qui écrivent `data/ministere.duckdb` sur l'hôte ne sont pas visibles dans le container si celui-ci monte un named volume. Solution : bind mount `./data:/app/data:ro` en dev.
 - **Dev vs prod** : le compose dev utilise un bind mount (DB locale instantanément visible) ; le compose prod utilise un named volume (DB copiée une fois, container autonome). Ne pas confondre les deux en déploiement.
 - **Extension spatial DuckDB** : doit être pré-installée dans l'image Docker (`duckdb -c "INSTALL spatial"`), pas téléchargée au runtime. Sans ça, le container plante au premier `LOAD spatial` avec une erreur réseau ou "extension not found".
-- **uv dans Dockerfile** : ne pas utiliser `uv:latest` — pinner la version (`uv 0.11.16`) pour garantir des builds reproductibles. Constat 2026-09-24 : appliqué dans le `Dockerfile` racine, pas dans `deploy/Dockerfile`, qui produit l'image publiée sur GHCR (`uv:latest`).
+- **uv dans Dockerfile** : ne pas utiliser `uv:latest` — pinner la version (`uv 0.11.16`) pour garantir des builds reproductibles. Appliqué dans les deux Dockerfiles depuis J4 (2026-10-06), avec l’image Python figée par digest ; le 2026-09-24, `deploy/Dockerfile` utilisait encore `uv:latest`.
 - **Un tag `v*` déclenche la publication de l'image** (`docker-publish.yml`) : les tags correctifs `v0.4.2-actions-fix` et `v0.4.3-fix-spatial` existent sans release GitHub associée. Distinguer tag technique et release annoncée.
 - **pages/ dans l'image** : les pages Streamlit (`pages/`) doivent être COPY-ées explicitement dans le Dockerfile. Sans ça, l'app conteneurisée n'affiche que la page d'accueil.
 
 ### Backup
 
-- Le script `backup_db.sh` copie depuis le named volume Docker via `docker cp` — il ne fonctionne pas en dev avec bind mount (la DB est directement dans `data/`). Adapter si le workflow de backup change.
-- Le plist launchd est planifié à 3h quotidien ; vérifier `data/backups/backup.log` le lendemain après activation.
+- `scripts/backup_db.sh` sauvegarde le fichier désigné par `MINISTERE_DB_PATH` (lecture seule, copie vérifiée, rotation), pas le contenu d'un volume Docker.
+- **Une tâche planifiée non surveillée peut échouer en silence** : le LaunchAgent de sauvegarde pointait vers un ancien chemin et échouait depuis le 1er juin 2026 (accès refusé par macOS). Il a été supprimé le 2026-10-06 ; le directeur de projet est garant des sauvegardes (zips vérifiés, registre `../ministere-de-l-info-backups/BACKUPS.md`).
+- **Les copies de base s'accumulent** : 9 copies (≈ 8 Go) dans `data/`, non exclues par `.gitignore`. Règle depuis J4 : seules la base active et la dernière copie de sécurité restent dans `data/` ; `data/*.duckdb*` est ignoré par le dépôt.
+
+### Disque
+
+- **Disque interne saturé** (97 %, 6,2 Go libres le 2026-10-06) : le projet reste sur le disque externe. N'écrire aucun fichier volumineux (base, archives, caches) sur le disque interne ; vérifier l'espace libre avant un zip ou un rechargement de la base.
 
 ---
 
@@ -139,15 +157,41 @@ rapports de `reports/` et du code. Les sections ajoutées indiquent leur phase d
 - **Identifier le run du commit poussé** : comparer `headSha` du run à `git rev-parse HEAD`.
   En D3.3, le run 27265331430 a été surveillé à la place du run du commit `7f21346` ; un
   échec CI est passé inaperçu pendant deux commits.
-- La CI ne se déclenche que sur `main` et sur les PR vers `main` : un push sur une autre
-  branche ne lance rien.
+- La CI se déclenche sur les pushs vers `main` et `claude/**` et sur les PR vers `main` :
+  un push sur une autre branche (`docs/…`, `fix/…`) ne lance rien tant qu'aucune PR n'est
+  ouverte.
+
+### Branches et worktrees (2026-10-06)
+
+- **Branche distante en avance non vue** : comparer à une référence locale périmée fait
+  manquer des commits poussés ailleurs. Toujours `git fetch` avant de comparer ou de
+  fusionner, puis comparer à `origin/<branche>`.
+- **Worktrees d'agents basés sur un vieux `main`** : un worktree créé depuis une
+  référence locale ancienne travaille sur un état dépassé. Première commande d'un agent :
+  `git reset --hard origin/main` (après `git fetch`), puis vérifier `git log --oneline -1`.
+
+### Relais par un autre modèle (2026-10-04)
+
+- **Un relais peut déclarer « validé » sans rien exécuter** : Gemini (via Antigravity) a
+  annoncé une relecture de J2 « validée » sans lancer de tests ; elle n'a pas été retenue.
+  Une validation n'est recevable qu'avec les commandes exécutées et leur résultat cité
+  (règles de `docs/reprise.md`).
+
+### Remplacements de texte
+
+- **Espaces insécables** : le code formate les nombres avec une espace fine insécable
+  (U+202F, `_display.fmt_nd`), et la typographie française place des espaces
+  insécables (U+00A0) avant `:`, `;`, `%`, `»`. Un remplacement de texte (`sed`, `Edit`,
+  test d'égalité de chaîne) écrit avec une espace ordinaire ne trouve pas la cible.
+  Copier la chaîne depuis le fichier, ou normaliser les espaces avant de comparer.
 
 ### Rapports cités
 
-- Plusieurs rapports cités dans la documentation ou les docstrings n'existent pas dans le
-  dépôt (ex. `reports/exploration-elections.md`, `reports/verification-sources-phase-e-plus.md`,
-  rapports d'exploration Économie produits par des sous-agents). Commiter un rapport au
-  moment où on le cite, ou ne pas le citer.
+- Plusieurs rapports cités dans la documentation ou les docstrings ont longtemps manqué
+  au dépôt (ex. `reports/exploration-elections.md`, `reports/verification-sources-phase-e-plus.md`,
+  rapports d'exploration Économie produits par des sous-agents) ; 21 rapports historiques
+  ont été ajoutés le 2026-10-06 (J4). Commiter un rapport au moment où on le cite, ou ne
+  pas le citer.
 
 ### DuckDB en test
 
@@ -175,7 +219,10 @@ rapports de `reports/` et du code. Les sections ajoutées indiquent leur phase d
 - GeoJSON complet France entière = trop lourd pour Folium. `gdf.simplify(0.001)` en amont, ou pré-simplifier au chargement DuckDB (`geometry_simplified_*`).
 - **Clic sur carte** : `st_folium` ne renvoie pas les propriétés de l'entité cliquée dans la version utilisée (Phase D2) → drill-down par liste déroulante.
 - **Hachures Folium** non rendues : les communes « Non classé » sont en gris uni, la légende l'explique.
-- **Pattern de connexion réel** : Géographie utilise une connexion `@st.cache_resource` ; les modules `viz/*_queries.py` ouvrent une connexion `read_only` par appel et mettent le résultat en `@st.cache_data`. Les deux coexistent.
+- **Pattern de connexion réel** (depuis J4, 2026-10-06) : une seule fonction `viz/_queries.open_ro()` ouvre une connexion en lecture seule par appel, fermée aussitôt ; les résultats sont mis en `@st.cache_data`. L'ancienne connexion permanente `@st.cache_resource` de Géographie bloquait les rechargements ETL (verrou DuckDB) ; elle est supprimée. Mise en cache des requêtes Géographie : rerun de 2,49 s à 0,001 s.
+- **Onglets paresseux** (`st.tabs(..., on_change="rerun")`, Streamlit ≥ 1.57) : seul l'onglet ouvert est calculé ; sans précaution, les sélections des onglets fermés sont remises à zéro (`_theme.conserver_selections`, `index_persiste`).
+- **Une valeur absente n'est pas un zéro** (J1-J3) : afficher « n.d. » partout (`fmt_nd`, `na_rep="n.d."`) et garder les NULL jusqu'à l'affichage ; ne remplacer par 0 que les voix d'un bloc absent d'une commune.
+- **Classes de couleur fixes** : des seuils recalculés sur les données affichées rendent deux cartes incomparables ; `BORNES_FIXES` fixe les seuils par indicateur, et le score d'un bloc est toujours sur 0-100 %.
 
 ### Design system et navigation (août 2026)
 
