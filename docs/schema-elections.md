@@ -316,6 +316,32 @@ La même nuance peut désigner des formations différentes selon l'année. La cl
 
 ---
 
+### PIÈGE 5 — Municipales 2026 : nuance NULL
+
+49 637 lignes candidats des municipales 2026 (communes sous le seuil de nuançage,
+3 500 habitants) ont une nuance NULL dans la source : elles restent « Non classé »
+(bloc NULL), comme `NC` et `LNC`. Ce n'est pas une erreur de chargement.
+
+## Contrôles de chargement (vague B, 2026-10-07)
+
+Exécutés par `controler_chargement()` (`etl/loaders/elections_agregees.py`) à la fin de
+chaque loader :
+
+- **Unicité** des clés logiques des tables de résultats (`verifier_unicite_resultats`) :
+  `RuntimeError` en cas de doublon.
+- **Lignes écartées** (commune de la source absente de `geographies_communes`), par
+  scrutin et catégorie (`etranger` : département `ZZ` ; `pacifique` : communes `98…` et
+  départements `ZN`, `ZP`, `ZW`, `ZX` ; `reste` : essentiellement des communes fusionnées
+  depuis) : écrites dans la table **`elections_ecarts_chargement`** (`id_election`,
+  `perimetre`, `categorie`, `nb_communes`, `nb_bv`, `exprimes`, `exprimes_total`,
+  `pct_exprimes`), journalisées en warning ; `RuntimeError` si `reste` dépasse
+  `SEUIL_ECART_RESTE_PCT` (3 %) des exprimés d'un scrutin.
+- **Somme des voix = exprimés** par bureau (hors municipales, dont les communes
+  plurinominales additionnent des voix de candidats) : warning avec les 5 pires écarts,
+  non bloquant. Mesure France (2026-10-07) : 1 BV en 2009_euro_t1 (écart 180 voix,
+  scrutin à `no_panneau` NULL dans la source), 5 BV en 2024_legi_t1 et 1 en 2024_legi_t2
+  (écarts ≤ 2 voix) ; 0 ailleurs.
+
 ## Classements — blocs politiques
 
 Le classement de chaque candidat ou nuance dans un bloc repose sur la **nomenclature
