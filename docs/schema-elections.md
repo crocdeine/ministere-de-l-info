@@ -345,13 +345,28 @@ d'accueil, y compris aux municipales, où ses listes restent distinctes dans
 `v_listes_commune_muni` mais s'additionnent dans `v_scores_commune_muni`) ; scissions
 (créations, rétablissements : 999 événements) recensées mais jamais réparties ; une
 commune (code 26383 / 02899) reste non rattachée (≤ 184 exprimés par scrutin).
+
+Cas d'une commune rattachée à une commune d'un autre département : Cormicy (51171,
+Marne) a absorbé en 2017 une commune de l'Aisne (02344). Ses résultats portent
+`code_departement = '51'` (commune actuelle) mais gardent la circonscription du scrutin
+quand la source la fournit (`02-01` de 2012 à 2022) ; pour 2002 et 2007, la
+circonscription reconstruite est celle de la commune actuelle (`51-01`). Aucune
+correction : quelques dizaines d'exprimés par scrutin, hors HdF après rattachement.
+
+Municipales : `v_listes_commune_muni` expose `code_commune_origine` et calcule
+`pct_exprimes` sur les exprimés de la commune d'origine (une commune absorbée a eu sa
+propre élection) ; l'interface affiche « Liste de l'ancienne commune <code> ». Le nom de
+l'ancienne commune n'est pas en base.
 Effet mesuré : exprimés HdF en hausse de 0,06 % (2024) à 1,2 % (euro 1999) ; bilan
 France = total de la source (écart 0,000 %).
 
 ## Contrôles de chargement (vague B, 2026-10-07)
 
-Exécutés par `controler_chargement()` (`etl/loaders/elections_agregees.py`) à la fin de
-chaque loader :
+Chaque chargement (`DELETE` + `INSERT` + contrôles) s'exécute dans **une seule
+transaction** (`transaction()` de `elections_agregees.py`) : un contrôle en échec annule
+tout et laisse la base dans son état antérieur. En `--perimetre france`, une table
+`communes_passage` vide est une erreur bloquante (simple avertissement en HdF).
+Contrôles de `controler_chargement()` :
 
 - **Unicité** des clés logiques des tables de résultats (`verifier_unicite_resultats`) :
   `RuntimeError` en cas de doublon.
@@ -360,8 +375,10 @@ chaque loader :
   `etranger` : département `ZZ` ; `outremer_hors_referentiel` : communes `98…`, `977`,
   `978`, `97123`, `97127`, départements `ZN`, `ZP`, `ZW`, `ZX`, `ZT`, `ZY` ; `reste`) : écrites dans la table **`elections_ecarts_chargement`** (`id_election`,
   `perimetre`, `categorie`, `nb_communes`, `nb_bv`, `exprimes`, `exprimes_total`,
-  `pct_exprimes`), journalisées en warning ; `RuntimeError` si `reste` dépasse
-  `SEUIL_ECART_RESTE_PCT` (3 %) des exprimés d'un scrutin.
+  `pct_exprimes`), journalisées (info pour `rattachee`, warning sinon) ; `RuntimeError`
+  si `reste` dépasse `SEUIL_ECART_RESTE_PCT` (3 %) ou si `etranger` +
+  `outremer_hors_referentiel` dépassent `SEUIL_ECART_HORS_REFERENTIEL_PCT` (5 % ; mesuré
+  au plus ~2,5 %, législatives 2024) des exprimés d'un scrutin.
 - **Somme des voix = exprimés** par bureau (hors municipales, dont les communes
   plurinominales additionnent des voix de candidats) : warning avec les 5 pires écarts,
   non bloquant. Mesure France (2026-10-07) : 1 BV en 2009_euro_t1 (écart 180 voix,
@@ -529,6 +546,8 @@ Municipales, agrégat HdF (filtre explicite sur les 5 départements) : `(annee, 
 Détail liste par liste (drill-down) : une ligne par `(annee, tour, code_commune,
 no_panneau)` avec nuance, bloc, libellés, tête de liste, voix, `pct_exprimes`. En 2008,
 `no_panneau` est NULL et la liste est identifiée par ses descripteurs (correctif C1).
+`code_commune_origine` distingue les listes d'une commune absorbée depuis le scrutin ;
+leur `pct_exprimes` se rapporte aux exprimés de cette ancienne commune.
 
 ---
 
