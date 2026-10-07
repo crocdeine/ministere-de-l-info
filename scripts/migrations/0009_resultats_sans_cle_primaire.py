@@ -5,8 +5,9 @@ resultats_participation et resultats_candidats pesait ~1,1 Go en France entière
 Les deux tables sont reconstruites sans clé primaire (NOT NULL conservé sur les colonnes
 de la clé) ; l'unicité est contrôlée par les loaders (verifier_unicite_resultats).
 
-Idempotente : sans effet si les tables n'ont plus de clé primaire. Les vues restent
-valides (liées par nom). À lancer AVANT les rechargements --perimetre france.
+Idempotente : sans effet si les tables n'ont plus de clé primaire. Nombre de lignes
+contrôlé avant et après (RuntimeError, rollback). Les vues électorales, municipales et
+économiques sont recréées en fin de migration. À lancer AVANT les rechargements --perimetre france.
 
 Usage :
     uv run python scripts/migrations/0009_resultats_sans_cle_primaire.py
@@ -23,7 +24,10 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
+from ministere_de_l_info.etl.schema_economie import create_economie_views  # noqa: E402
 from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
+    create_elections_views,
+    create_municipales_views,
     retirer_cles_primaires_resultats,
 )
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
@@ -40,6 +44,10 @@ def main() -> None:
     con = open_connection(db_path)
     try:
         tables = retirer_cles_primaires_resultats(con)
+        # Vues dépendantes recréées (liées par nom, mais rebind explicite par sécurité)
+        create_elections_views(con)
+        create_municipales_views(con)
+        create_economie_views(con)
         con.execute("CHECKPOINT")
         logger.info("Migration 0009 : %s", ", ".join(tables) or "rien à faire (déjà appliquée)")
     finally:

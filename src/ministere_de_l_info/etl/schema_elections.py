@@ -1481,6 +1481,9 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("ALTER TABLE candidats_presidentielle ADD COLUMN IF NOT EXISTS parti VARCHAR")
     con.execute("ALTER TABLE candidats_presidentielle ADD COLUMN IF NOT EXISTS source_bloc VARCHAR")
 
+    # Vague B (2026-10-07) : lignes de la source non chargées, par scrutin et catégorie
+    con.execute(ECARTS_DDL)
+
     # Migration D1.2 : nouvelles colonnes pour les scrutins législatifs
     con.execute(
         "ALTER TABLE elections ADD COLUMN IF NOT EXISTS ancien_decoupage BOOLEAN DEFAULT FALSE"
@@ -1489,6 +1492,20 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
 
     logger.info("Schéma électoral créé/vérifié : 6 tables")
 
+
+# Lignes de la source écartées au chargement (commune absente de geographies_communes)
+ECARTS_DDL = """
+    CREATE TABLE IF NOT EXISTS elections_ecarts_chargement (
+        id_election    VARCHAR NOT NULL,
+        perimetre      VARCHAR NOT NULL,
+        categorie      VARCHAR NOT NULL,  -- etranger | pacifique | reste
+        nb_communes    INTEGER,
+        nb_bv          INTEGER,
+        exprimes       BIGINT,
+        exprimes_total BIGINT,            -- exprimés de la source sur le périmètre
+        pct_exprimes   DOUBLE
+    )
+"""
 
 # Clés logiques des tables de résultats (unicité contrôlée au chargement, sans index)
 CLES_RESULTATS: dict[str, tuple[str, ...]] = {
@@ -1524,11 +1541,17 @@ def retirer_cles_primaires_resultats(con: duckdb.DuckDBPyConnection) -> list[str
             continue
         con.execute("BEGIN TRANSACTION")
         try:
+            n_avant = ligne_unique(con.execute(f"SELECT COUNT(*) FROM {table}"))[0]  # noqa: S608
             con.execute(f"CREATE TABLE {table}__sans_pk AS SELECT * FROM {table}")  # noqa: S608
             con.execute(f"DROP TABLE {table}")
             con.execute(f"ALTER TABLE {table}__sans_pk RENAME TO {table}")
             for col in cles:
                 con.execute(f"ALTER TABLE {table} ALTER COLUMN {col} SET NOT NULL")
+            n_apres = ligne_unique(con.execute(f"SELECT COUNT(*) FROM {table}"))[0]  # noqa: S608
+            if n_apres != n_avant:
+                raise RuntimeError(
+                    f"{table} : {n_avant} lignes avant reconstruction, {n_apres} après"
+                )
             con.execute("COMMIT")
         except Exception:
             con.execute("ROLLBACK")
