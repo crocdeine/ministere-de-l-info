@@ -1,6 +1,6 @@
 # Point de reprise — à lire en premier par toute nouvelle session
 
-Dernière mise à jour : 2026-10-07, `main` à `6768623` (PR #1 à #7 fusionnées).
+Dernière mise à jour : 2026-10-07 (branche `release/v1.0`), `main` à `6768623` (PR #1 à #7 fusionnées).
 Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), `docs/roadmap.md`.
 
 ## Où on en est
@@ -17,6 +17,15 @@ Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), 
 - Exécution sur le Mac : native recommandée (ADR-0012) mais non installée (reportée) ; Docker
   non maintenu activement.
 - En attente de Mathias : contrôle visuel de J3 ; question Dependabot (oui / non).
+
+## Version 1.0 (branche `release/v1.0`, 2026-10-07)
+
+- Installateur en une commande (`install.sh`, `uninstall.sh`), version 1.0.0, `CHANGELOG.md`,
+  brouillon `docs/release-notes-v1.0.md`. Scénario local vert (rapport
+  `reports/release-v1-installateur-2026-10-07.md`, avec la liste de publication).
+- Base `db-2026-10-07` (vague B) branchée (`DB_TAG`) ; test réel avec téléchargement GitHub vert
+  (100 s, 1,9 Go). Reste : PR vers `main`, accord de Mathias pour le tag `v1.0.0`, test via la
+  vraie commande `curl | bash` après le tag.
 
 ## Prochaines étapes, dans l'ordre
 

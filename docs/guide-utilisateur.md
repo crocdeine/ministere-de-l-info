@@ -3,11 +3,42 @@
 Ce guide s'adresse à une personne qui utilise l'application sans connaître son
 fonctionnement technique. Il décrit chaque page et la façon de lire ce qu'elle affiche.
 
-Mis à jour le 2026-10-06 : interface « direction éditoriale » (design system v2). Des
+Mis à jour le 2026-10-07 : installation en une commande (version 1.0) ; interface « direction éditoriale » (design system v2). Des
 captures d'écran sont rangées dans `docs/captures/design-v2/` (Accueil, Élections,
 Législatif).
 
-## Accéder à l'application
+## Installer, ouvrir, mettre à jour, désinstaller
+
+**Installer** (une seule fois, environ 2 à 5 minutes selon la connexion ; 3 Go d'espace libre
+nécessaires) :
+
+1. Ouvrir l'application **Terminal** (Applications > Utilitaires).
+2. Coller la commande ci-dessous, appuyer sur Entrée :
+
+   ```
+   curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/install.sh | bash
+   ```
+
+3. Attendre le message « Installation terminée ». Aucun mot de passe n'est demandé.
+
+**Premier lancement** : dans le Finder, menu Aller > Départ, dossier **Applications**, icône
+**Ministère de l'Info** (double-clic ; on peut la glisser dans le Dock). La première ouverture
+prend quelques secondes, puis la page s'ouvre dans le navigateur. Les ouvertures suivantes
+rouvrent simplement la page. L'application fonctionne uniquement sur votre Mac, sans compte.
+
+**Mettre à jour** : relancer la même commande. La base n'est retéléchargée que si elle a changé.
+
+**Désinstaller** : coller dans le Terminal, puis répondre `o` :
+
+```
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/uninstall.sh | bash
+```
+
+**En cas de problème** : le message d'erreur indique le journal à transmettre
+(`~/Library/Logs/Ministere-de-l-Info/`). Testé sur Mac Apple Silicon (M1 et suivants) ; Mac Intel
+non testé.
+
+## Accéder à l'application (dossier du projet)
 
 - **Depuis le dossier du projet** (cas actuel sur le Mac) : lancer
   `uv run streamlit run app.py` dans le Terminal, puis ouvrir **http://localhost:8501**

@@ -23,6 +23,7 @@ sommaire (`grep -n '^## ' <fichier>`) avant d'ouvrir une section.
 
 | Fichier | Objet | Taille |
 |---|---|---|
+| [release-v1-installateur-2026-10-07.md](release-v1-installateur-2026-10-07.md) | Version 1.0 : installateur en une commande, scénario de test, liste de publication | 6 Ko |
 | [synthese-brainstorm-fonctionnalites-2026-10-06.md](synthese-brainstorm-fonctionnalites-2026-10-06.md) | Synthèse de l'équipe de réflexion : feuille de route A-D, garde-fous, 9 décisions | 5 Ko |
 | [brainstorm-revue-fonctionnalites-2026-10-06.md](brainstorm-revue-fonctionnalites-2026-10-06.md) | Revue des fonctionnalités en place, compléments | — |
 | [brainstorm-analyses-politiques-2026-10-06.md](brainstorm-analyses-politiques-2026-10-06.md) | Nouvelles analyses politiques, garde-fous | — |

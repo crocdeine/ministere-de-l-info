@@ -1,7 +1,7 @@
 [project]
 name = "ministere-de-l-info"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.0.0"
+description = "Data-visualisation électorale, économique et parlementaire de la France"
 readme = "README.md"
 authors = [
     { name = "Mathias", email = "bertinotti16@gmail.com" }

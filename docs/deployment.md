@@ -1,9 +1,10 @@
 # Déploiement et exploitation
 
-État au 2026-10-06 (orientations de Mathias, `docs/orientations.md`) :
+État au 2026-10-07 (orientations de Mathias, `docs/orientations.md`) :
 
 | Mode | Rôle | Référence |
 |---|---|---|
+| **Installateur v1.0** (`install.sh`, icône dans `~/Applications`) | **Distribution aux destinataires** (lecteurs) depuis la version 1.0.0 : une commande, sans sudo ni jeton, pas de LaunchAgent ni de sauvegarde | §0 |
 | **Natif** (uv + LaunchAgent macOS) | **Mode recommandé** sur le Mac mini. Scripts prêts et testés, mais **pas installé** : installation reportée par Mathias le 2026-10-06, à reproposer avec l'option `--sans-sauvegarde` | [ADR-0012](adr/0012-execution-native-mac.md), §1 à §3 |
 | **Docker / OrbStack** | Non déployé sur le Mac (constat du 25/09/2026, confirmé le 2026-10-06). Fichiers conservés pour une éventuelle distribution (`deploy/install.sh`), **sans maintenance active** | §4 |
 
@@ -17,12 +18,56 @@ chaque grande étape, zip de la base avant toute écriture importante ou publica
 registre `../ministere-de-l-info-backups/BACKUPS.md`. La sauvegarde quotidienne décrite
 au §2.5 reste disponible dans `install-native.sh`, mais n'est pas active.
 
-**Cible de production** (décision du 2026-10-06) : interface web emballée en application
-Mac (Tauri), pour un public très restreint. Prototype en cours sur la branche
-`poc/tauri`, hors `main` ; ce document ne le couvre pas.
+**Cible de production** : décision du 2026-10-07, la version 1.0 est l'application Streamlit
+actuelle, distribuée par l'installateur du §0. L'application Mac Tauri (décision du 2026-10-06,
+branche `poc/tauri`, hors `main`) reste une piste ultérieure ; ce document ne la couvre pas.
 
 La publication des releases (image + base) est décrite dans
 [`deploy/README-deploy.md`](../deploy/README-deploy.md).
+
+## 0. Installateur de la version 1.0 (destinataires)
+
+Commande (épinglée sur le tag, jamais sur `main`) :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/install.sh | bash
+```
+
+| Élément | Emplacement |
+|---|---|
+| Code (archive du tag `v1.0.0`), base, Python 3.12, environnement, uv | `~/Library/Application Support/Ministere-de-l-Info/` (`code/`, `ministere.duckdb`, `python/`, `venv/`, `bin/uv`) |
+| Empreinte de la base installée | `…/ministere.duckdb.gz.sha256` (base conservée à la mise à jour si inchangée) |
+| Port et PID du serveur lancé par l'icône | `…/port`, `…/serveur.pid` |
+| Icône | `~/Applications/Ministère de l'Info.app` (construite localement : pas de quarantaine Gatekeeper) |
+| Journaux | `~/Library/Logs/Ministere-de-l-Info/installation.log`, `application.log` |
+
+Fonctionnement : `install.sh` (tout le code dans `main`, appelée en dernière ligne) vérifie
+l'espace libre (3 Go si la base doit être téléchargée, 1 Go sinon), installe uv 0.11.16 dans
+le dossier d'installation, télécharge l'archive du tag, arrête le serveur éventuellement lancé,
+remplace le code, exécute `uv sync --frozen --no-dev --python 3.12`, installe l'extension DuckDB
+`spatial` (dans `~/.duckdb`, partagé), télécharge la base de la release `DB_TAG` (variable en tête
+du script) avec reprise (`curl -C -`), vérifie son SHA-256 (convention de `scripts/download_db.sh` :
+empreinte de l'archive, format historique accepté), puis crée l'icône. Au clic, l'icône relance la
+page si son serveur répond déjà, sinon démarre Streamlit sur 127.0.0.1 au premier port libre à
+partir de 8501 (fonctions de `deploy/native/commun.sh`), attend `/_stcore/health` (90 s au plus)
+et ouvre le navigateur ; en cas d'échec, une alerte donne le chemin du journal. Le serveur tourne
+jusqu'à la fermeture de session.
+
+Désinstallation (`--oui` pour ne pas demander confirmation) :
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/uninstall.sh | bash
+```
+
+Test local sans GitHub : variables `MI_SOURCE_ARCHIVE` (archive `git archive --prefix=…/`),
+`MI_DB_ARCHIVE` (avec `.sha256` à côté), `MI_INSTALL_DIR`, `MI_APPS_DIR`, `MI_LOG_DIR` ; le lanceur
+accepte `MI_NO_BROWSER=1` (affiche l'adresse au lieu d'ouvrir le navigateur). Procédure complète :
+`reports/release-v1-installateur-2026-10-07.md`.
+
+Limites : Mac Intel non testé ; pas d'icône graphique (icône générique) ; nouvelle version =
+nouveau tag, donc nouvelle commande à communiquer (la commande `v1.0.0` réinstalle toujours la 1.0.0).
+
+---
 
 Convention de ce document : les blocs de commandes se copient-collent tels quels dans
 le Terminal. Ils ne contiennent volontairement aucun commentaire `#` : le Terminal de
