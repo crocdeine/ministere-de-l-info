@@ -121,3 +121,14 @@ Voir `reports/synthese-brainstorm-fonctionnalites-2026-10-06.md`.
   › Ouvrir la première fois). À reconsidérer seulement si la diffusion l'exige.
 - Caches de développement sur le disque externe : `UV_CACHE_DIR` (uv) et Rust
   (`RUSTUP_HOME`, `CARGO_HOME`) sous `/Volumes/le gros stockage/outils/`, déclarés dans `~/.zshenv`.
+
+## Décisions du 2026-10-07 (outillage ECC)
+
+- **Planification** : notre pipeline (directeur, agents en worktree, questions fermées, rapports) est
+  conservé ; il est complété par le format de plan de `/ecc:plan` sous forme de **fiche de mission**
+  commitée dans `.claude/plans/` avant tout lancement d'agent qui modifie du code ou la base.
+- Relecture avant fusion par les agents relecteurs d'ECC (`ecc:python-reviewer`,
+  `ecc:silent-failure-hunter` pour l'ETL, relecteurs TypeScript/React/Rust pour l'application web).
+- Hook GateGuard d'ECC désactivé pour les modifications de fichiers (`ECC_DISABLED_HOOKS`) ; il reste
+  actif pour les commandes destructrices du Terminal. Packs de règles ECC non installés (conflit avec
+  ruff et notre seuil de couverture).
