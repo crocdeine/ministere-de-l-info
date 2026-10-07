@@ -141,3 +141,7 @@ cantonales plus tard ; classements : unions 100 % gauche → GAU, LDR régionale
 LUCD/BC-UCD 2021 → DTE, BC-UCG 2021 → DIV, LECO/BC-ECO 2021 (avec EELV) → GAU, européennes 2019
 Philippot → EXD et Vauclin → DIV, CPNT et Asselineau → DIV ; commune partagée entre circonscriptions
 rattachée à une seule (limite affichée). Addendum à l'ADR-0010.
+- **Communes fusionnées** (2026-10-07) : résultats des communes disparues rattachés à la commune
+  actuelle via la table officielle de l'INSEE (COG), code d'origine conservé ; scissions signalées
+  sans répartition des voix. Chargements : communes écartées et écarts voix/exprimés désormais
+  comptés et signalés (relectures ECC).
