@@ -45,6 +45,7 @@ Format repris de `/ecc:plan` (plugin ECC) et complété par les règles du proje
 - Commits tôt et souvent (WIP accepté) ; ne jamais pousser.
 - Aucune décision structurante ou de classement politique : questions fermées.
 - Réflexe documentation (table de `CLAUDE.md`).
+- Économie de jetons : skill `economie-tokens` (graphify avant grep, échelle ponytail).
 
 ## Validation finale
 ```bash

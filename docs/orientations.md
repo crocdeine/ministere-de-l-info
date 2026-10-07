@@ -145,3 +145,10 @@ rattachée à une seule (limite affichée). Addendum à l'ADR-0010.
   actuelle via la table officielle de l'INSEE (COG), code d'origine conservé ; scissions signalées
   sans répartition des voix. Chargements : communes écartées et écarts voix/exprimés désormais
   comptés et signalés (relectures ECC).
+
+## Décisions du 2026-10-07 (plugins : économie de jetons)
+
+- graphify : graphe du code mis à jour automatiquement à chaque commit (hook git, sans IA) ; requêtes
+  par noms de symboles avant grep. ponytail et karpathy-guidelines : échelle « écrire le moins de code
+  possible », changements chirurgicaux. Recherche large déléguée à `caveman:cavecrew-investigator`.
+  Règles dans la skill `economie-tokens`.
