@@ -67,6 +67,7 @@ class TestGetCircosHdfLegi:
         rows = con.execute("""
             SELECT DISTINCT v.code_circo
             FROM v_scores_circo_legi v
+            WHERE split_part(v.code_circo, '-', 1) IN ('02', '59', '60', '62', '80')
         """).fetchall()
         assert len(rows) == 50, f"Attendu 50 circos, trouvé {len(rows)}"
 
@@ -95,7 +96,8 @@ class TestGetCarteHdfData:
         """2022 t1 doit couvrir 50 circos."""
         n = ligne(
             con.execute(
-                "SELECT COUNT(DISTINCT code_circo) FROM v_scores_circo_legi WHERE annee = 2022 AND tour = 1"
+                "SELECT COUNT(DISTINCT code_circo) FROM v_scores_circo_legi WHERE annee = 2022 "
+                "AND tour = 1 AND split_part(code_circo, '-', 1) IN ('02', '59', '60', '62', '80')"
             )
         )[0]
         assert n == 50, f"Attendu 50 circos 2022t1, trouvé {n}"

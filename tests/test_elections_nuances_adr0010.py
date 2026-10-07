@@ -190,7 +190,8 @@ class TestLot1GrillesOfficielles:
 
     def test_lcom_gau_toutes_annees_municipales(self, con: duckdb.DuckDBPyConnection) -> None:
         rows = con.execute(
-            "SELECT annee, bloc FROM nuances_harmonisees WHERE nuance = 'LCOM' ORDER BY annee"
+            "SELECT annee, bloc FROM nuances_harmonisees WHERE nuance = 'LCOM' "
+            "AND annee IN (2008, 2014, 2020, 2026) ORDER BY annee"
         ).fetchall()
         assert rows == [(2008, "GAU"), (2014, "GAU"), (2020, "GAU"), (2026, "GAU")]
 

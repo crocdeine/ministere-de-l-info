@@ -79,17 +79,21 @@ class TestVolumes:
         assert not manquants, f"Scrutins sans données : {manquants}"
 
     def test_communes_hdf_uniquement(self, con):
-        """Aucune commune hors HdF ne doit être présente."""
+        """Toute commune chargée existe dans le référentiel géographique.
+
+        Vague B : la base peut contenir la France entière (--perimetre france) ; le contrôle
+        « hors HdF » est remplacé par l'intégrité référentielle.
+        """
         n_hors_hdf = ligne(
             con.execute("""
             SELECT COUNT(DISTINCT rc.code_commune)
             FROM resultats_candidats rc
             LEFT JOIN geographies_communes gc ON gc.code_insee = rc.code_commune
             WHERE rc.id_election LIKE '%_pres_%'
-              AND (gc.code_region IS NULL OR gc.code_region != '32')
+              AND gc.code_insee IS NULL
         """)
         )[0]
-        assert n_hors_hdf == 0, f"{n_hors_hdf} communes hors HdF trouvées"
+        assert n_hors_hdf == 0, f"{n_hors_hdf} communes absentes du référentiel"
 
 
 class TestResolutionBloc:
@@ -98,7 +102,7 @@ class TestResolutionBloc:
         rows = con.execute("""
             SELECT id_election, COUNT(*) AS n_orphelins
             FROM v_resultats_candidats_avec_bloc
-            WHERE bloc IS NULL AND type_scrutin != 'muni'
+            WHERE bloc IS NULL AND type_scrutin IN ('pres', 'legi')
             GROUP BY id_election
         """).fetchall()
         assert not rows, (

@@ -367,7 +367,7 @@ def get_croisement_eco_elections(
                 ON r.code_commune = e.code_commune AND r.annee_millesime = e.annee - 1
             LEFT JOIN geographies_communes gc ON gc.code_insee = e.code_commune
             WHERE e.annee = ? AND e.tour = ?
-              AND e.code_departement IN ('02', '59', '60', '62', '80')
+              AND LEFT(e.code_commune, 2) IN ('02', '59', '60', '62', '80')
         """
         params: list = [annee_election, tour]
         if bloc is not None:

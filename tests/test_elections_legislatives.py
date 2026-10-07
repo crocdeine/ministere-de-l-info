@@ -68,12 +68,14 @@ class TestVolumes:
         """Ordre de grandeur conforme au chargement (HdF, BV-level)."""
         n_part = ligne(
             con.execute(
-                "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_legi_%'"
+                "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_legi_%' "
+                "AND code_departement IN ('02', '59', '60', '62', '80')"
             )
         )[0]
         n_cand = ligne(
             con.execute(
-                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%'"
+                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_legi_%' "
+                "AND code_departement IN ('02', '59', '60', '62', '80')"
             )
         )[0]
         assert 50_000 < n_part < 120_000, f"participation hors plage : {n_part}"
@@ -160,7 +162,7 @@ class TestCodeCirco:
                 WHERE e.type_scrutin = 'legi' AND rp.code_circo IS NOT NULL
             """).fetchall()
         ]
-        pat = re.compile(r"^\d{2,3}-\d{2}$")
+        pat = re.compile(r"^(\d{2,3}|2[AB])-\d{2}$")
         invalides = [c for c in codes if not pat.match(c)]
         assert invalides == [], f"Codes circo invalides : {invalides[:10]}"
 
@@ -171,6 +173,7 @@ class TestCodeCirco:
             SELECT COUNT(DISTINCT code_circo) FROM resultats_participation rp
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'legi' AND e.tour = 1 AND rp.code_circo IS NOT NULL
+              AND split_part(rp.code_circo, '-', 1) IN ('02', '59', '60', '62', '80')
         """)
         )[0]
         assert n == 50, f"Attendu 50 circos HdF, trouvé {n}"

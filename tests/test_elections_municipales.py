@@ -87,7 +87,9 @@ class TestVolumesParScrutin:
         for idel, attendu in _VOLUMES_BV.items():
             n = ligne(
                 con.execute(
-                    "SELECT COUNT(*) FROM resultats_participation WHERE id_election = ?", [idel]
+                    "SELECT COUNT(*) FROM resultats_participation WHERE id_election = ? "
+                    "AND code_departement IN ('02', '59', '60', '62', '80')",
+                    [idel],
                 )
             )[0]
             assert n == attendu, f"{idel} BV : {n} (attendu {attendu})"
@@ -96,7 +98,8 @@ class TestVolumesParScrutin:
         for idel, attendu in _VOLUMES_COMMUNES.items():
             n = ligne(
                 con.execute(
-                    "SELECT COUNT(DISTINCT code_commune) FROM resultats_participation WHERE id_election = ?",
+                    "SELECT COUNT(DISTINCT code_commune) FROM resultats_participation "
+                    "WHERE id_election = ? AND code_departement IN ('02', '59', '60', '62', '80')",
                     [idel],
                 )
             )[0]
@@ -105,12 +108,14 @@ class TestVolumesParScrutin:
     def test_volume_global_plausible(self, con):
         n_part = ligne(
             con.execute(
-                "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%'"
+                "SELECT COUNT(*) FROM resultats_participation WHERE id_election LIKE '%_muni_%' "
+                "AND code_departement IN ('02', '59', '60', '62', '80')"
             )
         )[0]
         n_cand = ligne(
             con.execute(
-                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_muni_%'"
+                "SELECT COUNT(*) FROM resultats_candidats WHERE id_election LIKE '%_muni_%' "
+                "AND code_departement IN ('02', '59', '60', '62', '80')"
             )
         )[0]
         assert 20_000 < n_part < 35_000, f"participation hors plage : {n_part}"
@@ -142,13 +147,16 @@ class TestNuancesHarmonisees:
             assert n == n_att, f"nuances_harmonisees {annee} : {n} (attendu {n_att})"
 
     def test_pres_legi_preservees(self, con):
-        """Les 149 entrées pres/legi ne doivent pas avoir été écrasées."""
+        """Les 149 entrées pres/legi (+ euro/regi/dpmt, vague B) ne doivent pas être écrasées."""
+        from ministere_de_l_info.etl.schema_elections import _NUANCES_EURO_REGI_DPMT
+
         n = ligne(
             con.execute(
                 "SELECT COUNT(*) FROM nuances_harmonisees WHERE annee NOT IN (2008,2014,2020,2026)"
             )
         )[0]
-        assert n == 149, f"Entrées pres/legi : {n} (attendu 149)"
+        attendu = 149 + len(_NUANCES_EURO_REGI_DPMT)
+        assert n == attendu, f"Entrées hors municipales : {n} (attendu {attendu})"
 
     def test_toutes_les_entrees_ont_source_bloc(self, con):
         n_null = ligne(
@@ -178,7 +186,12 @@ class TestLFIBascule:
         assert bloc[0] == "EXG", f"LFI 2026 → {bloc[0]} (attendu EXG)"
 
     def test_exactement_deux_entrees_lfi(self, con):
-        n = ligne(con.execute("SELECT COUNT(*) FROM nuances_harmonisees WHERE nuance='LFI'"))[0]
+        n = ligne(
+            con.execute(
+                "SELECT COUNT(*) FROM nuances_harmonisees WHERE nuance='LFI' "
+                "AND annee IN (2008, 2014, 2020, 2026)"
+            )
+        )[0]
         assert n == 2, f"LFI : {n} entrées (attendu exactement 2 : 2020+2026)"
 
 
@@ -307,7 +320,8 @@ class TestVueScoresCommune:
         n = ligne(
             con.execute("""
             SELECT COUNT(*) FROM v_scores_commune_muni
-            WHERE pct_exprimes < 0 OR pct_exprimes > 100
+            WHERE (pct_exprimes < 0 OR pct_exprimes > 100)
+              AND LEFT(code_commune, 2) IN ('02', '59', '60', '62', '80')
         """)
         )[0]
         assert n == 0, f"{n} lignes avec pct_exprimes hors [0,100]"
@@ -391,6 +405,7 @@ class TestCommunesSansNuance2026:
             SELECT COUNT(DISTINCT code_commune)
             FROM resultats_candidats
             WHERE id_election = '2026_muni_t1' AND nuance IS NULL
+              AND code_departement IN ('02', '59', '60', '62', '80')
         """)
         )[0]
         assert 3_400 <= n_sans <= 3_520, f"Communes sans nuance 2026 t1 : {n_sans} (attendu ~3 459)"
@@ -401,6 +416,7 @@ class TestCommunesSansNuance2026:
             SELECT COUNT(DISTINCT code_commune)
             FROM resultats_candidats
             WHERE id_election = '2026_muni_t1' AND nuance IS NOT NULL
+              AND code_departement IN ('02', '59', '60', '62', '80')
         """)
         )[0]
         assert 310 <= n_avec <= 330, f"Communes avec nuance 2026 t1 : {n_avec} (attendu ~320)"

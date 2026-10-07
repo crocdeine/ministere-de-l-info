@@ -69,7 +69,8 @@ def _n_muni(con: duckdb.DuckDBPyConnection) -> int:
 class TestC2ReferentielsConserventMunicipales:
     def test_referentiel_contient_les_trois_jeux(self, con: duckdb.DuckDBPyConnection) -> None:
         n_total = ligne(con.execute("SELECT COUNT(*) FROM nuances_harmonisees"))[0]
-        assert n_total == len(_NUANCES_PRES) + len(_NUANCES_LEGI) + len(_NUANCES_MUNI)
+        attendu = len(_NUANCES_PRES) + len(_NUANCES_LEGI) + len(_NUANCES_MUNI)
+        assert n_total == attendu + len(schema_elections._NUANCES_EURO_REGI_DPMT)
         assert _n_muni(con) == _N_MUNI
 
     def test_relance_referentiels_conserve_les_nuances_muni(
