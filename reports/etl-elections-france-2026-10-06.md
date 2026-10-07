@@ -2,7 +2,16 @@
 
 Date : 2026-10-06 (exécution 2026-10-07) — branche `feat/elections-france-entiere` — agent `ingenieur-etl`.
 
-## Résumé exécutif (mis à jour le 2026-10-07 : durcissement et communes fusionnées)
+## Résumé exécutif (mis à jour le 2026-10-07 : correctifs des relectures)
+
+1. Fiche `.claude/plans/2026-10-07-vague-b-correctifs-relecture.plan.md` exécutée : chaque chargement (DELETE + INSERT + contrôles) est **une transaction** ; un contrôle en échec laisse la base intacte (testé).
+2. `communes_passage` vide en `--perimetre france` → erreur bloquante ; étranger + outre-mer hors référentiel bornés à 5 % des exprimés (mesuré ≤ ~2,5 %) ; communes rattachées journalisées en info.
+3. `v_listes_commune_muni` : `code_commune_origine` exposé, `pct_exprimes` calculé sur les exprimés de la commune d'origine ; l'interface affiche « Liste de l'ancienne commune <code> ». Deux sommes > 100 % restantes (2026 : 68374 t2, 37261 t1, 100,7-100,8 %) viennent de la source, sans rattachement en jeu.
+4. Cas Cormicy (02344 → 51171, hors région) documenté, sans correction.
+5. Rejeu sur la copie : base **1 297 Mo compactée, 731 Mo gzip** ; chargement ≈ 70 s ; « reste » ≤ 0,001 % ; tests : ruff OK, 329 hermétiques, 691 sur la copie France.
+
+### Résumé du 2026-10-07 (durcissement et communes fusionnées)
+
 
 1. Durcissement (fiche `.claude/plans/2026-10-07-vague-b-durcissement.plan.md`) : migration 0009 contrôlée (lignes avant/après, vues recréées) ; table `elections_ecarts_chargement` et contrôle bloquant au-delà de 3 % des exprimés ; alerte voix ≠ exprimés ; périmètre HdF centralisé (`perimetre.py`).
 2. Communes fusionnées (fiche `…-communes-fusionnees.plan.md`) : table `communes_passage` (INSEE COG 2026, 4 234 codes) ; résultats rattachés à la commune actuelle, code d'origine conservé (`code_commune_origine`, BV préfixés).
@@ -217,7 +226,7 @@ uv run python -c "import duckdb; c = duckdb.connect(); c.execute('LOAD spatial')
 c.execute(\"ATTACH 'data/ministere.duckdb' AS s (READ_ONLY)\"); \
 c.execute(\"ATTACH 'data/ministere-compact.duckdb' AS d\"); c.execute('COPY FROM DATABASE s TO d')"
 mv data/ministere-compact.duckdb data/ministere.duckdb
-uv run pytest -q        # 687 tests attendus verts sur la base France
+uv run pytest -q        # 691 tests attendus verts sur la base France
 ```
 
 Contrôle des écarts : `SELECT * FROM elections_ecarts_chargement WHERE categorie = 'reste' ORDER BY pct_exprimes DESC;` (attendu ≤ 0,001 %).
