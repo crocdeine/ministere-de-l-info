@@ -32,7 +32,7 @@ compte. Mise à jour : relancer la même commande. Désinstallation : même comm
 ## Limites
 
 - Mac uniquement. Testé sur Mac Apple Silicon ; Mac Intel non testé.
-- 3 Go d'espace libre nécessaires à l'installation, environ 2 Go occupés ensuite ; connexion Internet
+- 3 Go d'espace libre nécessaires à l'installation, 1,9 Go occupés ensuite ; connexion Internet
   nécessaire à l'installation, pas à l'usage (sauf fond de carte).
 - L'application ne fonctionne que sur l'ordinateur où elle est installée (adresse 127.0.0.1).
 - Données figées à la date de la base publiée (`db-2026-10-07`) ; les groupes du Sénat issus du

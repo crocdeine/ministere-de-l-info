@@ -61,7 +61,7 @@ curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.
 
 L'icône « Ministère de l'Info » apparaît dans le dossier Applications de votre dossier personnel
 (`~/Applications`) ; un double-clic ouvre l'application dans le navigateur. Environ 3 Go d'espace
-libre requis, 1,6 Go occupés ensuite. Mise à jour : relancer la même commande. Désinstallation :
+libre requis, 1,9 Go occupés ensuite. Mise à jour : relancer la même commande. Désinstallation :
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/uninstall.sh | bash
