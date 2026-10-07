@@ -55,7 +55,7 @@ SOURCES: dict[str, Source] = {
     ),
     "insee_cog": Source(
         "Code officiel géographique : mouvements des communes (rattachement des fusions)",
-        "INSEE",
+        "INSEE (Code officiel géographique)",
         LO2,
         "https://www.insee.fr/fr/information/8740218",
         ("communes_passage",),
