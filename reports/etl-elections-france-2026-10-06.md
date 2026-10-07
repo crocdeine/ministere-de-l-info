@@ -9,7 +9,7 @@ Date : 2026-10-06 (exécution 2026-10-07) — branche `feat/elections-france-ent
 3. Rejeu sur la copie : base **1 266 Mo compactée** (1 460 Mo avant compactage), **728 Mo en gzip** (contre 2,1 Go / 861 Mo avec clés primaires).
 4. Voix non classées : 0 % sur tous les scrutins euro/regi/dpmt, sauf les européennes 2009 (11 voix : résidus LPC/LDD/LDV).
 5. Temps : migration 0009 20 s, puis init 5 s, présidentielles 7 s, législatives 14 s, municipales 13 s, euro/regi/dpmt 14 s.
-6. Tests : ruff OK ; 333 réussis en hermétique (363 ignorés faute de base) ; 681 réussis sur la copie France. pyright non exécuté (PyPI injoignable).
+6. Tests : ruff OK ; 319 réussis en hermétique (363 ignorés faute de base) ; 681 réussis sur la copie France. pyright non exécuté (PyPI injoignable).
 
 ### Résumé initial (2026-10-06)
 
