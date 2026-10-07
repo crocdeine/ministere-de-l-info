@@ -132,3 +132,16 @@ Voir `reports/synthese-brainstorm-fonctionnalites-2026-10-06.md`.
 - Hook GateGuard d'ECC désactivé pour les modifications de fichiers (`ECC_DISABLED_HOOKS`) ; il reste
   actif pour les commandes destructrices du Terminal. Packs de règles ECC non installés (conflit avec
   ruff et notre seuil de couverture).
+
+## Décisions du 2026-10-07 (vague B — élections France entière)
+
+« Oui à tout » sur `reports/etl-elections-france-2026-10-06.md` : détail au bureau de vote pour toute
+la France ; clés primaires des tables de résultats supprimées (contrôle d'unicité au chargement) ;
+cantonales plus tard ; classements : unions 100 % gauche → GAU, LDR régionales 2004 → DTE,
+LUCD/BC-UCD 2021 → DTE, BC-UCG 2021 → DIV, LECO/BC-ECO 2021 (avec EELV) → GAU, européennes 2019
+Philippot → EXD et Vauclin → DIV, CPNT et Asselineau → DIV ; commune partagée entre circonscriptions
+rattachée à une seule (limite affichée). Addendum à l'ADR-0010.
+- **Communes fusionnées** (2026-10-07) : résultats des communes disparues rattachés à la commune
+  actuelle via la table officielle de l'INSEE (COG), code d'origine conservé ; scissions signalées
+  sans répartition des voix. Chargements : communes écartées et écarts voix/exprimés désormais
+  comptés et signalés (relectures ECC).
