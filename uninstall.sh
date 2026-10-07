@@ -25,7 +25,7 @@ main() {
   if [ "${1:-}" != "--oui" ]; then
     # Lecture sur le terminal : l'entrée standard est le script lui-même avec curl | bash.
     printf 'Confirmer ? (o/N) '
-    read -r reponse </dev/tty || reponse=""
+    { read -r reponse </dev/tty; } 2>/dev/null || reponse=""
     case "$reponse" in
       o | O | oui | OUI) ;;
       *)
