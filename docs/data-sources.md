@@ -155,8 +155,8 @@ Types : `pres`, `legi`, `euro`, `regi`, `muni`, `dpmt`, `cant`.
 Les scripts de chargement joignent sur `geographies_communes` : `--perimetre hdf` (défaut)
 ne conserve que `code_region = '32'` (02, 59, 60, 62, 80), `--perimetre france` toutes les
 communes du référentiel. Volumes France entière (vague B, 48 scrutins pres/legi/muni/euro/
-regi/dpmt) : 2,87 M bureaux × scrutin, 26,0 M lignes candidats ; base ≈ 2,1 Go (≈ 0,86 Go
-compressée). Lignes écartées (commune absente du référentiel) : ~2 000 BV par scrutin
+regi/dpmt) : 2,87 M bureaux × scrutin, 26,0 M lignes candidats ; base ≈ 1,27 Go compactée, sans
+clé primaire sur les résultats (≈ 0,73 Go compressée). Lignes écartées (commune absente du référentiel) : ~2 000 BV par scrutin
 avant 2017 (communes fusionnées depuis), ~900 après (Français de l'étranger « ZZ »,
 Nouvelle-Calédonie, Polynésie, Wallis). Codes « Z* » de l'outre-mer normalisés en `97x`.
 Étude d'impact : `reports/etl-elections-france-2026-10-06.md`.

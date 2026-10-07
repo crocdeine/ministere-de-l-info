@@ -249,3 +249,51 @@ sont alignés sur 80 entrées municipales.
 
 **Réversibilité** : chaque classement est une ligne de `schema_elections.py` ; l'ancien
 bloc est conservé dans `source_bloc` (`avant : …`).
+
+## Addendum 2026-10-07 — vague B : européennes, régionales, départementales
+
+Décision : Mathias, 2026-10-07 (« oui à tout » sur les questions Q3 à Q9 du rapport
+`reports/etl-elections-france-2026-10-06.md`). Exécution : `_NUANCES_EURO_REGI_DPMT`
+(155 entrées) et `_LISTES_EURO_2019` (34 listes, table `candidats_presidentielle`) dans
+`schema_elections.py` ; chaque `source_bloc` cite le motif, la grille, « ADR-0010 règle 2 »
+et « décision Mathias 2026-10-07 ».
+
+**Grilles appliquées (doctrine (b), règle 2)** : INTA1931378J (2020, annexe 3 p. 10) pour
+les scrutins de 1999 à 2021 ; IOMA2322276J (2023, annexes 1-2 p. 6-7) pour les européennes
+2024 (grille antérieure la plus proche) et `BC-UXD` 2021 (absent de la grille 2020, grille
+suivante). Les européennes 2014 reprennent les 17 codes des municipales 2014 ; les codes de
+liste 2004 sont communs aux européennes et aux régionales.
+
+| Bloc | Codes (année) |
+|---|---|
+| EXG | EXG 1999 ; LXG 2004 ; LEXG 2009, 2010, 2015, 2021, 2024 ; BC-EXG 2015, 2021 |
+| GAU | GAU, VEC, COM 1999 ; LPS, LVE, LPC, LDG, LGA 2004 ; LSOC, LVEC, LCOP, LDVG 2009 ; LUG, LSOC, LVEC, LDVG, LCOP 2010 ; LUG, LDVG, LVEC, LVEG, LFG, LCOM, LSOC, LRDG 2015 ; LUGE, LUG, LDVG, LFI, LSOC, LCOM, LECO 2021 ; BC-SOC, BC-UG, BC-DVG, BC-FG, BC-VEC, BC-COM, BC-RDG, BC-PG 2015 ; BC-UGE, BC-DVG, BC-UG, BC-SOC, BC-COM, BC-FI, BC-RDG, BC-ECO 2021 ; LUG, LFI, LVEC, LCOM, LDVG 2024 |
+| DIV | DIV, ECO, REG, CPNT 1999 ; LDV, LEC, LRG, LCP 2004 ; LAUT, LREG 2009, 2010 ; LREG, LDIV, LECO 2015 ; LREG, LDIV 2021 ; BC-DIV 2015 ; BC-DIV, BC-REG, BC-GJ, BC-UCG 2021 ; LDIV, LECO 2024 |
+| CENT | UDF 1999 ; LUDF 2004 ; LCMD 2009, 2010 ; LMDM, LUDI 2015 ; LUC, LDVC, LREM, LMDM, LUDI 2021 ; BC-UDI, BC-MDM, BC-UC 2015 ; BC-DVC, BC-UC, BC-REM, BC-UDI, BC-MDM 2021 ; LENS 2024 |
+| DTE | DTE, DVD 1999 ; LUMP, LDD, LDR 2004 ; LMAJ, LDVD 2009, 2010 ; LUD, LDLF, LDVD, LLR 2015 ; LUD, LLR, LDVD, LDSV, LUCD 2021 ; BC-UD, BC-UMP, BC-DVD, BC-DLF 2015 ; BC-DVD, BC-UD, BC-LR, BC-DSV, BC-UCD 2021 ; LLR, LDVD 2024 |
+| EXD | FRN, MNA 1999 ; LFN, LXD 2004 ; LFN, LEXD 2009, 2010, 2015 ; LRN, LEXD 2021 ; BC-FN, BC-EXD 2015 ; BC-RN, BC-EXD, BC-UXD 2021 ; LRN, LREC, LEXD 2024 |
+
+**Cas tranchés par Mathias** :
+
+| Question | Code | Bloc | Motif |
+|---|---|---|---|
+| Q3 | LGA 2004, LVEG 2015, LUGE 2021, BC-UGE 2021 | GAU | Union dont toutes les composantes sont de gauche (règle de composition) |
+| Q4 | LDR 2004 (régionales) | DTE | Libellé « droite », listes majoritairement UMP ; inclut des listes UDF autonomes (Santini, Bayrou, Arthuis), mélange mentionné dans `source_bloc` |
+| Q5 | LUCD, BC-UCD 2021 | DTE | Union du centre et de la droite |
+| Q6 | BC-UCG 2021 | DIV | Entente centre-gauche sans équivalent dans les grilles, comme LGC 2008 |
+| Q7 | LECO, BC-ECO 2021 | GAU | Aucun code VEC en 2021 : le code englobe EELV ; sens de l'époque, comme ECO aux législatives 2017/2022 |
+| Q8 | Européennes 2019 : Philippot ; Vauclin | EXD ; DIV | Listes sans nuance de la source (classement par tête de liste) |
+| Q9 | CPNT 1999, LCP 2004 ; Asselineau 2019 | DIV | CPNT autonome (règle 3, comme 2002/2007) ; UPR nuancée LDIV par le ministère en 2024 |
+
+**Européennes 2019** (34 listes, grille 2020) : EXD Bardella, Camus, Philippot ; CENT
+Loiseau, Lagarde ; GAU Jadot, Aubry, Glucksmann, Hamon, Brossat ; DTE Bellamy,
+Dupont-Aignan, de Prévoisin ; EXG Arthaud, Sanchez ; DIV les 19 autres listes.
+
+**Restent sans bloc** : `LPC`, `LDD`, `LDV` aux européennes 2009 (résidus de codes 2004,
+11 voix au total). Cantonales 2001-2011 : non chargées (décision Q10, plus tard).
+
+**Volumes** : `nuances_harmonisees` = 384 entrées (38 pres, 111 legi, 80 muni, 155
+euro/regi/dpmt) ; `candidats_presidentielle` = 57 entrées (23 + 34).
+
+**Tests** : `tests/test_elections_france_vague_b.py` (clés uniques, blocs valides, grille
+citée dans chaque `source_bloc`, résolution par la vue, idempotence).

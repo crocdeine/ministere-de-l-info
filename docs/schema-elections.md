@@ -85,12 +85,17 @@ Référentiel des 56 scrutins disponibles dans le dataset (1999–2026).
 Données de participation électorale par bureau de vote. Correspond au fichier source
 `candidats-results.parquet` (nommage trompeur — voir [PIÈGE 1](#pieges-connus)).
 
+**Pas de clé primaire** (décision Mathias 2026-10-07, migration 0009) : les colonnes
+marquées « clé » forment une clé logique (NOT NULL) sans index ; l'index pesait ~1,1 Go en
+France entière. L'unicité est contrôlée par les loaders (`verifier_unicite_resultats`,
+erreur si doublon).
+
 | Colonne | Type | Description |
 |---------|------|-------------|
-| `id_election` | `VARCHAR` PK | FK → `elections.id_election` |
-| `code_departement` | `VARCHAR` PK | Code département sans zéro-padding (`'59'`, `'2A'`) |
-| `code_commune` | `VARCHAR` PK | Code INSEE commune, 5 chars zéro-paddé (`'59606'`) |
-| `code_bv` | `VARCHAR` PK | Identifiant du bureau de vote |
+| `id_election` | `VARCHAR` clé | FK → `elections.id_election` |
+| `code_departement` | `VARCHAR` clé | Code département sans zéro-padding (`'59'`, `'2A'`) |
+| `code_commune` | `VARCHAR` clé | Code INSEE commune, 5 chars zéro-paddé (`'59606'`) |
+| `code_bv` | `VARCHAR` clé | Identifiant du bureau de vote |
 | `inscrits` | `INTEGER` | Inscrits sur les listes électorales |
 | `abstentions` | `INTEGER` | Abstentions |
 | `votants` | `INTEGER` | Votants (inscrits – abstentions) |
@@ -108,14 +113,15 @@ Données de participation électorale par bureau de vote. Correspond au fichier 
 
 Résultats par candidat, par bureau de vote. Correspond au fichier source
 `general-results.parquet` (nommage trompeur — voir [PIÈGE 1](#pieges-connus)).
+Même règle de clé logique sans index que `resultats_participation`.
 
 | Colonne | Type | Description |
 |---------|------|-------------|
-| `id_election` | `VARCHAR` PK | FK → `elections.id_election` |
-| `code_departement` | `VARCHAR` PK | Code département |
-| `code_commune` | `VARCHAR` PK | Code INSEE commune 5 chars |
-| `code_bv` | `VARCHAR` PK | Identifiant du bureau de vote |
-| `no_panneau` | `INTEGER` PK | Numéro de panneau (ordre alphabétique du candidat) |
+| `id_election` | `VARCHAR` clé | FK → `elections.id_election` |
+| `code_departement` | `VARCHAR` clé | Code département |
+| `code_commune` | `VARCHAR` clé | Code INSEE commune 5 chars |
+| `code_bv` | `VARCHAR` clé | Identifiant du bureau de vote |
+| `no_panneau` | `INTEGER` clé | Numéro de panneau (ordre alphabétique du candidat) |
 | `nuance` | `VARCHAR` | Code politique — NULL pour pres 2017/2022 et euro 2019 |
 | `sexe` | `VARCHAR` | Sexe déclaré du candidat |
 | `nom` | `VARCHAR` | Nom de famille MAJUSCULES (tel que dans le Parquet) |
@@ -191,7 +197,7 @@ Mapping `(nuance, annee) → bloc` pour les scrutins **avec nuances** dans le Pa
 | `bloc` | `VARCHAR` NN | FK → `blocs_politiques.bloc` |
 | `source_bloc` | `VARCHAR` | Justification courte du classement (1 ligne, modèle `candidats_presidentielle`) |
 
-**Couverture** : **378 entrées**, source unique `schema_elections.py` (listes
+**Couverture** : **384 entrées**, source unique `schema_elections.py` (listes
 `_NUANCES_PRES`, `_NUANCES_LEGI`, `_NUANCES_MUNI`, `_NUANCES_EURO_REGI_DPMT`) :
 
 | Jeu | Années | Entrées |
@@ -199,13 +205,14 @@ Mapping `(nuance, annee) → bloc` pour les scrutins **avec nuances** dans le Pa
 | Présidentielles (codes-candidats) | 2002 (16), 2007 (12), 2012 (10) | 38 |
 | Législatives (codes partisans) | 2002 (22), 2007 (17), 2012 (17), 2017 (17), 2022 (16), 2024 (22) | 111 |
 | Municipales (codes de liste) | 2008 (15), 2014 (17), 2020 (23), 2026 (25) | 80 |
-| Européennes, régionales, départementales — **proposition vague B, à valider** | euro 1999 (13), 2004 euro+regi (15), euro 2009 (12), regi 2010 (13), regi 2015 (20), regi 2021 (20), dpmt 2015 (19), dpmt 2021 (23), euro 2024 (14) | 149 |
+| Européennes, régionales, départementales (vague B, décision Mathias 2026-10-07) | euro 1999 (13), 2004 euro+regi (16), euro 2009 (12), regi 2010 (13), regi 2015 (20), regi 2021 (22), dpmt 2015 (19), dpmt 2021 (26), euro 2024 (14) | 155 |
 
 Vague B : les européennes 2014 utilisent les codes des municipales 2014 (même année,
 même sens) ; les codes de liste 2004 sont communs aux européennes et aux régionales.
-Codes ambigus **non insérés** (bloc NULL) en attendant la décision de Mathias : `LDR`
-2004, `LUCD` / `LECO` 2021, `BC-UCD` / `BC-UCG` / `BC-ECO` 2021
-(`_CODES_VAGUE_B_NON_CLASSES`, détail : `reports/etl-elections-france-2026-10-06.md`).
+Cas tranchés par Mathias le 2026-10-07 (addendum « vague B » de l'ADR-0010) : `LDR` 2004
+→ DTE, `LUCD` / `BC-UCD` 2021 → DTE, `BC-UCG` 2021 → DIV, `LECO` / `BC-ECO` 2021 → GAU
+(EELV inclus), unions 100 % gauche → GAU. Seuls codes sans bloc : résidus `LPC`, `LDD`,
+`LDV` des européennes 2009 (11 voix ; `_CODES_VAGUE_B_NON_CLASSES`).
 `populate_nuances_vague_b()` écrit ces entrées par `INSERT OR REPLACE` ciblé.
 
 Les listes municipales 2020 et 2026 reprennent intégralement les codes de liste des
@@ -248,11 +255,12 @@ Chaque entrée porte le parti d'appartenance et la justification sourcée du cla
 | `libelle` | `VARCHAR` | Nom complet lisible (`'Marine Le Pen'`) |
 | `source_bloc` | `VARCHAR` | Justification datée du classement (circulaire ou décision CE) |
 
-**Couverture** : 11 candidats 2017 + 12 candidats 2022 = 23 entrées, plus 32 listes
-**européennes 2019** (nuance NULL dans la source, même mécanisme ; proposition vague B) :
+**Couverture** : 11 candidats 2017 + 12 candidats 2022 = 23 entrées, plus 34 listes
+**européennes 2019** (nuance NULL dans la source, même mécanisme ; décision Mathias
+2026-10-07) :
 pour ce scrutin, `resultats_candidats.nom` reçoit `nom_tete_liste` de la source
-(ex. `'BARDELLA Jordan'`) et la clé `nom` de cette table a le même format. Listes non
-classées (bloc NULL) : Philippot, Vauclin.
+(ex. `'BARDELLA Jordan'`) et la clé `nom` de cette table a le même format. Toutes les
+listes sont classées (Philippot → EXD, Vauclin → DIV).
 
 ---
 
@@ -449,7 +457,10 @@ dont `code_circo` est renseigné sont comptés. `ancien_decoupage` = TRUE pour 2
 source), la circonscription est reconstruite : circonscription du département de la
 commune la plus proche de son centroïde (correctif vague B ; avant, un centroïde pouvait
 tomber dans une circonscription d'un département voisin). Une commune coupée entre
-plusieurs circonscriptions (Paris, Marseille…) est entièrement affectée à une seule.
+plusieurs circonscriptions (Paris, Marseille…) est entièrement affectée à une seule :
+**limite acceptée** par Mathias le 2026-10-07 (législatives 2024 en France entière : 529
+circonscriptions représentées sur 559). L'interface la signale pour 2002/2007
+(`_WARNING_ANCIEN_DECOUPAGE`, pages/elections_legislatives.py) ; pas encore pour 2024.
 
 ### `v_scores_commune_muni`
 
