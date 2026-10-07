@@ -115,3 +115,10 @@ nohup.out
 
 # Graphe du code (graphify), régénérable : graphify update .
 graphify-out/
+
+# Prototype web (A0) : dépendances, données exportées, compilation Tauri
+web/node_modules/
+web/public/data/
+web/src-tauri/target/
+web/src-tauri/gen/
+*.dmg
