@@ -2,7 +2,7 @@
 #
 # Installateur de « Ministère de l'Info » (macOS), en une commande :
 #
-#   curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/install.sh | bash
 #
 # Installe (ou met à jour) l'application dans
 #   ~/Library/Application Support/Ministere-de-l-Info/   (code, base, Python, environnement)
@@ -24,7 +24,7 @@
 
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 DB_TAG="db-2026-10-07"      # release GitHub de la base (asset ministere.duckdb.gz + .sha256)
 VERSION_UV="0.11.16"        # même version que deploy/native/install-native.sh
 DEPOT="crocdeine/ministere-de-l-info"
@@ -109,7 +109,7 @@ main() {
   # ── 4. Python et dépendances ────────────────────────────────────────────
   etape "4/7 Installation de Python et des bibliothèques (quelques minutes la première fois)..."
   lancer "Installation des bibliothèques impossible (connexion Internet ?)." \
-    "$uv" sync --frozen --no-dev --python 3.12 --project "$install_dir/code"
+    "$uv" sync --frozen --no-dev --compile-bytecode --python 3.12 --project "$install_dir/code"
   lancer "Extension cartographique de DuckDB impossible à installer (connexion Internet ?)." \
     "$install_dir/venv/bin/python" -c \
     "import duckdb; c = duckdb.connect(); c.execute('INSTALL spatial'); c.execute('LOAD spatial')"
@@ -271,9 +271,19 @@ ouvrir() {
   open "http://127.0.0.1:$1"
 }
 
-# Serveur déjà lancé par cette icône et qui répond : on rouvre simplement la page.
-if [ -f "$FICHIER_PORT" ] && [ -f "$FICHIER_PID" ] &&
-  kill -0 "$(cat "$FICHIER_PID")" 2>/dev/null && app_repond "$(cat "$FICHIER_PORT")"; then
+# Bibliothèques précompilées à l'installation : laisser Python écrire son cache.
+unset PYTHONDONTWRITEBYTECODE
+ATTENTE=300
+notifier() {
+  osascript -e "display notification \"$1\" with title \"Ministère de l'Info\"" >/dev/null 2>&1 || true
+}
+
+# Serveur déjà lancé par cette icône : on rouvre la page, en attendant la fin de son démarrage
+# s'il démarre encore (jamais un second serveur).
+if [ -f "$FICHIER_PORT" ] && [ -f "$FICHIER_PID" ] && kill -0 "$(cat "$FICHIER_PID")" 2>/dev/null; then
+  app_repond "$(cat "$FICHIER_PORT")" || notifier "Démarrage en cours, la page va s'ouvrir…"
+  attendre_app "$(cat "$FICHIER_PORT")" "$ATTENTE" ||
+    alerte "L'application démarre encore. Réessayez dans une minute. Journal : $JOURNAL"
   ouvrir "$(cat "$FICHIER_PORT")"
   exit 0
 fi
@@ -294,7 +304,8 @@ MINISTERE_DB_PATH="$INSTALL_DIR/ministere.duckdb" nohup "$INSTALL_DIR/venv/bin/p
   </dev/null >>"$JOURNAL" 2>&1 &
 echo $! >"$FICHIER_PID"
 
-attendre_app "$PORT" 90 ||
+notifier "Démarrage en cours, la page va s'ouvrir…"
+attendre_app "$PORT" "$ATTENTE" ||
   alerte "L'application ne démarre pas. Journal : $JOURNAL"
 ouvrir "$PORT"
 EOF

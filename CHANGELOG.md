@@ -7,6 +7,17 @@ Toutes les évolutions notables de ministere-de-l-info. Format :
 
 ## [Non publié]
 
+## [1.0.1] — 2026-10-07
+
+### Corrigé
+- Premier lancement : les bibliothèques sont précompilées à l'installation (`uv sync --compile-bytecode`) ;
+  sans cela, le premier démarrage pouvait dépasser le délai d'attente et afficher « L'application ne
+  démarre pas ».
+- Lanceur : attend un serveur déjà en cours de démarrage au lieu d'en lancer un second ; notification
+  « Démarrage en cours » ; délai d'attente porté de 90 s à 5 min ; ignore `PYTHONDONTWRITEBYTECODE`.
+- Désinstallation : arrête tous les serveurs de l'application, pas seulement le dernier enregistré.
+
+
 ## [1.0.0] — 2026-10-07
 
 Première version de production : l'application Streamlit complète, installée sur un Mac par une
