@@ -3,7 +3,7 @@ import type { ExpressionSpecification, Map as CarteML } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 // Worker MapLibre empaqueté par Vite (sinon introuvable après build).
 import urlWorker from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import { Protocol } from "pmtiles";
+import { PMTiles, Protocol, type RangeResponse, type Source } from "pmtiles";
 import { useEffect, useRef, useState } from "react";
 import { type Meta, urlDonnees } from "./donnees";
 
@@ -30,7 +30,25 @@ const COUCHE = "communes"; // nom de la couche dans les tuiles (tippecanoe -l)
 const OPACITE = 0.85;
 const FONDU_MS = 220;
 
+/**
+ * Archive lue en entier puis découpée en mémoire : le protocole tauri:// ignore l'en-tête
+ * Range (réponse 200 avec le fichier complet, mesuré), ce qui bloque la lecture par plages.
+ */
+class SourceMemoire implements Source {
+  private octets: Promise<ArrayBuffer> | null = null;
+  constructor(private readonly url: string) {}
+  getKey(): string {
+    return this.url;
+  }
+  async getBytes(offset: number, length: number): Promise<RangeResponse> {
+    this.octets ??= fetch(this.url).then((r) => r.arrayBuffer());
+    return { data: (await this.octets).slice(offset, offset + length) };
+  }
+}
+
+const URL_TUILES = urlDonnees("communes.pmtiles");
 const protocole = new Protocol();
+if (location.protocol === "tauri:") protocole.add(new PMTiles(new SourceMemoire(URL_TUILES)));
 maplibregl.addProtocol("pmtiles", protocole.tile);
 maplibregl.setWorkerUrl(urlWorker);
 
@@ -110,7 +128,7 @@ export function Carte({ meta, scrutin, strategie, fondu, onCarte, onSurvol }: Pr
           },
           [SOURCE]: {
             type: "vector",
-            url: `pmtiles://${urlDonnees("communes.pmtiles")}`,
+            url: `pmtiles://${URL_TUILES}`,
             promoteId: { [COUCHE]: "code" },
             attribution: meta.sources.elections.mention,
           },
