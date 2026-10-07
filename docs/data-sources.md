@@ -100,8 +100,8 @@ plus récents. À remplacer par un export officiel AN dès disponibilité.
 | Granularité | Bureau de vote |
 | Couverture | 56 scrutins de 1999 à 2026 au référentiel (euro, pres, legi, regi, muni, dpmt, cant) ; 30 chargés (pres, legi, muni) |
 | Volume | ~28 M lignes / 222 MB (deux fichiers Parquet) |
-| Filtrage | Hauts-de-France uniquement (code_region = '32') au chargement |
-| Scripts | `scripts/load_elections_presidentielles.py`, `load_elections_legislatives.py`, `load_elections_municipales.py` |
+| Filtrage | `--perimetre hdf` (défaut, code_region = '32') ou `--perimetre france` au chargement (vague B) |
+| Scripts | `scripts/load_elections_presidentielles.py`, `load_elections_legislatives.py`, `load_elections_municipales.py`, `load_elections_autres.py` (euro, regi, dpmt) ; code partagé `etl/loaders/elections_agregees.py` |
 
 Le dataset est distribué en deux fichiers Parquet au nommage contre-intuitif :
 
@@ -127,7 +127,8 @@ La colonne `nuance` (code partisan) est **entièrement NULL** pour 5 scrutins :
 | 2022_pres_t2 | 139 364 |
 
 Pour les présidentielles 2017 et 2022, le classement par bloc politique est réalisé via la
-table `candidats_presidentielle` (jointure sur `nom`). Pour les présidentielles 2002/2007/2012,
+table `candidats_presidentielle` (jointure sur `nom`). Les européennes 2019 suivent le même
+mécanisme (vague B) : `nom` reçoit la tête de liste (`nom_tete_liste`). Pour les présidentielles 2002/2007/2012,
 la colonne `nuance` contient un **code-candidat** (ex. `CHIR` = Chirac) ; la table
 `nuances_harmonisees` assure la correspondance avec les blocs politiques.
 
@@ -149,11 +150,19 @@ Types : `pres`, `legi`, `euro`, `regi`, `muni`, `dpmt`, `cant`.
   avec `geographies_communes.code_insee`
 - `code_departement` : VARCHAR sans padding (`'59'`, `'2A'`, `'971'`)
 
-### Filtrage Hauts-de-France
+### Périmètre (Hauts-de-France ou France)
 
-Les scripts de chargement joignent sur `geographies_communes.code_region = '32'` pour ne
-conserver que les communes des 5 départements HdF (02, 59, 60, 62, 80). Ce filtrage
-réduit le volume d'un facteur ~10.
+Les scripts de chargement joignent sur `geographies_communes` : `--perimetre hdf` (défaut)
+ne conserve que `code_region = '32'` (02, 59, 60, 62, 80), `--perimetre france` toutes les
+communes du référentiel. Volumes France entière (vague B, 48 scrutins pres/legi/muni/euro/
+regi/dpmt) : 2,87 M bureaux × scrutin, 26,0 M lignes candidats ; base ≈ 1,27 Go compactée, sans
+clé primaire sur les résultats (≈ 0,73 Go compressée). Communes fusionnées depuis le scrutin (~1 850 communes par
+scrutin avant 2017) : rattachées à la commune actuelle par la table de passage INSEE
+(`communes_passage`, COG 2026, mouvements des communes, Licence Ouverte 2.0 :
+`https://www.insee.fr/fr/statistiques/fichier/8740222/v_mvt_commune_2026.csv`). Restent
+écartés et comptés (`elections_ecarts_chargement`) : Français de l'étranger « ZZ »,
+Pacifique, Saint-Martin et Saint-Barthélemy. Codes « Z* » de l'outre-mer normalisés en `97x`.
+Étude d'impact : `reports/etl-elections-france-2026-10-06.md`.
 
 **Références** : `reports/exploration-elections-legislatives.md` (exploration des législatives). Le rapport d'exploration initial `reports/exploration-elections.md`, cité dans les versions précédentes de ce document, n'existe pas dans le dépôt.
 

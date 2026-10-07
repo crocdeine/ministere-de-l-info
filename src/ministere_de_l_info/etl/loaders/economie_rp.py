@@ -42,10 +42,11 @@ import duckdb
 
 from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
+from ministere_de_l_info.perimetre import DEPTS_HDF
 
 logger = logging.getLogger(__name__)
 
-_DEPTS_HDF = ("02", "59", "60", "62", "80")
+_DEPTS_HDF = DEPTS_HDF
 
 # Clefs OLAP nécessaires au calcul des indicateurs (source rp_actifs_emploi / rp_logements).
 CLEFS_REQUISES: dict[str, tuple[str, ...]] = {

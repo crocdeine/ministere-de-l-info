@@ -16,6 +16,7 @@ Toute réutilisation doit citer les sources ci-dessous.
 | Contours administratifs (ADMIN-EXPRESS-COG) | IGN | Licence Ouverte 2.0 |
 | Contours des circonscriptions législatives (non officiels) | J. Desboeufs, via data.gouv.fr | Licence Ouverte 2.0 |
 | Populations légales | INSEE | Licence Ouverte 2.0 |
+| Code officiel géographique (mouvements des communes) | INSEE | Licence Ouverte 2.0 |
 | Filosofi et recensement (fichier republié) | INSEE, republié par T. Szczurek-Gayant sur data.gouv.fr | Licence Ouverte 2.0 |
 | Foyers allocataires du RSA | CNAF | Licence Ouverte 2.0 |
 | Accessibilité potentielle localisée (APL) | DREES | Licence Ouverte 2.0 |

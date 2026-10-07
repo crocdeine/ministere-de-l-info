@@ -22,7 +22,7 @@ Quatre modules de données + une page d'accueil :
 | Module | Périmètre chargé | ETL | UI |
 |--------|------------------|-----|----|
 | Géographie | France | `scripts/etl_territoires.py` | `pages/1_📍_Géographie.py` (code dans la page) |
-| Élections | Hauts-de-France | `scripts/init_elections_schema.py`, `scripts/load_elections_*.py`, `scripts/migrations/` | `pages/2_🗳️_Élections.py` → `src/.../pages/elections_*.py` |
+| Élections | Hauts-de-France ; France entière avec `--perimetre france` (vague B) | `scripts/init_elections_schema.py`, `scripts/load_elections_*.py`, `scripts/migrations/` | `pages/2_🗳️_Élections.py` → `src/.../pages/elections_*.py` |
 | Législatif | France | `scripts/load_legislatif.py` | `pages/3_🏛️_Législatif.py` → `src/.../pages/legislatif.py` |
 | Économie | Hauts-de-France (+ contexte régional/national Eurostat) | `scripts/load_economie.py` | `pages/4_📊_Économie.py` → `src/.../pages/economie.py` |
 
@@ -66,6 +66,7 @@ ministere-de-l-info/
 ├── src/ministere_de_l_info/
 │   ├── config.py                   # get_settings() (pydantic-settings) : db_path, racine du projet
 │   ├── sources.py                  # Registre SOURCES (producteur, licence, URL, tables) ;
+│   ├── perimetre.py                # Départements des Hauts-de-France (définition unique du périmètre)
 │   │                               #   mention() pour les légendes, tableau_sources() pour l'Accueil
 │   ├── _sql.py                     # ligne_unique() : première ligne d'un agrégat, erreur si absente
 │   ├── _theme.py                   # inject_css(), modèle Plotly « mdi », render_page_header(),
@@ -94,6 +95,8 @@ ministere-de-l-info/
 │   │   └── loaders/
 │   │       ├── regions.py, departements.py, epci.py, communes.py,
 │   │       │   arrondissements_municipaux.py, circonscriptions.py, populations.py
+│   │       ├── communes_passage.py    # Communes fusionnées → commune actuelle (COG INSEE)
+│   │       ├── elections_agregees.py  # Périmètre hdf/france, euro/regi/dpmt (vague B)
 │   │       ├── _http_retry.py
 │   │       ├── economie_filosofi.py    # Dataset OLAP data.gouv → economie_filosofi
 │   │       ├── economie_rp.py          # Dataset OLAP data.gouv → economie_rp
@@ -132,9 +135,10 @@ ministere-de-l-info/
 │   ├── etl_territoires.py          # ETL géographie + populations
 │   ├── etl_regions.py              # Ancien ETL régions (toujours présent)
 │   ├── init_elections_schema.py    # Schéma électoral + tables de référence
-│   ├── load_elections_{presidentielles,legislatives,municipales}.py
+│   ├── load_communes_passage.py    # Table de passage COG (avant les loaders électoraux)
+│   ├── load_elections_{presidentielles,legislatives,municipales,autres}.py  # --perimetre hdf|france
 │   ├── migrations/                 # 0006 schéma municipales, 0007 vues municipales,
-│   │                               #   0008 Législatif par législature
+│   │                               #   0008 Législatif par législature, 0009 résultats sans clé primaire
 │   ├── load_economie.py            # --source filosofi|rp|cnaf|urssaf|drees|social|eurostat|contexte|all
 │   ├── load_legislatif.py          # --source senat|datan|nuances|overrides|all
 │   ├── veille_groupes_senat.py     # Contrôle : sénateurs actifs sans groupe (lecture seule)

@@ -4,7 +4,8 @@ Usage :
     uv run python scripts/load_elections_municipales.py
 
 Filtre :
-- Région Hauts-de-France (code_region = '32'), 5 départements : 02, 59, 60, 62, 80
+- Région Hauts-de-France (code_region = '32'), 5 départements : 02, 59, 60, 62, 80 ;
+  `--perimetre france` : toutes les communes de geographies_communes (vague B)
 - Municipales uniquement : type_scrutin = 'muni' dans la table elections
 - 8 scrutins : 2008, 2014, 2020, 2026 (t1 + t2)
 
@@ -38,6 +39,7 @@ Nuances harmonisées (liste _NUANCES_MUNI définie dans etl/schema_elections.py)
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -47,6 +49,16 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
+from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
+    PERIMETRES,
+    code_departement_sql,
+    controler_chargement,
+    filtre_perimetre,
+    preparer_rattachement,
+    source_rattachee_sql,
+    transaction,
+    verifier_unicite_resultats,
+)
 from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
     _NUANCES_MUNI,
     populate_nuances_municipales,
@@ -74,7 +86,7 @@ def _delete_municipales(con) -> None:
     logger.info("Nettoyage idempotent : municipales supprimées avant rechargement")
 
 
-def _load_participation(con) -> int:
+def _load_participation(con, perimetre: str) -> int:
     """Charge resultats_participation depuis candidats-results.parquet (HdF, muni).
 
     code_circo = NULL pour toutes les municipales (pas de circonscription).
@@ -83,10 +95,10 @@ def _load_participation(con) -> int:
     con.execute(f"""
         INSERT INTO resultats_participation
             (id_election, code_departement, code_commune, code_bv,
-             inscrits, abstentions, votants, blancs, nuls, exprimes, code_circo)
+             inscrits, abstentions, votants, blancs, nuls, exprimes, code_circo, code_commune_origine)
         SELECT
             p.id_election,
-            p.code_departement,
+            {code_departement_sql("p")},
             p.code_commune,
             p.code_bv,
             p.inscrits,
@@ -95,10 +107,11 @@ def _load_participation(con) -> int:
             p.blancs,
             p.nuls,
             p.exprimes,
-            NULL AS code_circo
-        FROM '{parquet}' p
+            NULL AS code_circo,
+            p.code_commune_origine
+        FROM {source_rattachee_sql(parquet)} p
         INNER JOIN geographies_communes gc ON gc.code_insee = p.code_commune
-        WHERE gc.code_region = '32'
+        WHERE {filtre_perimetre(perimetre)}
           AND p.id_election IN {_MUNI_IDS}
     """)
     n = con.execute(
@@ -108,7 +121,7 @@ def _load_participation(con) -> int:
     return n
 
 
-def _load_candidats(con) -> int:
+def _load_candidats(con, perimetre: str) -> int:
     """Charge resultats_candidats depuis general-results.parquet (HdF, muni).
 
     Colonnes spécifiques muni :
@@ -127,10 +140,10 @@ def _load_candidats(con) -> int:
             (id_election, code_departement, code_commune, code_bv,
              no_panneau, nuance, sexe, nom, prenom, voix,
              liste, libelle_abrege_liste, libelle_etendu_liste,
-             nom_tete_liste, prenom_tete_liste)
+             nom_tete_liste, prenom_tete_liste, code_commune_origine)
         SELECT
             c.id_election,
-            c.code_departement,
+            {code_departement_sql("c")},
             c.code_commune,
             c.code_bv,
             COALESCE(
@@ -149,10 +162,11 @@ def _load_candidats(con) -> int:
             c.libelle_abrege_liste,
             c.libelle_etendu_liste,
             c.nom_tete_liste,
-            NULL AS prenom_tete_liste
-        FROM '{parquet}' c
+            NULL AS prenom_tete_liste,
+            c.code_commune_origine
+        FROM {source_rattachee_sql(parquet)} c
         INNER JOIN geographies_communes gc ON gc.code_insee = c.code_commune
-        WHERE gc.code_region = '32'
+        WHERE {filtre_perimetre(perimetre)}
           AND c.id_election IN {_MUNI_IDS}
     """)
     n = con.execute(
@@ -214,6 +228,14 @@ def _print_summary(con) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+    parser.add_argument(
+        "--perimetre",
+        choices=PERIMETRES,
+        default="hdf",
+        help="hdf (défaut, 5 départements) ou france (toutes les communes)",
+    )
+    args = parser.parse_args()
     for p in (_PARQUET_PARTICIPATION, _PARQUET_CANDIDATS):
         if not p.exists():
             logger.error("Parquet manquant : %s", p)
@@ -222,10 +244,14 @@ def main() -> None:
     logger.info("Chargement municipales HdF → %s", _DB_PATH)
     con = open_connection(_DB_PATH)
     try:
-        _delete_municipales(con)
+        preparer_rattachement(con, args.perimetre)
         populate_nuances_municipales(con)
-        _load_participation(con)
-        _load_candidats(con)
+        with transaction(con):
+            _delete_municipales(con)
+            _load_participation(con, args.perimetre)
+            _load_candidats(con, args.perimetre)
+            verifier_unicite_resultats(con, _MUNI_IDS)
+            controler_chargement(con, _PARQUET_PARTICIPATION, _MUNI_IDS, args.perimetre)
         _print_summary(con)
         print("\nChargement municipales terminé.")
     finally:

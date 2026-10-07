@@ -11,6 +11,7 @@ circulaires de nuances ne figurent que dans ce registre (ce ne sont pas des donn
 |---|---|---|---|---|---|---|
 | ADMIN-EXPRESS-COG | IGN (data.geopf.fr) | `geographies_*` (hors circonscriptions) | Licence Ouverte 2.0 (Etalab) | R | « IGN » + date de mise à jour | Oui (Accueil + légendes) |
 | Populations légales / historiques | INSEE (Mélodi) | populations | Licence Ouverte 2.0 | R | « Source : Insee » + date | Oui (Accueil + légendes) |
+| Code officiel géographique, mouvements des communes (millésime 2026) | INSEE | `communes_passage` (rattachement des communes fusionnées, élections) | Licence Ouverte 2.0 (vérifiée le 2026-10-07, data.gouv.fr « Code officiel géographique ») | V | « Source : Insee, COG » + date | Non (traçabilité en base) |
 | Filosofi + Recensement (fichier OLAP « RP communal et Filosofi depuis 2015 ») | INSEE, **republié par un particulier** sur data.gouv.fr (id `67289477639527408ae687da`) | `economie_filosofi`, `economie_rp` | Licence Ouverte 2.0 | V | Insee + intermédiaire + date | Oui (Accueil + légendes) |
 | RSA par commune | CNAF (data.caf.fr) | `economie_social` | Licence Ouverte 2.0 | V | « CNAF » + date | Oui (Accueil + légendes) |
 | APL (accessibilité potentielle localisée) | DREES | `economie_social` | Licence Ouverte 2.0 | V | « DREES » + date | Oui (Accueil + légendes) |

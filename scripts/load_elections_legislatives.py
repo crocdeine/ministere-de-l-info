@@ -4,7 +4,8 @@ Usage :
     uv run python scripts/load_elections_legislatives.py
 
 Filtre :
-- Région Hauts-de-France (code_region = '32'), 5 départements : 02, 59, 60, 62, 80
+- Région Hauts-de-France (code_region = '32'), 5 départements : 02, 59, 60, 62, 80 ;
+  `--perimetre france` : toutes les communes de geographies_communes (vague B)
 - Législatives uniquement : type_scrutin = 'legi' dans la table elections
 - 12 scrutins : 2002, 2007, 2012, 2017, 2022, 2024 (t1 + t2)
 
@@ -27,6 +28,7 @@ Reconstruction de code_circo (clé circonscription "DPT-NN") :
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -36,6 +38,16 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
+from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
+    PERIMETRES,
+    code_departement_sql,
+    controler_chargement,
+    filtre_perimetre,
+    preparer_rattachement,
+    source_rattachee_sql,
+    transaction,
+    verifier_unicite_resultats,
+)
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
 configure_logging()
@@ -44,10 +56,6 @@ logger = logging.getLogger(__name__)
 _DB_PATH = get_settings().db_path
 _PARQUET_CANDIDATS = ROOT / "data" / "exploration" / "general-results.parquet"
 _PARQUET_PARTICIPATION = ROOT / "data" / "exploration" / "candidats-results.parquet"
-
-# Départements de la région Hauts-de-France
-_HDF_DEPTS = ("02", "59", "60", "62", "80")
-_HDF_DEPTS_SQL = ", ".join(f"'{d}'" for d in _HDF_DEPTS)
 
 # Filtre commun : législatives via sous-requête sur la table elections
 _LEGI_FILTER = "type_scrutin = 'legi'"
@@ -72,7 +80,7 @@ def _delete_legislatives(con) -> None:
     logger.info("Nettoyage idempotent : législatives supprimées avant rechargement")
 
 
-def _load_participation(con) -> int:
+def _load_participation(con, perimetre: str) -> int:
     """Charge resultats_participation depuis candidats-results.parquet (HdF, legi).
 
     code_circo direct pour 2012/2017/2022 (code_circonscription présent),
@@ -82,10 +90,10 @@ def _load_participation(con) -> int:
     con.execute(f"""
         INSERT INTO resultats_participation
             (id_election, code_departement, code_commune, code_bv,
-             inscrits, abstentions, votants, blancs, nuls, exprimes, code_circo)
+             inscrits, abstentions, votants, blancs, nuls, exprimes, code_circo, code_commune_origine)
         SELECT
             p.id_election,
-            p.code_departement,
+            {code_departement_sql("p")},
             p.code_commune,
             p.code_bv,
             p.inscrits,
@@ -96,12 +104,13 @@ def _load_participation(con) -> int:
             p.exprimes,
             CASE
                 WHEN p.code_circonscription IS NOT NULL
-                THEN p.code_departement || '-' || LPAD(p.code_circonscription, 2, '0')
+                THEN p.code_departement_scrutin || '-' || LPAD(p.code_circonscription, 2, '0')
                 ELSE NULL
-            END AS code_circo
-        FROM '{parquet}' p
+            END AS code_circo,
+            p.code_commune_origine
+        FROM {source_rattachee_sql(parquet)} p
         INNER JOIN geographies_communes gc ON gc.code_insee = p.code_commune
-        WHERE gc.code_region = '32'
+        WHERE {filtre_perimetre(perimetre)}
           AND p.id_election IN {_LEGI_IDS}
     """)
     n = con.execute(
@@ -111,29 +120,42 @@ def _load_participation(con) -> int:
     return n
 
 
-def _reconstruct_code_circo_spatial(con) -> None:
+def _reconstruct_code_circo_spatial(con, perimetre: str) -> None:
     """Reconstruit code_circo par jointure spatiale (2002/2007/2024).
 
     Centroïde de la commune ∈ polygone de circonscription. Une commune → une circo
     (celle qui contient son centroïde). Les communes coupées entre plusieurs circos
     sont assignées à la circo de leur centroïde (approximation documentée).
+
+    Correctif vague B (2026-10-06) : la circo est cherchée dans le département de la
+    commune, la plus proche du centroïde (distance nulle si elle le contient). Avant, un
+    centroïde tombant dans une circo d'un département voisin (imprécision des contours :
+    Coyolles et Haramont, Aisne → circos de l'Oise) y était rattaché, et un centroïde hors
+    de tout polygone (Forest-sur-Marque) restait sans circo.
     """
     con.execute(f"""
-        CREATE OR REPLACE TEMP TABLE _commune_circo_hdf AS
-        SELECT gc.code_insee AS code_commune, circ.code AS code_circo
-        FROM geographies_communes gc
-        JOIN geographies_circonscriptions circ
-          ON ST_Within(ST_Centroid(gc.geometry), circ.geometry)
-         AND circ.code_departement IN ({_HDF_DEPTS_SQL})
-        WHERE gc.code_region = '32'
+        CREATE OR REPLACE TEMP TABLE _commune_circo AS
+        SELECT code_commune, code_circo FROM (
+            SELECT gc.code_insee AS code_commune, circ.code AS code_circo,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY gc.code_insee
+                       ORDER BY ST_Distance(ST_Centroid(gc.geometry), circ.geometry), circ.code
+                   ) AS rang
+            FROM geographies_communes gc
+            JOIN geographies_circonscriptions circ
+              ON circ.code_departement = CASE WHEN gc.code_insee LIKE '97%'
+                                              THEN LEFT(gc.code_insee, 3)
+                                              ELSE gc.code_departement END
+            WHERE {filtre_perimetre(perimetre)}
+        ) WHERE rang = 1
     """)
-    n_map = con.execute("SELECT COUNT(*) FROM _commune_circo_hdf").fetchone()[0]
-    logger.info("Table d'assignation commune→circo (centroïde) : %d communes HdF", n_map)
+    n_map = con.execute("SELECT COUNT(*) FROM _commune_circo").fetchone()[0]
+    logger.info("Table d'assignation commune→circo (centroïde) : %d communes", n_map)
 
     con.execute(f"""
         UPDATE resultats_participation rp
         SET code_circo = m.code_circo
-        FROM _commune_circo_hdf m
+        FROM _commune_circo m
         WHERE rp.code_commune = m.code_commune
           AND rp.code_circo IS NULL
           AND rp.id_election IN ({_SPATIAL_IDS_SQL})
@@ -141,16 +163,16 @@ def _reconstruct_code_circo_spatial(con) -> None:
     logger.info("code_circo reconstruit par jointure spatiale (2002/2007/2024)")
 
 
-def _load_candidats(con) -> int:
+def _load_candidats(con, perimetre: str) -> int:
     """Charge resultats_candidats depuis general-results.parquet (HdF, legi)."""
     parquet = str(_PARQUET_CANDIDATS)
     con.execute(f"""
         INSERT INTO resultats_candidats
             (id_election, code_departement, code_commune, code_bv,
-             no_panneau, nuance, sexe, nom, prenom, voix)
+             no_panneau, nuance, sexe, nom, prenom, voix, code_commune_origine)
         SELECT
             c.id_election,
-            c.code_departement,
+            {code_departement_sql("c")},
             c.code_commune,
             c.code_bv,
             c.no_panneau,
@@ -158,10 +180,11 @@ def _load_candidats(con) -> int:
             c.sexe,
             c.nom,
             c.prenom,
-            c.voix
-        FROM '{parquet}' c
+            c.voix,
+            c.code_commune_origine
+        FROM {source_rattachee_sql(parquet)} c
         INNER JOIN geographies_communes gc ON gc.code_insee = c.code_commune
-        WHERE gc.code_region = '32'
+        WHERE {filtre_perimetre(perimetre)}
           AND c.id_election IN {_LEGI_IDS}
     """)
     n = con.execute(
@@ -221,6 +244,14 @@ def _print_summary(con) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+    parser.add_argument(
+        "--perimetre",
+        choices=PERIMETRES,
+        default="hdf",
+        help="hdf (défaut, 5 départements) ou france (toutes les communes)",
+    )
+    args = parser.parse_args()
     for p in (_PARQUET_PARTICIPATION, _PARQUET_CANDIDATS):
         if not p.exists():
             logger.error("Parquet manquant : %s", p)
@@ -229,10 +260,14 @@ def main() -> None:
     logger.info("Chargement législatives HdF → %s", _DB_PATH)
     con = open_connection(_DB_PATH)
     try:
-        _delete_legislatives(con)
-        _load_participation(con)
-        _reconstruct_code_circo_spatial(con)
-        _load_candidats(con)
+        preparer_rattachement(con, args.perimetre)
+        with transaction(con):
+            _delete_legislatives(con)
+            _load_participation(con, args.perimetre)
+            _reconstruct_code_circo_spatial(con, args.perimetre)
+            _load_candidats(con, args.perimetre)
+            verifier_unicite_resultats(con, _LEGI_IDS)
+            controler_chargement(con, _PARQUET_PARTICIPATION, _LEGI_IDS, args.perimetre)
         _print_summary(con)
         print("Chargement législatives terminé.")
     finally:

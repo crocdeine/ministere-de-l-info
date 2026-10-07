@@ -4,7 +4,8 @@ Usage :
     uv run python scripts/load_elections_presidentielles.py
 
 Filtre :
-- Région Hauts-de-France (code_region = '32'), 5 départements : 02, 59, 60, 62, 80
+- Région Hauts-de-France (code_region = '32'), 5 départements : 02, 59, 60, 62, 80 ;
+  `--perimetre france` : toutes les communes de geographies_communes (vague B)
 - Présidentielles uniquement : type_scrutin = 'pres' dans la table elections
 - Années 2002, 2007, 2012, 2017, 2022 (t1 + t2)
 
@@ -19,6 +20,7 @@ Mapping Parquet (ATTENTION nommage inversé dans la source) :
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -28,6 +30,16 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
+from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
+    PERIMETRES,
+    code_departement_sql,
+    controler_chargement,
+    filtre_perimetre,
+    preparer_rattachement,
+    source_rattachee_sql,
+    transaction,
+    verifier_unicite_resultats,
+)
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
 configure_logging()
@@ -54,16 +66,16 @@ def _delete_presidentielles(con) -> None:
     logger.info("Nettoyage idempotent : présidentielles supprimées avant rechargement")
 
 
-def _load_participation(con) -> int:
+def _load_participation(con, perimetre: str) -> int:
     """Charge resultats_participation depuis candidats-results.parquet (HdF, pres)."""
     parquet = str(_PARQUET_PARTICIPATION)
     con.execute(f"""
         INSERT INTO resultats_participation
             (id_election, code_departement, code_commune, code_bv,
-             inscrits, abstentions, votants, blancs, nuls, exprimes)
+             inscrits, abstentions, votants, blancs, nuls, exprimes, code_commune_origine)
         SELECT
             p.id_election,
-            p.code_departement,
+            {code_departement_sql("p")},
             p.code_commune,
             p.code_bv,
             p.inscrits,
@@ -71,10 +83,11 @@ def _load_participation(con) -> int:
             p.votants,
             p.blancs,
             p.nuls,
-            p.exprimes
-        FROM '{parquet}' p
+            p.exprimes,
+            p.code_commune_origine
+        FROM {source_rattachee_sql(parquet)} p
         INNER JOIN geographies_communes gc ON gc.code_insee = p.code_commune
-        WHERE gc.code_region = '32'
+        WHERE {filtre_perimetre(perimetre)}
           AND p.id_election IN (SELECT id_election FROM elections WHERE {_PRES_FILTER})
     """)
     n = con.execute(
@@ -85,16 +98,16 @@ def _load_participation(con) -> int:
     return n
 
 
-def _load_candidats(con) -> int:
+def _load_candidats(con, perimetre: str) -> int:
     """Charge resultats_candidats depuis general-results.parquet (HdF, pres)."""
     parquet = str(_PARQUET_CANDIDATS)
     con.execute(f"""
         INSERT INTO resultats_candidats
             (id_election, code_departement, code_commune, code_bv,
-             no_panneau, nuance, sexe, nom, prenom, voix)
+             no_panneau, nuance, sexe, nom, prenom, voix, code_commune_origine)
         SELECT
             c.id_election,
-            c.code_departement,
+            {code_departement_sql("c")},
             c.code_commune,
             c.code_bv,
             c.no_panneau,
@@ -102,10 +115,11 @@ def _load_candidats(con) -> int:
             c.sexe,
             c.nom,
             c.prenom,
-            c.voix
-        FROM '{parquet}' c
+            c.voix,
+            c.code_commune_origine
+        FROM {source_rattachee_sql(parquet)} c
         INNER JOIN geographies_communes gc ON gc.code_insee = c.code_commune
-        WHERE gc.code_region = '32'
+        WHERE {filtre_perimetre(perimetre)}
           AND c.id_election IN (SELECT id_election FROM elections WHERE {_PRES_FILTER})
     """)
     n = con.execute(
@@ -136,6 +150,14 @@ def _print_summary(con) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
+    parser.add_argument(
+        "--perimetre",
+        choices=PERIMETRES,
+        default="hdf",
+        help="hdf (défaut, 5 départements) ou france (toutes les communes)",
+    )
+    args = parser.parse_args()
     for p in (_PARQUET_PARTICIPATION, _PARQUET_CANDIDATS):
         if not p.exists():
             logger.error("Parquet manquant : %s — lancer d'abord l'exploration C1.", p)
@@ -144,9 +166,20 @@ def main() -> None:
     logger.info("Chargement présidentielles HdF → %s", _DB_PATH)
     con = open_connection(_DB_PATH)
     try:
-        _delete_presidentielles(con)
-        _load_participation(con)
-        _load_candidats(con)
+        preparer_rattachement(con, args.perimetre)
+        with transaction(con):
+            _delete_presidentielles(con)
+            _load_participation(con, args.perimetre)
+            _load_candidats(con, args.perimetre)
+            verifier_unicite_resultats(
+                con, "(SELECT id_election FROM elections WHERE type_scrutin = 'pres')"
+            )
+            controler_chargement(
+                con,
+                _PARQUET_PARTICIPATION,
+                "(SELECT id_election FROM elections WHERE type_scrutin = 'pres')",
+                args.perimetre,
+            )
         _print_summary(con)
         print("Chargement présidentielles terminé. Étape suivante → C2b vues.")
     finally:

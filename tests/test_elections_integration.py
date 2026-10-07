@@ -89,7 +89,7 @@ class TestCoherenceBlocs:
         n = ligne(
             con.execute("""
             SELECT COUNT(*) FROM v_resultats_candidats_avec_bloc
-            WHERE bloc IS NULL AND type_scrutin != 'muni'
+            WHERE bloc IS NULL AND type_scrutin IN ('pres', 'legi')
         """)
         )[0]
         assert n == 0, f"{n} lignes orphelines de bloc (pres+legi)"

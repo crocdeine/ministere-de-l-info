@@ -30,6 +30,7 @@ import streamlit as st
 
 from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.config import get_settings
+from ministere_de_l_info.perimetre import DEPTS_HDF_SQL
 from ministere_de_l_info.viz._queries import open_ro
 
 DB_PATH: Path = get_settings().db_path
@@ -344,7 +345,7 @@ def get_croisement_eco_elections(
         raise ValueError(f"Tour invalide : {tour}")
     con = _open_ro()
     try:
-        sql = """
+        sql = f"""
             SELECT
                 e.code_commune,
                 gc.nom                                            AS nom_commune,
@@ -367,6 +368,7 @@ def get_croisement_eco_elections(
                 ON r.code_commune = e.code_commune AND r.annee_millesime = e.annee - 1
             LEFT JOIN geographies_communes gc ON gc.code_insee = e.code_commune
             WHERE e.annee = ? AND e.tour = ?
+              AND LEFT(e.code_commune, 2) IN ({DEPTS_HDF_SQL})
         """
         params: list = [annee_election, tour]
         if bloc is not None:

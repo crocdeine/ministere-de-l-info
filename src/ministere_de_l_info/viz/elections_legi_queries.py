@@ -6,9 +6,12 @@ import polars as pl
 import streamlit as st
 
 from ministere_de_l_info._sql import ligne_unique
+from ministere_de_l_info.perimetre import DEPTS_HDF_SQL
 from ministere_de_l_info.viz.elections_queries import DB_PATH, _open_ro  # noqa: PLC2701
 
-_HDF_DEPTS_SQL: str = "'02', '59', '60', '62', '80'"
+_HDF_DEPTS_SQL: str = DEPTS_HDF_SQL
+# Filtre HdF sur code_circo « DPT-NN » (la base peut contenir la France entière, vague B)
+_HDF_CIRCO_SQL: str = f"split_part(code_circo, '-', 1) IN ({_HDF_DEPTS_SQL})"
 
 _LEGI_JOIN = """
     FROM resultats_candidats rc
@@ -68,12 +71,13 @@ def get_circos_hdf_legi() -> list[tuple[str, str]]:
     """Retourne [(code_circo, display_name), ...] pour les 50 circos HdF triées."""
     con = _open_ro()
     try:
-        rows = con.execute("""
+        rows = con.execute(f"""
             SELECT DISTINCT v.code_circo, gc.nom
             FROM v_scores_circo_legi v
             LEFT JOIN geographies_circonscriptions gc ON gc.code = v.code_circo
+            WHERE {_HDF_CIRCO_SQL}
             ORDER BY v.code_circo
-        """).fetchall()
+        """).fetchall()  # noqa: S608
     finally:
         con.close()
     return [(code, f"{code} — {nom}" if nom else code) for code, nom in rows]
@@ -85,7 +89,8 @@ def get_scores_hdf_legi(annee: int, tour: int) -> pl.DataFrame:
     con = _open_ro()
     try:
         rows = con.execute(
-            "SELECT code_circo, bloc, voix FROM v_scores_circo_legi WHERE annee = ? AND tour = ?",
+            "SELECT code_circo, bloc, voix FROM v_scores_circo_legi "  # noqa: S608
+            f"WHERE annee = ? AND tour = ? AND {_HDF_CIRCO_SQL}",
             [annee, tour],
         ).fetchall()
     finally:
@@ -108,7 +113,7 @@ def get_participation_hdf_legi(annee: int, tour: int) -> pl.DataFrame:
     try:
         rows = con.execute(
             "SELECT code_circo, inscrits, votants, exprimes, taux_participation_pct "
-            "FROM v_participation_circo_legi WHERE annee = ? AND tour = ?",
+            f"FROM v_participation_circo_legi WHERE annee = ? AND tour = ? AND {_HDF_CIRCO_SQL}",
             [annee, tour],
         ).fetchall()
     finally:

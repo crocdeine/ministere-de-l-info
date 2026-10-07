@@ -6,9 +6,10 @@ import polars as pl
 import streamlit as st
 
 from ministere_de_l_info._sql import ligne_unique
+from ministere_de_l_info.perimetre import DEPTS_HDF_SQL
 from ministere_de_l_info.viz.elections_queries import DB_PATH, _open_ro  # noqa: PLC2701
 
-_HDF_DEPTS_SQL: str = "'02', '59', '60', '62', '80'"
+_HDF_DEPTS_SQL: str = DEPTS_HDF_SQL
 
 __all__ = [
     "DB_PATH",
@@ -74,8 +75,8 @@ def get_scores_communes_muni(annee: int, tour: int) -> pl.DataFrame:
     try:
         rows = con.execute(
             "SELECT code_commune, bloc, voix, pct_exprimes "
-            "FROM v_scores_commune_muni "
-            "WHERE annee = ? AND tour = ?",
+            "FROM v_scores_commune_muni "  # noqa: S608
+            f"WHERE annee = ? AND tour = ? AND LEFT(code_commune, 2) IN ({_HDF_DEPTS_SQL})",
             [annee, tour],
         ).fetchall()
     finally:
@@ -323,10 +324,11 @@ def get_listes_commune_muni(annee: int, tour: int, code_commune: str) -> pl.Data
         rows = con.execute(
             """
             SELECT nuance, bloc, libelle_abrege_liste, libelle_etendu_liste,
-                   nom_tete_liste, prenom_tete_liste, voix, pct_exprimes
+                   nom_tete_liste, prenom_tete_liste, voix, pct_exprimes, code_commune_origine
             FROM v_listes_commune_muni
             WHERE annee = ? AND tour = ? AND code_commune = ?
-            ORDER BY voix DESC NULLS LAST, no_panneau NULLS LAST
+            ORDER BY code_commune_origine NULLS FIRST, voix DESC NULLS LAST,
+                     no_panneau NULLS LAST
             """,
             [annee, tour, code_commune],
         ).fetchall()
@@ -343,6 +345,7 @@ def get_listes_commune_muni(annee: int, tour: int, code_commune: str) -> pl.Data
                 "prenom_tete_liste": pl.Utf8,
                 "voix": pl.Int64,
                 "pct_exprimes": pl.Float64,
+                "commune_origine": pl.Utf8,
                 "rang": pl.Int32,
                 "label_affichage": pl.Utf8,
             }
@@ -368,6 +371,8 @@ def get_listes_commune_muni(annee: int, tour: int, code_commune: str) -> pl.Data
             "prenom_tete_liste": [r[5] for r in rows],
             "voix": [r[6] for r in rows],
             "pct_exprimes": [float(r[7]) if r[7] is not None else None for r in rows],
+            # Liste d'une ancienne commune absorbée depuis (rattachement COG, 2026-10-07)
+            "commune_origine": [r[8] for r in rows],
         }
     )
 

@@ -56,6 +56,7 @@ from ministere_de_l_info.etl.schema_economie import (  # noqa: E402
     create_economie_views,
 )
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
+from ministere_de_l_info.perimetre import DEPTS_HDF  # noqa: E402
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ _PARQUET_URL = (
     "20241104-093439/donnees-insee-olap.parquet"
 )
 
-_DEPTS_HDF = ("02", "59", "60", "62", "80")
+_DEPTS_HDF = DEPTS_HDF
 
 
 def _build_hdf_cache(force: bool = False, yes: bool = False) -> None:

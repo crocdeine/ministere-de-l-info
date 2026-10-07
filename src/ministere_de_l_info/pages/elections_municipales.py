@@ -337,6 +337,10 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
                 pl.col("nom_tete_liste").fill_null("—").alias("Nom tête de liste"),
                 pl.col("prenom_tete_liste").fill_null("").alias("Prénom"),
                 pl.col("libelle_abrege_liste").fill_null("—").alias("Libellé abrégé"),
+                pl.when(pl.col("commune_origine").is_not_null())
+                .then(pl.lit("Liste de l'ancienne commune ") + pl.col("commune_origine"))
+                .otherwise(pl.lit(""))
+                .alias("Commune d'origine"),
             )
             .select(
                 [
@@ -347,6 +351,7 @@ def _render_drilldown_commune(annee: int, tour: int, libelles: dict[str, str]) -
                     "Nom tête de liste",
                     "voix",
                     "pct_exprimes",
+                    "Commune d'origine",
                 ]
             )
             .rename({"rang": "Rang", "voix": "Voix", "pct_exprimes": "% exprimés"})
