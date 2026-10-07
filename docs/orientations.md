@@ -157,3 +157,23 @@ rattachée à une seule (limite affichée). Addendum à l'ADR-0010.
   `.bak-2026-10-07`) ; télémétrie de l'application coupée (`telemetry.telemetryLevel: off`) ;
   configuration `.agents/` propre au projet plutôt qu'ECC pour Antigravity ; pas de plugin tiers
   installé (aucun pertinent pour Python/DuckDB/Streamlit, voir `reports/brainstorm-antigravity-2026-10-07.md`).
+
+## Décisions du 2026-10-07 (recherche UI/UX, interface web — « oui à tout »)
+
+Voir `reports/recherche-ui-couleur-2026-10-07.md`, `reports/recherche-ux-experience-2026-10-07.md`,
+`reports/recherche-animation-performance-2026-10-07.md`, ADR-0015 et ADR-0016.
+1. ADR-0015 accepté : interface web + Tauri, données précalculées (JSON compressé jusqu'aux mesures),
+   Streamlit gelé (corrections seulement) puis retiré page par page, prototype de performance A0 avant
+   tout, mises à jour des données par paquet séparé (release GitHub, SHA256), Apple Silicon seul.
+2. Palette « Papier » (ADR-0016) ; pas de code couleur par module ; palette sarcelle écartée.
+3. Mode sombre dans la future application, cartes et graphiques partisans sur plaque blanche fixe.
+4. Animations sobres (fondu de la carte, transitions de page), `prefers-reduced-motion` respecté.
+5. Étiquette de méthode (« Grille officielle » / « Reconstruit ») sur chaque visualisation, panneau
+   Méthodologie sans changer de page.
+6. Recherche par code postal : base officielle des codes postaux (La Poste), licence à vérifier avant
+   chargement.
+7. Liens partageables propres à l'application Mac (pas de site hébergé).
+8. Cinq tests avec des utilisateurs du public visé ; Mathias fournit les contacts.
+Correction des notes de la release v1.0.1 (élections affichées : Hauts-de-France ; base : France entière).
+Tranché par le directeur : candidats par voix décroissantes ; carte d'écart à échelle fixe ±30 points ;
+questions préréglées sur l'Accueil.

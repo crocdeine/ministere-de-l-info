@@ -10,6 +10,7 @@ Toutes les évolutions notables de ministere-de-l-info. Format :
 ## [1.0.1] — 2026-10-07
 
 ### Corrigé
+- Notes de version : périmètre affiché précisé (Hauts-de-France ; la base contient la France entière).
 - Premier lancement : les bibliothèques sont précompilées à l'installation (`uv sync --compile-bytecode`) ;
   sans cela, le premier démarrage pouvait dépasser le délai d'attente et afficher « L'application ne
   démarre pas ».
@@ -38,10 +39,11 @@ seule commande.
   indicateur.
 - Élections : légende du classement propre à chaque scrutin ; « grille officielle » réservée aux
   municipales 2020 et 2026 (ADR-0010).
-- Élections France entière, 1999-2026 : 48 scrutins (présidentielles, législatives, municipales,
+- Base de données : élections France entière, 1999-2026, 48 scrutins (présidentielles, législatives, municipales,
   européennes, régionales, départementales) ; communes fusionnées rattachées à la commune
   actuelle (code d'origine conservé) ; contrôles bloquants au chargement (écarts à la source,
-  voix ≠ exprimés).
+  voix ≠ exprimés). L'interface n'affiche encore que les Hauts-de-France (présidentielles,
+  législatives, municipales).
 - Base de données de la version : release `db-2026-10-07` (ODbL).
 
 ### Modifications
