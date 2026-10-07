@@ -66,6 +66,7 @@ ministere-de-l-info/
 ├── src/ministere_de_l_info/
 │   ├── config.py                   # get_settings() (pydantic-settings) : db_path, racine du projet
 │   ├── sources.py                  # Registre SOURCES (producteur, licence, URL, tables) ;
+│   ├── perimetre.py                # Départements des Hauts-de-France (définition unique du périmètre)
 │   │                               #   mention() pour les légendes, tableau_sources() pour l'Accueil
 │   ├── _sql.py                     # ligne_unique() : première ligne d'un agrégat, erreur si absente
 │   ├── _theme.py                   # inject_css(), modèle Plotly « mdi », render_page_header(),
@@ -136,7 +137,6 @@ ministere-de-l-info/
 │   ├── init_elections_schema.py    # Schéma électoral + tables de référence
 │   ├── load_communes_passage.py    # Table de passage COG (avant les loaders électoraux)
 │   ├── load_elections_{presidentielles,legislatives,municipales,autres}.py  # --perimetre hdf|france
-│   ├── load_communes_passage.py    # Table de passage COG (communes fusionnées → commune actuelle)
 │   ├── migrations/                 # 0006 schéma municipales, 0007 vues municipales,
 │   │                               #   0008 Législatif par législature, 0009 résultats sans clé primaire
 │   ├── load_economie.py            # --source filosofi|rp|cnaf|urssaf|drees|social|eurostat|contexte|all
