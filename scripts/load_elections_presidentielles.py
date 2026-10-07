@@ -37,6 +37,7 @@ from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
     filtre_perimetre,
     preparer_rattachement,
     source_rattachee_sql,
+    transaction,
     verifier_unicite_resultats,
 )
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
@@ -165,19 +166,20 @@ def main() -> None:
     logger.info("Chargement présidentielles HdF → %s", _DB_PATH)
     con = open_connection(_DB_PATH)
     try:
-        preparer_rattachement(con)
-        _delete_presidentielles(con)
-        _load_participation(con, args.perimetre)
-        _load_candidats(con, args.perimetre)
-        verifier_unicite_resultats(
-            con, "(SELECT id_election FROM elections WHERE type_scrutin = 'pres')"
-        )
-        controler_chargement(
-            con,
-            _PARQUET_PARTICIPATION,
-            "(SELECT id_election FROM elections WHERE type_scrutin = 'pres')",
-            args.perimetre,
-        )
+        preparer_rattachement(con, args.perimetre)
+        with transaction(con):
+            _delete_presidentielles(con)
+            _load_participation(con, args.perimetre)
+            _load_candidats(con, args.perimetre)
+            verifier_unicite_resultats(
+                con, "(SELECT id_election FROM elections WHERE type_scrutin = 'pres')"
+            )
+            controler_chargement(
+                con,
+                _PARQUET_PARTICIPATION,
+                "(SELECT id_election FROM elections WHERE type_scrutin = 'pres')",
+                args.perimetre,
+            )
         _print_summary(con)
         print("Chargement présidentielles terminé. Étape suivante → C2b vues.")
     finally:

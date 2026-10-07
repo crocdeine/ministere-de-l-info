@@ -2008,11 +2008,14 @@ def _create_v_listes_commune_muni(con: duckdb.DuckDBPyConnection) -> None:
     con.execute(f"""
         CREATE OR REPLACE VIEW v_listes_commune_muni AS
         WITH exprimes_commune AS (
-            SELECT rp.id_election, rp.code_commune, SUM(rp.exprimes) AS exprimes
+            -- par commune ET commune d'origine : une commune absorbée depuis le scrutin
+            -- a eu sa propre élection (pct calculé sur ses propres exprimés)
+            SELECT rp.id_election, rp.code_commune, rp.code_commune_origine,
+                   SUM(rp.exprimes) AS exprimes
             FROM resultats_participation rp
             JOIN elections e ON e.id_election = rp.id_election
             WHERE e.type_scrutin = 'muni'
-            GROUP BY rp.id_election, rp.code_commune
+            GROUP BY rp.id_election, rp.code_commune, rp.code_commune_origine
         ),
         lignes AS (
             SELECT
@@ -2044,6 +2047,7 @@ def _create_v_listes_commune_muni(con: duckdb.DuckDBPyConnection) -> None:
             l.no_panneau,
             l.nuance,
             l.bloc,
+            l.code_commune_origine,
             MAX(l.libelle_abrege_liste) AS libelle_abrege_liste,
             MAX(l.libelle_etendu_liste) AS libelle_etendu_liste,
             MAX(l.nom_tete_liste)       AS nom_tete_liste,
@@ -2055,6 +2059,7 @@ def _create_v_listes_commune_muni(con: duckdb.DuckDBPyConnection) -> None:
         FROM lignes l
         JOIN exprimes_commune ex
             ON ex.id_election = l.id_election AND ex.code_commune = l.code_commune
+            AND ex.code_commune_origine IS NOT DISTINCT FROM l.code_commune_origine
         GROUP BY
             l.annee, l.tour, l.code_commune, l.no_panneau, l.nuance, l.bloc,
             -- commune absorbée depuis (rattachement COG) : ses listes restent distinctes

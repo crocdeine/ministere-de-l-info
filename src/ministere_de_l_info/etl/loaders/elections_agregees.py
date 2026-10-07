@@ -16,6 +16,8 @@ depuis, Français de l'étranger, collectivités du Pacifique) sont écartées, 
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import duckdb
@@ -34,6 +36,9 @@ TYPES_VAGUE_B: tuple[str, ...] = ("euro", "regi", "dpmt")
 
 # Part maximale des exprimés d'un scrutin écartée hors étranger et Pacifique (« reste »)
 SEUIL_ECART_RESTE_PCT: float = 3.0
+# Part maximale des exprimés hors référentiel légitime (étranger + outre-mer hors
+# référentiel) ; mesuré au plus ~2,5 % (législatives 2024). Garde-fou large.
+SEUIL_ECART_HORS_REFERENTIEL_PCT: float = 5.0
 
 # Catégorie d'une ligne de la source dont la commune est absente du référentiel :
 # étranger ; collectivités d'outre-mer hors référentiel (Pacifique 98x, Saint-Martin et
@@ -69,15 +74,34 @@ def code_departement_sql(alias: str) -> str:
     )
 
 
-def preparer_rattachement(con: duckdb.DuckDBPyConnection) -> int:
+@contextmanager
+def transaction(con: duckdb.DuckDBPyConnection) -> Iterator[None]:
+    """BEGIN ... COMMIT ; ROLLBACK si une exception (contrôle compris) interrompt le bloc."""
+    con.execute("BEGIN TRANSACTION")
+    try:
+        yield
+    except BaseException:
+        con.execute("ROLLBACK")
+        raise
+    con.execute("COMMIT")
+
+
+def preparer_rattachement(con: duckdb.DuckDBPyConnection, perimetre: str = "hdf") -> int:
     """Garantit communes_passage et code_commune_origine ; avertit si la table est vide.
 
-    Retourne le nombre de codes anciens disponibles pour le rattachement.
+    Retourne le nombre de codes anciens disponibles pour le rattachement. En périmètre
+    france, une table vide est une erreur (les communes fusionnées seraient écartées
+    sans que le seuil de 3 % ne le détecte forcément).
     """
     con.execute(PASSAGE_DDL)
     for table in CLES_RESULTATS:
         con.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS code_commune_origine VARCHAR(5)")
     n = int(ligne_unique(con.execute("SELECT COUNT(*) FROM communes_passage"))[0])
+    if n == 0 and perimetre == "france":
+        raise RuntimeError(
+            "communes_passage vide : lancer scripts/load_communes_passage.py avant un "
+            "chargement --perimetre france"
+        )
     if n == 0:
         logger.warning(
             "communes_passage vide : les communes fusionnées seront écartées "
@@ -152,7 +176,27 @@ def load_scrutins_listes(
     Retourne (lignes participation, lignes candidats) du type après chargement.
     """
     ids = _ids(type_scrutin)
-    preparer_rattachement(con)
+    preparer_rattachement(con, perimetre)
+    with transaction(con):
+        _charger_listes(con, ids, parquet_candidats, parquet_participation, perimetre)
+    n_p = ligne_unique(
+        con.execute(f"SELECT COUNT(*) FROM resultats_participation WHERE id_election IN {ids}")
+    )[0]
+    n_c = ligne_unique(
+        con.execute(f"SELECT COUNT(*) FROM resultats_candidats WHERE id_election IN {ids}")
+    )[0]
+    logger.info("%s (%s) : %d BV, %d lignes candidats/listes", type_scrutin, perimetre, n_p, n_c)
+    return int(n_p), int(n_c)
+
+
+def _charger_listes(
+    con: duckdb.DuckDBPyConnection,
+    ids: str,
+    parquet_candidats: Path,
+    parquet_participation: Path,
+    perimetre: str,
+) -> None:
+    """DELETE + INSERT + contrôles d'un type de scrutin (appelé dans une transaction)."""
     where = filtre_perimetre(perimetre)
     con.execute(f"DELETE FROM resultats_participation WHERE id_election IN {ids}")
     con.execute(f"DELETE FROM resultats_candidats WHERE id_election IN {ids}")
@@ -187,14 +231,6 @@ def load_scrutins_listes(
     """)
     verifier_unicite_resultats(con, ids)
     controler_chargement(con, parquet_participation, ids, perimetre)
-    n_p = ligne_unique(
-        con.execute(f"SELECT COUNT(*) FROM resultats_participation WHERE id_election IN {ids}")
-    )[0]
-    n_c = ligne_unique(
-        con.execute(f"SELECT COUNT(*) FROM resultats_candidats WHERE id_election IN {ids}")
-    )[0]
-    logger.info("%s (%s) : %d BV, %d lignes candidats/listes", type_scrutin, perimetre, n_p, n_c)
-    return int(n_p), int(n_c)
 
 
 def controler_chargement(
@@ -253,6 +289,17 @@ def controler_chargement(
         [perimetre],
     ).fetchall()
     for idel, cat, n_com, n_bv, expr, pct in ecarts:
+        if cat == "rattachee":
+            logger.info(
+                "%s : %d communes fusionnées rattachées à la commune actuelle "
+                "(%d BV, %d exprimés, %.3f %%)",
+                idel,
+                n_com,
+                n_bv,
+                expr or 0,
+                pct or 0.0,
+            )
+            continue
         logger.warning(
             "%s : %s écarté(s) — %d communes, %d BV, %d exprimés (%.3f %%)",
             idel,
@@ -263,6 +310,16 @@ def controler_chargement(
             pct or 0.0,
         )
     trop = [(e[0], e[5]) for e in ecarts if e[1] == "reste" and (e[5] or 0) > seuil_reste_pct]
+    hors: dict[str, float] = {}
+    for e in ecarts:
+        if e[1] in ("etranger", "outremer_hors_referentiel"):
+            hors[e[0]] = hors.get(e[0], 0.0) + (e[5] or 0.0)
+    trop_hors = [(k, round(v, 3)) for k, v in hors.items() if v > SEUIL_ECART_HORS_REFERENTIEL_PCT]
+    if trop_hors:
+        raise RuntimeError(
+            "Étranger + outre-mer hors référentiel au-delà de "
+            f"{SEUIL_ECART_HORS_REFERENTIEL_PCT} % des exprimés : {trop_hors}"
+        )
     if trop:
         raise RuntimeError(
             f"Communes absentes du référentiel au-delà de {seuil_reste_pct} % des exprimés : {trop}"

@@ -95,6 +95,9 @@ def con() -> Iterator[duckdb.DuckDBPyConnection]:
         ('59350', '59', '32', 'Lille'), ('75056', '75', '11', 'Paris'),
         ('97101', '971', '01', 'Les Abymes'))
         t(code_insee, code_departement, code_region, nom)""")
+    # Table de passage non vide (exigée en périmètre france) ; code fictif sans effet
+    c.execute(se.PASSAGE_DDL)
+    c.execute("INSERT INTO communes_passage VALUES ('00000', '59350', NULL, '32')")
     yield c
     c.close()
 
@@ -420,3 +423,64 @@ class TestCommunesFusionnees:
             _n(con, "SELECT COUNT(*) FROM resultats_candidats WHERE code_commune_origine = '59999'")
             == 1
         )
+
+
+class TestCorrectifsRelecture:
+    """Fiche « vague B — correctifs issus des relectures » (2026-10-07)."""
+
+    def test_echec_de_controle_laisse_la_base_intacte(self, con, tmp_path, monkeypatch) -> None:
+        from ministere_de_l_info.etl.loaders import elections_agregees as ea
+
+        cand, part = _parquets(tmp_path)
+        load_scrutins_listes(con, "euro", cand, part, "france")
+        avant = con.execute(
+            "SELECT COUNT(*), SUM(voix) FROM resultats_candidats WHERE id_election LIKE '%euro%'"
+        ).fetchall()
+
+        def doublon(c, ids):
+            raise RuntimeError("Doublons de clé simulés")
+
+        monkeypatch.setattr(ea, "verifier_unicite_resultats", doublon)
+        with pytest.raises(RuntimeError, match="simulés"):
+            load_scrutins_listes(con, "euro", cand, part, "france")
+        apres = con.execute(
+            "SELECT COUNT(*), SUM(voix) FROM resultats_candidats WHERE id_election LIKE '%euro%'"
+        ).fetchall()
+        assert apres == avant
+
+    def test_passage_vide_bloque_le_perimetre_france(self, con, tmp_path) -> None:
+        con.execute("DELETE FROM communes_passage")
+        cand, part = _parquets(tmp_path)
+        with pytest.raises(RuntimeError, match="communes_passage vide"):
+            load_scrutins_listes(con, "euro", cand, part, "france")
+        load_scrutins_listes(con, "euro", cand, part, "hdf")  # HdF : simple avertissement
+
+    def test_hors_referentiel_au_dela_du_seuil(self, con, tmp_path) -> None:
+        c = duckdb.connect()
+        part = tmp_path / "p.parquet"
+        c.execute(f"""COPY (SELECT * FROM (VALUES
+            ('2024_euro_t1', 'ZZ', '99001', '1', 100),
+            ('2024_euro_t1', '75', '75056', '1', 900)
+        ) t(id_election, code_departement, code_commune, code_bv, exprimes))
+        TO '{part}' (FORMAT parquet)""")
+        c.close()
+        with pytest.raises(RuntimeError, match="hors référentiel"):
+            controler_chargement(con, part, "('2024_euro_t1')", "france")
+
+    def test_listes_commune_absorbee_pct_sur_ses_exprimes(self, con) -> None:
+        con.execute("""INSERT INTO resultats_participation
+            (id_election, code_departement, code_commune, code_bv, exprimes, code_commune_origine)
+            VALUES ('2020_muni_t1', '59', '59350', '0001', 100, NULL),
+                   ('2020_muni_t1', '59', '59350', '59999-0001', 50, '59999')""")
+        con.execute("""INSERT INTO resultats_candidats
+            (id_election, code_departement, code_commune, code_bv, no_panneau, nuance, voix,
+             code_commune_origine)
+            VALUES ('2020_muni_t1', '59', '59350', '0001', 1, 'LSOC', 60, NULL),
+                   ('2020_muni_t1', '59', '59350', '0001', 2, 'LLR', 40, NULL),
+                   ('2020_muni_t1', '59', '59350', '59999-0001', 1, 'LDVD', 50, '59999')""")
+        se.create_municipales_views(con)
+        rows = con.execute(
+            "SELECT code_commune_origine, SUM(pct_exprimes) FROM v_listes_commune_muni "
+            "GROUP BY 1 ORDER BY 1 NULLS FIRST"
+        ).fetchall()
+        assert rows == [(None, 100.0), ("59999", 100.0)]
