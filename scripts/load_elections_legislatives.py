@@ -42,6 +42,7 @@ from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
     PERIMETRES,
     code_departement_sql,
     filtre_perimetre,
+    verifier_unicite_resultats,
 )
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
@@ -257,6 +258,7 @@ def main() -> None:
         _load_participation(con, args.perimetre)
         _reconstruct_code_circo_spatial(con, args.perimetre)
         _load_candidats(con, args.perimetre)
+        verifier_unicite_resultats(con, _LEGI_IDS)
         _print_summary(con)
         print("Chargement législatives terminé.")
     finally:

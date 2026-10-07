@@ -1405,7 +1405,12 @@ def create_nuances_harmonisees(con: duckdb.DuckDBPyConnection) -> None:
 
 
 def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
-    """Crée les 6 tables électorales. Idempotent (CREATE TABLE IF NOT EXISTS)."""
+    """Crée les 6 tables électorales. Idempotent (CREATE TABLE IF NOT EXISTS).
+
+    resultats_participation et resultats_candidats n'ont pas de clé primaire (décision
+    Mathias 2026-10-07 : l'index pesait ~1,1 Go en France entière) ; l'unicité est
+    contrôlée au chargement (loaders.elections_agregees.verifier_unicite_resultats).
+    """
     con.execute("""
         CREATE TABLE IF NOT EXISTS elections (
             id_election      VARCHAR PRIMARY KEY,
@@ -1428,8 +1433,7 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
             votants          INTEGER,
             blancs           INTEGER,
             nuls             INTEGER,
-            exprimes         INTEGER,
-            PRIMARY KEY (id_election, code_departement, code_commune, code_bv)
+            exprimes         INTEGER
         )
     """)
 
@@ -1444,8 +1448,7 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
             sexe             VARCHAR,
             nom              VARCHAR,
             prenom           VARCHAR,
-            voix             INTEGER,
-            PRIMARY KEY (id_election, code_departement, code_commune, code_bv, no_panneau)
+            voix             INTEGER
         )
     """)
 
@@ -1484,6 +1487,54 @@ def create_elections_schema(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("ALTER TABLE resultats_participation ADD COLUMN IF NOT EXISTS code_circo VARCHAR")
 
     logger.info("Schéma électoral créé/vérifié : 6 tables")
+
+
+# Clés logiques des tables de résultats (unicité contrôlée au chargement, sans index)
+CLES_RESULTATS: dict[str, tuple[str, ...]] = {
+    "resultats_participation": ("id_election", "code_departement", "code_commune", "code_bv"),
+    "resultats_candidats": (
+        "id_election",
+        "code_departement",
+        "code_commune",
+        "code_bv",
+        "no_panneau",
+    ),
+}
+
+
+def retirer_cles_primaires_resultats(con: duckdb.DuckDBPyConnection) -> list[str]:
+    """Reconstruit sans clé primaire les tables de résultats qui en ont une. Idempotent.
+
+    DuckDB ne sait pas supprimer une contrainte : copie (CREATE TABLE AS), suppression de
+    l'ancienne table, renommage, puis NOT NULL rétabli sur les colonnes de la clé, dans
+    une transaction. Les vues, liées par nom, restent valides. Retourne les tables
+    reconstruites.
+    """
+    reconstruites: list[str] = []
+    for table, cles in CLES_RESULTATS.items():
+        n_pk = ligne_unique(
+            con.execute(
+                "SELECT COUNT(*) FROM duckdb_constraints() "
+                "WHERE table_name = ? AND constraint_type = 'PRIMARY KEY'",
+                [table],
+            )
+        )[0]
+        if not n_pk:
+            continue
+        con.execute("BEGIN TRANSACTION")
+        try:
+            con.execute(f"CREATE TABLE {table}__sans_pk AS SELECT * FROM {table}")  # noqa: S608
+            con.execute(f"DROP TABLE {table}")
+            con.execute(f"ALTER TABLE {table}__sans_pk RENAME TO {table}")
+            for col in cles:
+                con.execute(f"ALTER TABLE {table} ALTER COLUMN {col} SET NOT NULL")
+            con.execute("COMMIT")
+        except Exception:
+            con.execute("ROLLBACK")
+            raise
+        reconstruites.append(table)
+        logger.info("%s reconstruite sans clé primaire", table)
+    return reconstruites
 
 
 # ── Population des référentiels ───────────────────────────────────────────────

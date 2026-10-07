@@ -34,6 +34,7 @@ from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
     PERIMETRES,
     code_departement_sql,
     filtre_perimetre,
+    verifier_unicite_resultats,
 )
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
@@ -162,6 +163,9 @@ def main() -> None:
         _delete_presidentielles(con)
         _load_participation(con, args.perimetre)
         _load_candidats(con, args.perimetre)
+        verifier_unicite_resultats(
+            con, "(SELECT id_election FROM elections WHERE type_scrutin = 'pres')"
+        )
         _print_summary(con)
         print("Chargement présidentielles terminé. Étape suivante → C2b vues.")
     finally:

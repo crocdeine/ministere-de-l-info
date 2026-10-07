@@ -53,6 +53,7 @@ from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
     PERIMETRES,
     code_departement_sql,
     filtre_perimetre,
+    verifier_unicite_resultats,
 )
 from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
     _NUANCES_MUNI,
@@ -241,6 +242,7 @@ def main() -> None:
         populate_nuances_municipales(con)
         _load_participation(con, args.perimetre)
         _load_candidats(con, args.perimetre)
+        verifier_unicite_resultats(con, _MUNI_IDS)
         _print_summary(con)
         print("\nChargement municipales terminé.")
     finally:

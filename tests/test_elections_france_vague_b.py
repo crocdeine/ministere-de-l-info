@@ -21,6 +21,7 @@ from ministere_de_l_info.etl import schema_elections as se  # noqa: E402
 from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
     filtre_perimetre,
     load_scrutins_listes,
+    verifier_unicite_resultats,
 )
 
 _BLOCS = {"EXG", "GAU", "DIV", "CENT", "DTE", "EXD"}
@@ -245,3 +246,40 @@ class TestVuesHdF:
         m0007._create_v_evolution_blocs_hdf_muni(con)
         rows = con.execute("SELECT bloc, pct_exprimes FROM v_evolution_blocs_hdf_muni").fetchall()
         assert rows == [("GAU", 100.0)]
+
+
+class TestSansClePrimaire:
+    """Q2 (décision Mathias 2026-10-07) : pas de PK, unicité contrôlée au chargement."""
+
+    def test_migration_retire_la_pk_et_conserve_donnees_et_vues(self) -> None:
+        c = duckdb.connect()
+        c.execute("""CREATE TABLE resultats_participation (id_election VARCHAR NOT NULL,
+            code_departement VARCHAR NOT NULL, code_commune VARCHAR NOT NULL,
+            code_bv VARCHAR NOT NULL, inscrits INTEGER,
+            PRIMARY KEY (id_election, code_departement, code_commune, code_bv))""")
+        c.execute("""CREATE TABLE resultats_candidats (id_election VARCHAR NOT NULL,
+            code_departement VARCHAR NOT NULL, code_commune VARCHAR NOT NULL,
+            code_bv VARCHAR NOT NULL, no_panneau INTEGER NOT NULL, voix INTEGER,
+            PRIMARY KEY (id_election, code_departement, code_commune, code_bv, no_panneau))""")
+        c.execute("INSERT INTO resultats_participation VALUES ('x', '59', '59350', '1', 10)")
+        c.execute("CREATE VIEW v AS SELECT SUM(inscrits) AS s FROM resultats_participation")
+        assert se.retirer_cles_primaires_resultats(c) == [
+            "resultats_participation",
+            "resultats_candidats",
+        ]
+        assert se.retirer_cles_primaires_resultats(c) == []
+        assert _n(c, "SELECT s FROM v") == 10
+        assert (
+            _n(c, "SELECT COUNT(*) FROM duckdb_constraints() WHERE constraint_type = 'PRIMARY KEY'")
+            == 0
+        )
+
+    def test_schema_neuf_sans_pk_et_doublon_detecte(self, con, tmp_path) -> None:
+        cand, part = _parquets(tmp_path)
+        load_scrutins_listes(con, "euro", cand, part, "hdf")
+        con.execute(
+            "INSERT INTO resultats_candidats (id_election, code_departement, code_commune, "
+            "code_bv, no_panneau, voix) VALUES ('2024_euro_t1', '59', '59350', '0001', 1, 1)"
+        )
+        with pytest.raises(RuntimeError, match="Doublons"):
+            verifier_unicite_resultats(con, "('2024_euro_t1')")

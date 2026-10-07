@@ -21,6 +21,7 @@ from pathlib import Path
 import duckdb
 
 from ministere_de_l_info._sql import ligne_unique
+from ministere_de_l_info.etl.schema_elections import CLES_RESULTATS
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,21 @@ def _ids(type_scrutin: str) -> str:
     if type_scrutin not in TYPES_VAGUE_B + ("pres", "legi", "muni", "cant"):
         raise ValueError(f"Type de scrutin inconnu : {type_scrutin!r}")
     return f"(SELECT id_election FROM elections WHERE type_scrutin = '{type_scrutin}')"
+
+
+def verifier_unicite_resultats(con: duckdb.DuckDBPyConnection, ids_sql: str) -> None:
+    """Lève RuntimeError si une clé logique de résultat est en double (tables sans PK).
+
+    ids_sql : sous-requête ou liste SQL des id_election à contrôler (code interne).
+    """
+    for table, cles in CLES_RESULTATS.items():
+        cols = ", ".join(cles)
+        doublons = con.execute(
+            f"SELECT {cols}, COUNT(*) AS n FROM {table} "  # noqa: S608
+            f"WHERE id_election IN {ids_sql} GROUP BY {cols} HAVING COUNT(*) > 1 LIMIT 5"
+        ).fetchall()
+        if doublons:
+            raise RuntimeError(f"Doublons de clé dans {table} : {doublons}")
 
 
 def load_scrutins_listes(
@@ -108,6 +124,7 @@ def load_scrutins_listes(
         JOIN geographies_communes gc ON gc.code_insee = c.code_commune
         WHERE {where} AND c.id_election IN {ids}
     """)
+    verifier_unicite_resultats(con, ids)
     n_p = ligne_unique(
         con.execute(f"SELECT COUNT(*) FROM resultats_participation WHERE id_election IN {ids}")
     )[0]
