@@ -7,7 +7,7 @@ Usage :
 Source : Parquet « Données des élections agrégées » (nommage inversé, gotcha n° 8).
 Scrutins : européennes 1999-2024, régionales 2004-2021, départementales 2015-2021,
 granularité bureau de vote. Idempotent : DELETE + INSERT par type de scrutin, sans
-toucher aux autres scrutins. Les nuances de ces scrutins (proposition vague B, ADR-0010)
+toucher aux autres scrutins. Les nuances de ces scrutins (vague B, décision Mathias 2026-10-07, ADR-0010)
 et les listes européennes 2019 sont écrites par populate_nuances_vague_b.
 Les cantonales (cant) ne sont pas chargées (hors décision du 2026-10-06).
 """

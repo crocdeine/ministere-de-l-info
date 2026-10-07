@@ -805,17 +805,18 @@ _ANNEES_MUNI: tuple[int, ...] = tuple(sorted({annee for _, annee, _, _ in _NUANC
 _CODES_MUNI_SANS_MAPPING: frozenset[str] = frozenset({"NC", "LNC"})
 
 # ── Nuances européennes, régionales, départementales (vague B, 2026-10-06) ───
-# PROPOSITION soumise à Mathias (reports/etl-elections-france-2026-10-06.md) : classement
-# reconstruit selon la doctrine ADR-0010 (b). Aucune grille ne couvre ces scrutins :
+# Classement validé par Mathias le 2026-10-07 (addendum ADR-0010 « vague B » ;
+# reports/etl-elections-france-2026-10-06.md), reconstruit selon la doctrine ADR-0010 (b).
+# Aucune grille ne couvre ces scrutins :
 # - 1999 à 2021 : INTA1931378J (2020), seule grille antérieure ou la plus proche ;
 # - européennes 2024 : IOMA2322276J (2023), grille antérieure la plus proche.
 # Les codes de liste 2004 sont communs aux européennes et aux régionales ; les européennes
 # 2014 utilisent les codes des municipales 2014 (déjà dans _NUANCES_MUNI, même sens).
-# Codes NON insérés (cas ambigus, bloc NULL = « Non classé », questions fermées du
-# rapport) : LDR 2004, LUCD 2021, LECO 2021, BC-UCD 2021, BC-UCG 2021, BC-ECO 2021 ;
-# résidus LPC/LDD/LDV 2009 (< 10 voix au total).
-# « Composition » : code d'union absent des grilles dont toutes les composantes sont du
-# même bloc (question fermée Q3 du rapport).
+# Cas tranchés par Mathias (2026-10-07) : LDR 2004 → DTE, LUCD/BC-UCD 2021 → DTE,
+# BC-UCG 2021 → DIV, LECO/BC-ECO 2021 → GAU. Seuls codes restant sans bloc : résidus
+# LPC/LDD/LDV des européennes 2009 (11 voix au total).
+# « Composition » : code d'union absent des grilles dont toutes les composantes sont de
+# gauche → GAU (décision Mathias 2026-10-07, Q3).
 _SRC_2023 = "IOMA2322276J annexes 1-2 p. 6-7"
 _R2 = "ADR-0010 règle 2"
 
@@ -824,7 +825,7 @@ def _n(
     nuance: str, annee: int, bloc: str, motif: str, grille: str = _SRC_2020
 ) -> tuple[str, int, str, str]:
     """Entrée (nuance, annee, bloc, source_bloc) avec grille et règle citées."""
-    return (nuance, annee, bloc, f"{motif} ({grille} ; {_R2} ; vague B, proposition)")
+    return (nuance, annee, bloc, f"{motif} ({grille} ; {_R2} ; décision Mathias 2026-10-07)")
 
 
 _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
@@ -834,7 +835,12 @@ _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
     _n("DVD", 1999, "DTE", "Liste RPF-MPF (Pasqua-Villiers) ; MPF ∈ DVD (p. 8) → DTE"),
     _n("VEC", 1999, "GAU", "Les Verts (Cohn-Bendit) ; VEC → GAU, ADR-0010 (c)"),
     _n("UDF", 1999, "CENT", "UDF (Bayrou) → CENT, cohérent UDF législatives 2002"),
-    _n("CPNT", 1999, "DIV", "CPNT autonome (Saint-Josse) → DIV, cohérent CPNT 2002/2007 (règle 3)"),
+    _n(
+        "CPNT",
+        1999,
+        "DIV",
+        "CPNT autonome (Saint-Josse) → DIV, cohérent CPNT 2002/2007 (règle 3, Q9)",
+    ),
     _n("COM", 1999, "GAU", "PCF (Hue) ; LCOM → GAU"),
     _n("FRN", 1999, "EXD", "Front national (Le Pen) ; LRN (successeur) → EXD"),
     _n("EXG", 1999, "EXG", "Liste LO-LCR (Laguiller) ; code = bloc"),
@@ -842,7 +848,7 @@ _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
     _n("MNA", 1999, "EXD", "MN-MNR (Mégret, scission FN) ; LEXD → EXD, cohérent MNR 2002"),
     _n("ECO", 1999, "DIV", "Écologistes hors Verts (MEI, Waechter), VEC distinct ; LECO → AUT"),
     _n("REG", 1999, "DIV", "Régionalistes ; LREG → AUT = DIV"),
-    # ── 2004 : européennes + régionales (codes communs, 15 codes ; LDR exclu) ──
+    # ── 2004 : européennes + régionales (codes communs, 16 codes) ──────────────
     _n("LPS", 2004, "GAU", "Liste du Parti socialiste ; LSOC → GAU"),
     _n("LUMP", 2004, "DTE", "Liste UMP ; LLR (successeur) → DTE"),
     _n("LUDF", 2004, "CENT", "Liste UDF ; LMDM / LUDI (héritiers) → CENT"),
@@ -852,12 +858,25 @@ _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
     _n("LPC", 2004, "GAU", "Liste du Parti communiste ; LCOM → GAU"),
     _n("LDV", 2004, "DIV", "Liste divers ; LDIV → AUT = DIV"),
     _n("LXG", 2004, "EXG", "Liste d'extrême gauche ; LEXG → EXG"),
-    _n("LCP", 2004, "DIV", "Liste CPNT autonome → DIV, cohérent CPNT 2002/2007 (règle 3)"),
+    _n("LCP", 2004, "DIV", "Liste CPNT autonome → DIV, cohérent CPNT 2002/2007 (règle 3, Q9)"),
     _n("LDG", 2004, "GAU", "Liste divers gauche ; LDVG → GAU"),
     _n("LEC", 2004, "DIV", "Liste écologiste hors Verts (LVE distinct, dont Cap 21) ; LECO → AUT"),
     _n("LXD", 2004, "EXD", "Liste d'extrême droite ; LEXD → EXD"),
     _n("LRG", 2004, "DIV", "Liste régionaliste ; LREG → AUT = DIV"),
-    _n("LGA", 2004, "GAU", "Liste de gauche (union PS-PCF-Verts : Huchon, Queyranne) ; LUG → GAU"),
+    _n(
+        "LGA",
+        2004,
+        "GAU",
+        "Composition : liste de gauche (union PS-PCF-Verts : Huchon, Queyranne) ; LUG → GAU "
+        "(union 100 % gauche, Q3)",
+    ),
+    _n(
+        "LDR",
+        2004,
+        "DTE",
+        "Liste divers droite des régionales (unions UMP-UDF, majoritairement UMP ; inclut "
+        "des listes UDF autonomes : Santini, Bayrou, Arthuis) ; LUD → DTE (Q4)",
+    ),
     # ── Européennes 2009 (12 codes) ─────────────────────────────────────────
     _n(
         "LMAJ",
@@ -897,7 +916,12 @@ _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
     _n("LDVG", 2015, "GAU", "Liste divers gauche ; LDVG → GAU"),
     _n("LVEC", 2015, "GAU", "EELV ; LVEC → GAU, ADR-0010 (c)"),
     _n("LDLF", 2015, "DTE", "Debout la France ; LDLF → DTE"),
-    _n("LVEG", 2015, "GAU", "Composition : liste EELV-Front de gauche, LVEC et LFG/LCOM → GAU"),
+    _n(
+        "LVEG",
+        2015,
+        "GAU",
+        "Composition : liste EELV-Front de gauche, LVEC et LFG/LCOM → GAU (union 100 % gauche, Q3)",
+    ),
     _n("LFG", 2015, "GAU", "Front de gauche ; LCOM / LFI → GAU, cohérent LFG 2014"),
     _n("LREG", 2015, "DIV", "Liste régionaliste ; LREG → AUT = DIV"),
     _n("LCOM", 2015, "GAU", "Liste du Parti communiste ; LCOM → GAU"),
@@ -911,14 +935,14 @@ _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
     _n("LEXD", 2015, "EXD", "Liste d'extrême droite ; LEXD → EXD"),
     _n("LRDG", 2015, "GAU", "Liste du Parti radical de gauche ; LRDG → GAU"),
     _n("LUDI", 2015, "CENT", "Liste UDI ; LUDI → CENT"),
-    # ── Régionales 2021 (20 codes ; LUCD et LECO exclus) ─────────────────────
+    # ── Régionales 2021 (22 codes) ──────────────────────────────────────────
     _n("LRN", 2021, "EXD", "Liste du Rassemblement national ; LRN → EXD"),
     _n("LUD", 2021, "DTE", "Liste d'union de la droite ; LUD → DTE"),
     _n(
         "LUGE",
         2021,
         "GAU",
-        "Composition : union de la gauche et des écologistes, LUG et LVEC → GAU",
+        "Composition : union de la gauche et des écologistes, LUG et LVEC → GAU (union 100 % gauche, Q3)",
     ),
     _n("LUG", 2021, "GAU", "Liste d'union de la gauche ; LUG → GAU"),
     _n("LLR", 2021, "DTE", "Liste Les Républicains ; LLR → DTE"),
@@ -937,6 +961,14 @@ _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
     _n("LMDM", 2021, "CENT", "Liste MoDem ; LMDM → CENT"),
     _n("LEXD", 2021, "EXD", "Liste d'extrême droite ; LEXD → EXD"),
     _n("LUDI", 2021, "CENT", "Liste UDI ; LUDI → CENT"),
+    _n("LUCD", 2021, "DTE", "Liste d'union du centre et de la droite ; LUD → DTE (Q5)"),
+    _n(
+        "LECO",
+        2021,
+        "GAU",
+        "Liste écologiste incluant EELV (aucun code LVEC en 2021 : Bayou, Grebert, Thierry) "
+        "→ GAU, sens de l'époque comme ECO législatives 2017/2022 (Q7)",
+    ),
     # ── Départementales 2015 (binômes, 19 codes) ────────────────────────────
     _n("BC-UD", 2015, "DTE", "Binôme d'union de la droite ; LUD → DTE"),
     _n("BC-FN", 2015, "EXD", "Binôme Front national ; RN → EXD"),
@@ -957,14 +989,14 @@ _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
     _n("BC-EXD", 2015, "EXD", "Binôme d'extrême droite ; EXD → EXD"),
     _n("BC-EXG", 2015, "EXG", "Binôme d'extrême gauche ; EXG → EXG"),
     _n("BC-PG", 2015, "GAU", "Binôme Parti de gauche ; FI (successeur) → GAU, cohérent LPG 2014"),
-    # ── Départementales 2021 (binômes, 23 codes ; BC-UCD, BC-UCG, BC-ECO exclus) ──
+    # ── Départementales 2021 (binômes, 26 codes) ────────────────────────────
     _n("BC-DVD", 2021, "DTE", "Binôme divers droite ; DVD → DTE"),
     _n("BC-RN", 2021, "EXD", "Binôme Rassemblement national ; RN → EXD"),
     _n(
         "BC-UGE",
         2021,
         "GAU",
-        "Composition : union de la gauche et des écologistes, UG et VEC → GAU",
+        "Composition : union de la gauche et des écologistes, UG et VEC → GAU (union 100 % gauche, Q3)",
     ),
     _n("BC-DVG", 2021, "GAU", "Binôme divers gauche ; DVG → GAU"),
     _n("BC-UG", 2021, "GAU", "Binôme d'union de la gauche ; LUG → GAU"),
@@ -985,6 +1017,21 @@ _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
     _n("BC-MDM", 2021, "CENT", "Binôme MoDem ; MDM → CENT"),
     _n("BC-DSV", 2021, "DTE", "Binôme droite souverainiste ; DLF → DTE (2020), DSV → DTE (2026)"),
     _n("BC-GJ", 2021, "DIV", "Binôme Gilets jaunes ; LGJ → AUT = DIV"),
+    _n("BC-UCD", 2021, "DTE", "Binôme d'union du centre et de la droite ; LUD → DTE (Q5)"),
+    _n(
+        "BC-UCG",
+        2021,
+        "DIV",
+        "Binôme d'union du centre et de la gauche, entente sans équivalent dans les grilles ; "
+        "DIV comme LGC 2008 (Q6)",
+    ),
+    _n(
+        "BC-ECO",
+        2021,
+        "GAU",
+        "Binôme écologiste incluant EELV (aucun code BC-VEC en 2021) → GAU, sens de l'époque "
+        "comme ECO législatives 2017/2022 (Q7)",
+    ),
     _n(
         "BC-UXD",
         2021,
@@ -1024,16 +1071,10 @@ _NUANCES_EURO_REGI_DPMT: list[tuple[str, int, str, str]] = [
     _n("LDVG", 2024, "GAU", "Liste divers gauche ; DVG → Gauche", _SRC_2023),
 ]
 
-# Codes ambigus volontairement non insérés (bloc NULL) — questions fermées du rapport.
+# Codes sans bloc restant dans les scrutins vague B (non classés, volume négligeable) :
+# résidus des européennes 2009 (codes 2004 réapparus, 11 voix au total).
 _CODES_VAGUE_B_NON_CLASSES: frozenset[tuple[str, int]] = frozenset(
-    {
-        ("LDR", 2004),
-        ("LUCD", 2021),
-        ("LECO", 2021),
-        ("BC-UCD", 2021),
-        ("BC-UCG", 2021),
-        ("BC-ECO", 2021),
-    }
+    {("LPC", 2009), ("LDD", 2009), ("LDV", 2009)}
 )
 
 # ── Candidats présidentiels 2017 / 2022 ──────────────────────────────────────
@@ -1221,12 +1262,11 @@ _CANDIDATS_PRES_2022: list[tuple[int, str, str, str, str, str, str]] = [
 
 
 # ── Listes européennes 2019 (nuance NULL dans la source, gotcha n° 9) ─────────
-# PROPOSITION vague B : résolution comme les présidentielles 2017/2022, par jointure
+# Validé par Mathias le 2026-10-07 : résolution comme les présidentielles 2017/2022, par jointure
 # sur le nom (resultats_candidats.nom = nom_tete_liste de la source, ex. « BARDELLA Jordan »).
 # Grille la plus proche : INTA1931378J (2020, postérieure de 9 mois) ; ADR-0010 règle 2.
-# Non insérées (bloc NULL, question fermée Q5 du rapport) : PHILIPPOT (Les Patriotes),
-# VAUCLIN (Liste de la reconquête).
-_SRC_EURO_2019 = f"{_SRC_2020} ; ADR-0010 règle 2 ; vague B, proposition"
+# Philippot → EXD et Vauclin → DIV : décision Mathias 2026-10-07 (Q8).
+_SRC_EURO_2019 = f"{_SRC_2020} ; ADR-0010 règle 2 ; décision Mathias 2026-10-07"
 
 
 def _l19(
@@ -1269,7 +1309,7 @@ _LISTES_EURO_2019: list[tuple[int, str, str, str, str, str, str]] = [
         "François",
         "UPR",
         "DIV",
-        "UPR (Frexit) ; LDIV → AUT, même formation nuancée LDIV aux européennes 2024",
+        "UPR (Frexit) ; LDIV → AUT, même formation nuancée LDIV aux européennes 2024 (Q9)",
     ),
     _l19("ARTHAUD", "Nathalie", "LO", "EXG", "Lutte ouvrière ; LEXG → EXG"),
     _l19("LALANNE", "Francis", "Alliance jaune", "DIV", "Gilets jaunes ; LGJ → AUT = DIV"),
@@ -1329,6 +1369,20 @@ _LISTES_EURO_2019: list[tuple[int, str, str, str, str, str, str]] = [
         "Neutre et actif",
         "DIV",
         "Liste sans rattachement ; LDIV → AUT",
+    ),
+    _l19(
+        "PHILIPPOT",
+        "Florian",
+        "Les Patriotes",
+        "EXD",
+        "Souverainiste nationaliste (ex-FN) ; LEXD → EXD (Q8)",
+    ),
+    _l19(
+        "VAUCLIN",
+        "Vincent",
+        "Liste de la reconquête",
+        "DIV",
+        "Liste sans rattachement à une formation de la grille ; LDIV → AUT (Q8)",
     ),
 ]
 

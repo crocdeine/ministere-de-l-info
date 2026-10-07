@@ -161,7 +161,7 @@ class TestColonnes:
                 "WHERE id_election = '2019_euro_t1'"
             ).fetchall()
         )
-        assert rows == {"BARDELLA Jordan": "EXD", "PHILIPPOT Florian": None}
+        assert rows == {"BARDELLA Jordan": "EXD", "PHILIPPOT Florian": "EXD"}
 
     def test_blocs_euro_2024_et_codes_ambigus(self, con, tmp_path) -> None:
         cand, part = _parquets(tmp_path)
@@ -178,7 +178,7 @@ class TestColonnes:
             "LENS": "CENT",
             "LUG": "GAU",
             "BC-RN": "EXD",
-            "BC-UCD": None,  # ambigu : non classé, question à Mathias
+            "BC-UCD": "DTE",  # décision Mathias 2026-10-07 (Q5)
         }
 
 
@@ -214,7 +214,7 @@ class TestReferentielVagueB:
         se.populate_nuances_vague_b(c)
         se.populate_nuances_vague_b(c)
         assert _n(c, "SELECT COUNT(*) FROM nuances_harmonisees") == n0
-        assert _n(c, "SELECT COUNT(*) FROM candidats_presidentielle WHERE annee = 2019") == 32
+        assert _n(c, "SELECT COUNT(*) FROM candidats_presidentielle WHERE annee = 2019") == 34
 
 
 class TestVuesHdF:
