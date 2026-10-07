@@ -1,67 +1,65 @@
 /// <reference lib="webworker" />
-// Résultats détaillés d'un scrutin (infobulle), décodés hors du thread principal.
-// Deux formats comparés (tâche 4 du prototype A0) : JSON en colonnes, ou colonnes Int32 brutes.
+// Résultats détaillés (infobulle) : JSON gzip décompressés et décodés hors du thread principal.
+import { type ColonnesScrutin, lireJsonGz } from "../donnees";
 
 export type Demande =
-  | { type: "charger"; format: "json" | "bin"; url: string; urlCodes: string; colonnes: string[]; nul: number }
-  | { type: "commune"; code: string };
+  | { type: "precharger"; urlCommunes: string; scrutin: string; url: string }
+  | { type: "commune"; urlCommunes: string; scrutin: string; url: string; code: string };
 
-export type Reponse =
-  | { type: "pret"; format: string; octets: number; msLecture: number; msDecodage: number }
-  | { type: "commune"; code: string; nom: string | null; valeurs: Record<string, number | null> | null };
+export type Reponse = {
+  code: string;
+  scrutin: string;
+  nom: string | null;
+  valeurs: Record<string, number | null> | null;
+};
 
-let index = new Map<string, number>();
-let noms: string[] = [];
-let colonnes: string[] = [];
-let valeur: (c: number, i: number) => number | null = () => null;
+type Communes = { index: Map<string, number>; noms: string[] };
 
-async function charger(d: Extract<Demande, { type: "charger" }>): Promise<Reponse> {
-  if (index.size === 0) {
-    const c = (await (await fetch(d.urlCodes)).json()) as { codes: string[]; noms: string[] };
-    index = new Map(c.codes.map((code, i) => [code, i]));
-    noms = c.noms;
+let communes: Promise<Communes> | null = null;
+const scrutins = new Map<string, Promise<ColonnesScrutin>>();
+const GARDES = 4; // scrutins gardés en mémoire (≈ 1-2 Mo décodés chacun)
+
+function lireCommunes(url: string): Promise<Communes> {
+  communes ??= lireJsonGz<{ codes: string[]; noms: string[] }>(url).then((c) => ({
+    index: new Map(c.codes.map((code, i) => [code, i])),
+    noms: c.noms,
+  }));
+  return communes;
+}
+
+function lireScrutin(id: string, url: string): Promise<ColonnesScrutin> {
+  let p = scrutins.get(id);
+  if (!p) {
+    p = lireJsonGz<ColonnesScrutin>(url);
+    scrutins.set(id, p);
+    for (const ancien of scrutins.keys()) {
+      if (scrutins.size <= GARDES) break;
+      scrutins.delete(ancien); // ordre d'insertion : le plus ancien d'abord
+    }
   }
-  const t0 = performance.now();
-  const r = await fetch(d.url);
-  const brut = await r.arrayBuffer();
-  const t1 = performance.now();
-  colonnes = d.colonnes;
-  if (d.format === "bin") {
-    const v = new Int32Array(brut);
-    const n = index.size;
-    valeur = (c, i) => {
-      const x = v[c * n + i];
-      return x === undefined || x === d.nul ? null : x;
-    };
-  } else {
-    const o = JSON.parse(new TextDecoder().decode(brut)) as Record<string, (number | null)[]>;
-    const cols = colonnes.map((c) => o[c]);
-    valeur = (c, i) => cols[c]?.[i] ?? null;
-  }
-  return {
-    type: "pret",
-    format: d.format,
-    octets: brut.byteLength,
-    msLecture: t1 - t0,
-    msDecodage: performance.now() - t1,
-  };
+  return p;
 }
 
 self.onmessage = async (e: MessageEvent<Demande>) => {
   const d = e.data;
-  if (d.type === "charger") {
-    self.postMessage(await charger(d));
+  let c: Communes, s: ColonnesScrutin;
+  try {
+    [c, s] = await Promise.all([lireCommunes(d.urlCommunes), lireScrutin(d.scrutin, d.url)]);
+  } catch {
+    // Fichier absent ou illisible : l'infobulle affiche « n.d. » ; nouvel essai au prochain survol.
+    communes = null;
+    scrutins.delete(d.scrutin);
+    if (d.type === "commune") self.postMessage({ code: d.code, scrutin: d.scrutin, nom: null, valeurs: null });
     return;
   }
-  const i = index.get(d.code);
-  const rep: Reponse =
-    i === undefined
-      ? { type: "commune", code: d.code, nom: null, valeurs: null }
-      : {
-          type: "commune",
-          code: d.code,
-          nom: noms[i] ?? null,
-          valeurs: Object.fromEntries(colonnes.map((c, k) => [c, valeur(k, i)])),
-        };
+  if (d.type !== "commune") return;
+  const i = c.index.get(d.code);
+  const rep: Reponse = {
+    code: d.code,
+    scrutin: d.scrutin,
+    nom: i === undefined ? null : (c.noms[i] ?? null),
+    valeurs:
+      i === undefined ? null : Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v[i] ?? null])),
+  };
   self.postMessage(rep);
 };

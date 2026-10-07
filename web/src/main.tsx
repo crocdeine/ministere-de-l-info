@@ -10,6 +10,10 @@ import "./styles.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { chargerMapLibre } from "./maplibre";
+
+// MapLibre (≈ 300 Ko gzip) se charge en parallèle du manifeste et du premier rendu.
+void chargerMapLibre().catch(() => {}); // l'erreur est affichée par la carte elle-même
 
 const racine = document.getElementById("root");
 if (racine)

@@ -1,192 +1,81 @@
-import type { Map as CarteML } from "maplibre-gl";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BANC, lancerBanc, PARAMS, surveillerOuverture } from "./banc";
-import { Carte, couleurs, type Strategie } from "./Carte";
-import { chargerMeta, entier, type Meta, pct, urlDonnees } from "./donnees";
-import type { Reponse } from "./worker/details";
+import { useEffect, useState } from "react";
+import { chargerManifeste, type Manifeste } from "./donnees";
+import { PageElections } from "./PageElections";
 
-type Survol = { x: number; y: number; code: string; car: string } | null;
-type Detail = Extract<Reponse, { type: "commune" }> | null;
+// Navigation : 5 entrées (comme l'application Streamlit). Pages non portées : renvoi vers
+// la version Streamlit. Numérotation « 0X — » (ADR-0016 : pas de code couleur par module).
+export const PAGES = [
+  { id: "accueil", numero: "00", titre: "Accueil" },
+  { id: "geographie", numero: "01", titre: "Géographie" },
+  { id: "elections", numero: "02", titre: "Élections" },
+  { id: "economie", numero: "03", titre: "Économie" },
+  { id: "legislatif", numero: "04", titre: "Législatif" },
+] as const;
+type IdPage = (typeof PAGES)[number]["id"];
+const PORTEES: ReadonlySet<IdPage> = new Set(["elections"]);
 
-const REDUIT = matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-function libelleCar(meta: Meta, car: string): string {
-  if (car === meta.codage.egalite) return "égalité entre blocs en tête";
-  if (car === meta.codage.non_classe) return "listes non classées en tête";
-  return meta.blocs.find((b) => b.car === car)?.libelle ?? "n.d.";
+function pageCourante(): IdPage {
+  const id = location.hash.replace(/^#\/?/, "").split(/[/?]/)[0];
+  return PAGES.find((p) => p.id === id)?.id ?? "elections";
 }
 
 export function App() {
-  const [meta, setMeta] = useState<Meta | null>(null);
+  const [page, setPage] = useState<IdPage>(pageCourante);
+  const [manifeste, setManifeste] = useState<Manifeste | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [scrutin, setScrutin] = useState(0);
-  const [fondu, setFondu] = useState(!REDUIT && PARAMS.get("fondu") !== "0");
-  const [survol, setSurvol] = useState<Survol>(null);
-  const [detail, setDetail] = useState<Detail>(null);
-  const strategie = (PARAMS.get("strategie") ?? "paint") as Strategie;
-  const worker = useMemo(
-    () => new Worker(new URL("./worker/details.ts", import.meta.url), { type: "module" }),
-    [],
-  );
-  const pretDetail = useRef(false);
 
   useEffect(() => {
-    chargerMeta()
-      .then((m) => {
-        setMeta(m);
-        setScrutin(m.scrutins.length - 1);
-      })
-      .catch((e: unknown) => setErreur(String(e)));
+    const suivre = () => setPage(pageCourante());
+    addEventListener("hashchange", suivre);
+    return () => removeEventListener("hashchange", suivre);
   }, []);
 
-  // Infobulle : nom et résultats détaillés demandés au worker (chargés après la 1re carte).
   useEffect(() => {
-    if (!meta || !survol) return;
-    worker.onmessage = (e: MessageEvent<Reponse>) => {
-      if (e.data.type === "commune") setDetail(e.data);
-    };
-    if (!pretDetail.current) {
-      pretDetail.current = true;
-      worker.postMessage({
-        type: "charger",
-        format: PARAMS.get("format") === "json" ? "json" : "bin",
-        url: urlDonnees(`detail/${meta.detail.scrutin}.${PARAMS.get("format") === "json" ? "json" : "bin"}`),
-        urlCodes: urlDonnees("detail/codes.json"),
-        colonnes: meta.detail.colonnes,
-        nul: meta.detail.nul,
-      });
-    }
-    worker.postMessage({ type: "commune", code: survol.code });
-  }, [meta, survol, worker]);
+    chargerManifeste()
+      .then(setManifeste)
+      .catch((e: unknown) => setErreur(e instanceof Error ? e.message : String(e)));
+  }, []);
 
-  const surCarte = (m: CarteML) => {
-    if (!BANC || !meta) return;
-    surveillerOuverture(m);
-    void lancerBanc(m, setScrutin, meta, worker);
-  };
-
-  if (erreur)
-    return (
-      <main className="page">
-        <p className="alerte">
-          Données non disponibles ({erreur}). Générer les fichiers :{" "}
-          <code>uv run python scripts/export_tuiles.py --db COPIE.duckdb</code>
-        </p>
-      </main>
-    );
-  if (!meta)
-    return (
-      <main className="page" aria-busy="true">
-        <p className="overline">Chargement…</p>
-      </main>
-    );
-
-  const s = meta.scrutins[scrutin];
-  const n = meta.scrutins.length;
-  const d = detail?.code === survol?.code ? detail : null;
-  const v = s?.id === meta.detail.scrutin ? d?.valeurs : null;
-  const blocTete = meta.blocs.find((b) => b.car === survol?.car);
-
+  const info = PAGES.find((p) => p.id === page) ?? PAGES[2];
   return (
-    <main className="page">
-      <header className="entete">
+    <>
+      <header className="bandeau">
         <p className="eyebrow">Ministère de l'Info</p>
-        <p className="overline">Prototype A0 — performance</p>
-        <h1>Bloc en tête par commune</h1>
-        <div className="sous-titre">
-          <span>France entière, {entier(n)} scrutins, 34 877 communes</span>
-        </div>
-      </header>
-
-      <section className="filtres" aria-label="Sélection du scrutin">
-        <div className="champ">
-          <label className="libelle" htmlFor="scrutin">
-            Scrutin
-          </label>
-          <select id="scrutin" value={scrutin} onChange={(e) => setScrutin(Number(e.target.value))}>
-            {meta.scrutins.map((x, i) => (
-              <option key={x.id} value={i}>
-                {x.libelle}
-              </option>
+        <nav aria-label="Pages">
+          <ul className="navigation">
+            {PAGES.map((p) => (
+              <li key={p.id}>
+                <a href={`#/${p.id}`} aria-current={p.id === page ? "page" : undefined}>
+                  <span className="mono">{p.numero}</span> {p.titre}
+                </a>
+              </li>
             ))}
-          </select>
-          <button type="button" onClick={() => setScrutin((scrutin + n - 1) % n)}>
-            Précédent
-          </button>
-          <button type="button" onClick={() => setScrutin((scrutin + 1) % n)}>
-            Suivant
-          </button>
-        </div>
-        {strategie === "couches" && (
-          <label className="champ">
-            <input
-              type="checkbox"
-              checked={fondu}
-              disabled={REDUIT}
-              onChange={(e) => setFondu(e.target.checked)}
-            />{" "}
-            Fondu entre scrutins (220 ms)
-          </label>
-        )}
-      </section>
-
-      <section className="section">
-        <h2>{s?.libelle}</h2>
-        <figure className="carte">
-          <Carte
-            meta={meta}
-            scrutin={scrutin}
-            strategie={strategie}
-            fondu={fondu}
-            onCarte={surCarte}
-            onSurvol={setSurvol}
-          />
-          {survol && (
-            <div className="infobulle" role="status" style={{ left: survol.x, top: survol.y }}>
-              <strong>{d?.nom ?? survol.code}</strong>
-              <span className="mono">{survol.code}</span>
-              <span>Bloc en tête : {libelleCar(meta, survol.car)}</span>
-              {v && blocTete && (
-                <span>
-                  {blocTete.libelle} :{" "}
-                  {pct(
-                    v[blocTete.code] == null || !v.exprimes
-                      ? null
-                      : (100 * (v[blocTete.code] ?? 0)) / v.exprimes,
-                  )}{" "}
-                  des exprimés
-                </span>
-              )}
-              {v && (
-                <span>
-                  Participation :{" "}
-                  {pct(v.inscrits && v.votants != null ? (100 * v.votants) / v.inscrits : null)}
-                </span>
-              )}
-            </div>
-          )}
-        </figure>
-        <ul className="legende" aria-label="Légende : bloc arrivé en tête">
-          {couleurs(meta).map((c) => (
-            <li key={c.car}>
-              <span className="carre" style={{ background: c.couleur }} />
-              {libelleCar(meta, c.car)}
-            </li>
-          ))}
-          <li>
-            <span className="carre" style={{ background: meta.couleur_nd }} />
-            n.d. (donnée non disponible)
-          </li>
-        </ul>
-        <div className="source">
-          <p className="source-titre">Source</p>
-          <p>
-            {meta.sources.elections.mention} ; {meta.sources.ign.mention}. {s?.legende} En cas
-            d'égalité de voix entre les blocs arrivés en tête, la commune est en blanc (aucun bloc
-            favorisé).
+          </ul>
+        </nav>
+      </header>
+      <main className="page">
+        {!PORTEES.has(page) ? (
+          <section className="entete">
+            <p className="overline">{info.numero} —</p>
+            <h1>{info.titre}</h1>
+            <p className="chapo">
+              Cette page n'est pas encore portée dans l'application. Elle reste disponible dans la
+              version Streamlit.
+            </p>
+          </section>
+        ) : erreur ? (
+          <p className="alerte" role="alert">
+            Données non disponibles : {erreur} Générer les fichiers :{" "}
+            <code>uv run python scripts/export_web.py</code>
           </p>
-        </div>
-      </section>
-    </main>
+        ) : !manifeste ? (
+          <p className="overline" aria-busy="true">
+            Chargement…
+          </p>
+        ) : (
+          <PageElections manifeste={manifeste} numero={info.numero} />
+        )}
+      </main>
+    </>
   );
 }

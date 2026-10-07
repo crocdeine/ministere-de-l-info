@@ -1,4 +1,5 @@
-/* Styles de la maquette : uniquement des var(--…) de tokens.css (design system v2). */
+/* Styles de l'application : uniquement des var(--…) de tokens.css (design system v2, ADR-0014 ;
+   palette « Papier » en surfaces, ADR-0016 : jamais sous une carte ou un graphique partisan). */
 
 *,
 *::before,
@@ -35,6 +36,68 @@ body {
   padding: var(--space-8) var(--space-20) var(--space-20);
 }
 
+/* ---- Bandeau et navigation (surface papier, ADR-0016) ------------------ */
+
+.bandeau {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-8);
+  padding: var(--space-4) var(--space-20);
+  background: var(--surface-header);
+  border-bottom: var(--border-w) solid var(--rule);
+}
+
+.bandeau .eyebrow {
+  margin: 0;
+}
+
+.navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.navigation a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-h);
+  padding: 0 var(--space-4);
+  border: var(--border-w) solid var(--ink);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-overline);
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: var(--transition-colors);
+}
+
+.navigation a .mono {
+  color: var(--text-meta-warm);
+}
+
+.navigation a[aria-current="page"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.navigation a[aria-current="page"] .mono {
+  color: var(--paper);
+}
+
+.navigation a:hover {
+  background: var(--bleu-france);
+  border-color: var(--bleu-france);
+  color: var(--paper);
+}
+
 /* ---- En-tête ---------------------------------------------------------- */
 
 .entete {
@@ -67,20 +130,12 @@ h1 {
 }
 
 .sous-titre {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  max-width: 22rem;
+  max-width: 28rem;
   margin: var(--space-8) 0 0 clamp(0px, 40%, 40rem);
   font-size: var(--text-sm);
   line-height: var(--leading-normal);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-}
-
-.fleche {
-  width: 24px;
-  height: 24px;
 }
 
 /* ---- Sections ---------------------------------------------------------- */
@@ -112,8 +167,15 @@ h2 {
 .filtres {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-end;
   gap: var(--space-6) var(--space-8);
   margin-bottom: var(--space-12);
+  padding: var(--space-6);
+  background: var(--surface-section);
+}
+
+.filtres select {
+  background: var(--surface-section);
 }
 
 .champ {
@@ -204,39 +266,37 @@ select:focus-visible {
   border-bottom: var(--border-w-strong) solid var(--bleu-france);
 }
 
-/* ---- Chiffres-clés ------------------------------------------------------ */
+/* ---- Carte (plaque blanche fixe, jamais de fond papier) ------------------ */
 
-.chiffres {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-  gap: var(--space-8);
-}
-
-.chiffre {
+.titre-carte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
   border-top: var(--border-w) solid var(--rule);
   padding-top: var(--space-3);
+  margin-bottom: var(--space-6);
 }
 
-.chiffre p {
+.titre-carte h2 {
   margin: 0;
+  padding: 0;
+  border: 0;
 }
 
-.chiffre .valeur {
-  margin-top: var(--space-2);
-  font-size: clamp(2.25rem, 3.6vw, 3.5rem);
-  font-weight: var(--fw-black);
-  line-height: var(--leading-tight);
-  letter-spacing: -0.04em;
-  font-variant-numeric: tabular-nums;
+.etiquette-methode {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-w) solid var(--ink);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: help;
 }
-
-.chiffre .note {
-  margin-top: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--grey-600);
-}
-
-/* ---- Carte ---------------------------------------------------------------- */
 
 figure {
   margin: 0;
@@ -244,7 +304,7 @@ figure {
 
 .carte {
   position: relative;
-  border-top: var(--border-w) solid var(--rule);
+  background: var(--paper);
 }
 
 .carte-conteneur {
@@ -302,51 +362,48 @@ figure {
 
 .carre {
   display: inline-block;
+  flex: none;
   width: 12px;
   height: 12px;
   outline: var(--border-w) solid var(--rule-soft);
 }
 
-.trait {
-  display: inline-block;
-  width: 20px;
-  height: 3px;
+/* Hors périmètre : aucun remplissage sur la carte, carré vide en pointillés. */
+.carre.vide {
+  outline: var(--border-w) dashed var(--grey-600);
 }
 
-.legende-score {
-  max-width: 32rem;
-  margin: var(--space-4) 0;
-}
-
-.degrade {
-  height: 12px;
-  outline: var(--border-w) solid var(--rule-soft);
-}
-
-.graduations {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--text-sm);
-}
-
-.legende-nd {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.methode {
+  max-width: 48rem;
   margin: var(--space-2) 0 0;
   font-size: var(--text-sm);
+  color: var(--grey-800);
 }
 
-/* ---- Graphique ------------------------------------------------------------ */
-
-.graphique {
+.limite {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-2);
   border-top: var(--border-w) solid var(--rule);
-  padding-top: var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--grey-800);
 }
 
-.graphique svg {
-  display: block;
-  max-width: 100%;
+.limite-titre {
+  margin-right: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.limite-titre::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--space-2);
+  background: var(--rouge-marianne);
 }
 
 /* ---- Source / limite ------------------------------------------------------ */
@@ -361,7 +418,7 @@ figure {
 }
 
 .source p {
-  margin: 0;
+  margin: 0 0 var(--space-2);
 }
 
 .source-titre {
@@ -377,14 +434,6 @@ figure {
   border-top: var(--border-w) solid var(--rouge-marianne);
 }
 
-.pied {
-  margin-top: var(--space-30);
-  padding-top: var(--space-2);
-  border-top: var(--border-w) solid var(--rule);
-  font-size: var(--text-sm);
-  color: var(--grey-600);
-}
-
 /* ---- Mobile (≤ 600 px) ------------------------------------------------------- */
 
 @media (max-width: 600px) {
@@ -392,22 +441,16 @@ figure {
     padding: var(--space-4) var(--space-4) var(--space-12);
   }
 
-  .section {
-    margin-top: var(--space-20);
+  .bandeau {
+    padding: var(--space-4);
   }
 
-  /* « PRÉSIDENTIELLES » (15 capitales) doit tenir sur une ligne à 390 px. */
   h1 {
-    font-size: 9.5vw;
+    font-size: 12vw;
   }
 
   .sous-titre {
     margin-left: 0;
-  }
-
-  .chiffres {
-    grid-template-columns: 1fr;
-    gap: var(--space-6);
   }
 
   .carte-conteneur {

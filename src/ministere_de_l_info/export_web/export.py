@@ -285,7 +285,8 @@ def _manifeste(
         "SELECT id_election, type_scrutin, annee, tour, libelle FROM _scrutins ORDER BY 1"
     ).fetchall()
     sans = con.execute(
-        "SELECT id_election FROM elections EXCEPT SELECT id_election FROM _scrutins ORDER BY 1"
+        "SELECT id_election, libelle FROM elections "
+        "WHERE id_election NOT IN (SELECT id_election FROM _scrutins) ORDER BY 1"
     ).fetchall()
     sans_contour = con.execute(
         "SELECT COUNT(DISTINCT code_commune) FROM _c "
@@ -323,7 +324,8 @@ def _manifeste(
             }
             for i, t, a, tour, lib in scrutins
         ],
-        "scrutins_sans_resultats": [s[0] for s in sans],
+        # Écart de chargement : tours déclarés dans `elections` sans aucun résultat.
+        "scrutins_sans_resultats": [{"id": i, "libelle": lib} for i, lib in sans],
         "blocs": [
             {
                 "code": b,
