@@ -1,6 +1,6 @@
 # Point de reprise — à lire en premier par toute nouvelle session
 
-Dernière mise à jour : 2026-10-07 (branche `release/v1.0`), `main` à `6768623` (PR #1 à #7 fusionnées).
+Dernière mise à jour : 2026-10-07 soir, `main` à `4d111b8` (PR #1 à #15 fusionnées).
 Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), `docs/roadmap.md`.
 
 ## Où on en est
@@ -18,14 +18,15 @@ Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), 
   non maintenu activement.
 - En attente de Mathias : contrôle visuel de J3 ; question Dependabot (oui / non).
 
-## Version 1.0 (branche `release/v1.0`, 2026-10-07)
+## Version 1.0.1 publiée (2026-10-07)
 
-- Installateur en une commande (`install.sh`, `uninstall.sh`), version 1.0.0, `CHANGELOG.md`,
-  brouillon `docs/release-notes-v1.0.md`. Scénario local vert (rapport
-  `reports/release-v1-installateur-2026-10-07.md`, avec la liste de publication).
-- Base `db-2026-10-07` (vague B) branchée (`DB_TAG`) ; test réel avec téléchargement GitHub vert
-  (100 s, 1,9 Go). Reste : PR vers `main`, accord de Mathias pour le tag `v1.0.0`, test via la
-  vraie commande `curl | bash` après le tag.
+- Release `v1.0.1` (« dernière version ») ; `v1.0.0` marquée « ne pas utiliser ». Commande :
+  `curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/install.sh | bash`.
+- Base `db-2026-10-07` : élections France entière 1999-2026 (vague B, PR #9), communes fusionnées
+  rattachées. Sauvegarde d'avant chargement : `../ministere-de-l-info-backups/2026-10-07_avant-vague-b.duckdb`.
+- Non testé : reprise du téléchargement après coupure réseau réelle ; Mac Intel.
+- Outillage : fiches de mission `.claude/plans/`, relecteurs ECC, graphify, Antigravity
+  (lecture seule, sorties à vérifier) — règles dans la skill `economie-tokens`.
 
 ## Prochaines étapes, dans l'ordre
 
@@ -37,7 +38,8 @@ Lire ensuite : `docs/orientations.md`, `docs/journal.md` (dernières entrées), 
 3. **Maquette web** : branche `poc/interface-web` (rapport `reports/poc-interface-web-2026-10-06.md`
    sur cette branche). Non fusionnée.
 4. ADR de révision de l'ADR-0002 (Streamlit → interface web + Tauri) à rédiger et faire valider.
-5. Note juridique CNCCFP à ajouter dans `docs/sources.md` avant intégration de la source (vague D).
+5. Ménage : fichiers de test dans `/Volumes/le gros stockage/outils/tmp/` (~4 Go), worktrees terminés.
+6. Note juridique CNCCFP à ajouter dans `docs/sources.md` avant intégration de la source (vague D).
 6. Republication de la base quand les groupes du Sénat seront connus (voir ci-dessous) ;
    zip de la base avant tout rechargement.
 

@@ -125,3 +125,20 @@ L'historique antérieur au 2026-10-04 est dans `reports/` (voir `reports/README.
 - Mathias retient l'option 2 (web + Tauri, public restreint) pour la version de production.
 - Design system v2 : skill copié dans `.claude/skills/design-system-mi` ; patch appliqué sur la
   branche `feat/design-system-v2` (agent developpeur-ui), validation visuelle attendue avant fusion.
+
+## 2026-10-07 — Vague B en production, version 1.0.1 publiée
+
+- Outillage : plugins ECC (relecteurs, fiches de mission `.claude/plans/`), graphify (graphe du code
+  à chaque commit), ponytail (audit : ~420 lignes et 5 paquets retirés, PR #13), Antigravity
+  (réglages réduits à une liste minimale, télémétrie de l'application coupée, lecture seule d'abord).
+- Vague B (PR #9) : élections France entière 1999-2026 (48 scrutins, bureau de vote), européennes,
+  régionales, départementales ; communes fusionnées rattachées (table de passage COG) ; contrôles
+  bloquants (unicité, écarts, voix/exprimés) et chargements transactionnels. Relectures ECC :
+  communes écartées sans log (corrigé), pourcentages des listes absorbées (corrigé). Antigravity :
+  1 constat juste sur 3.
+- Base réelle : sauvegarde, application en 53 s, HdF sans aucune baisse (+0 à +0,79 %), 691 tests ;
+  publiée `db-2026-10-07` (732 Mo).
+- Version 1.0.0 publiée puis **remplacée par la 1.0.1** le même jour : le premier lancement pouvait
+  dépasser les 90 s d'attente du lanceur (bibliothèques non précompilées). 1.0.1 : précompilation,
+  attente 5 min, pas de second serveur, désinstallation qui arrête tous les serveurs. Test de bout en
+  bout vert (premier lancement 92 s sur disque USB lent).
