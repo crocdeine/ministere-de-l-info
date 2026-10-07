@@ -40,7 +40,7 @@ _PARQUET_PARTICIPATION = ROOT / "data" / "exploration" / "candidats-results.parq
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--perimetre", choices=PERIMETRES, default="hdf")
     parser.add_argument("--types", nargs="+", choices=TYPES_VAGUE_B, default=list(TYPES_VAGUE_B))
     args = parser.parse_args()

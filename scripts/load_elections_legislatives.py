@@ -244,7 +244,7 @@ def _print_summary(con) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument(
         "--perimetre",
         choices=PERIMETRES,
