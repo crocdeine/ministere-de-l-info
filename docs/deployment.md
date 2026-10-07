@@ -30,12 +30,12 @@ La publication des releases (image + base) est décrite dans
 Commande (épinglée sur le tag, jamais sur `main`) :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/install.sh | bash
 ```
 
 | Élément | Emplacement |
 |---|---|
-| Code (archive du tag `v1.0.0`), base, Python 3.12, environnement, uv | `~/Library/Application Support/Ministere-de-l-Info/` (`code/`, `ministere.duckdb`, `python/`, `venv/`, `bin/uv`) |
+| Code (archive du tag `v1.0.1`), base, Python 3.12, environnement, uv | `~/Library/Application Support/Ministere-de-l-Info/` (`code/`, `ministere.duckdb`, `python/`, `venv/`, `bin/uv`) |
 | Empreinte de la base installée | `…/ministere.duckdb.gz.sha256` (base conservée à la mise à jour si inchangée) |
 | Port et PID du serveur lancé par l'icône | `…/port`, `…/serveur.pid` |
 | Icône | `~/Applications/Ministère de l'Info.app` (construite localement : pas de quarantaine Gatekeeper) |
@@ -56,7 +56,7 @@ jusqu'à la fermeture de session.
 Désinstallation (`--oui` pour ne pas demander confirmation) :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/uninstall.sh | bash
 ```
 
 Test local sans GitHub : variables `MI_SOURCE_ARCHIVE` (archive `git archive --prefix=…/`),

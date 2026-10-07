@@ -2,7 +2,7 @@
 #
 # Désinstalle « Ministère de l'Info » installé par install.sh :
 #
-#   curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/uninstall.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/uninstall.sh | bash
 #
 # Supprime le dossier d'installation (code, base, Python), l'icône et les journaux,
 # après confirmation (`--oui` pour ne pas la demander). Mêmes variables de test
@@ -35,10 +35,12 @@ main() {
     esac
   fi
 
+  # Tous les serveurs lancés depuis ce dossier (pas seulement le dernier enregistré).
   if [ -f "$install_dir/serveur.pid" ]; then
     kill "$(cat "$install_dir/serveur.pid")" 2>/dev/null || true
-    sleep 1
   fi
+  pkill -f "$install_dir/venv/bin/python" 2>/dev/null || true
+  sleep 1
   rm -rf "$install_dir" "$app" "$log_dir"
   echo "Ministère de l'Info a été désinstallé."
 }

@@ -56,7 +56,7 @@ Liste complète, intermédiaires et état de vérification : [docs/sources.md](
 Ouvrir l'application Terminal, coller cette commande, appuyer sur Entrée :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/install.sh | bash
 ```
 
 L'icône « Ministère de l'Info » apparaît dans le dossier Applications de votre dossier personnel
@@ -64,7 +64,7 @@ L'icône « Ministère de l'Info » apparaît dans le dossier Applications de vo
 libre requis, 1,9 Go occupés ensuite. Mise à jour : relancer la même commande. Désinstallation :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.0/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/crocdeine/ministere-de-l-info/v1.0.1/uninstall.sh | bash
 ```
 
 Testé sur Mac Apple Silicon ; Mac Intel non testé. Détails : [guide utilisateur](docs/guide-utilisateur.md).
