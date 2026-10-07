@@ -24,7 +24,7 @@ Vues (6)
 
 Filtre géographique
 -------------------
-Hauts-de-France uniquement (code_departement IN ('02','59','60','62','80')).
+Hauts-de-France uniquement (départements de perimetre.DEPTS_HDF).
 Le chargement (scripts/load_economie.py) filtre avant insertion.
 """
 
@@ -33,6 +33,8 @@ from __future__ import annotations
 import logging
 
 import duckdb
+
+from ministere_de_l_info.perimetre import DEPTS_HDF_SQL
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +148,7 @@ def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
     """)
     logger.debug("Vue v_economie_commune créée.")
 
-    con.execute("""
+    con.execute(f"""
         CREATE OR REPLACE VIEW v_croisement_eco_elections AS
         SELECT
             e.code_commune,
@@ -166,7 +168,7 @@ def create_economie_views(con: duckdb.DuckDBPyConnection) -> None:
             --              présidentielles 2002/2007/2012 → NULL (hors couverture Filosofi)
             -- Le LEFT JOIN retourne NULL pour les années sans données — comportement attendu.
         -- Filtre explicite (vague B) : la base électorale peut contenir la France entière
-        WHERE e.code_departement IN ('02', '59', '60', '62', '80')
+        WHERE e.code_departement IN ({DEPTS_HDF_SQL})
     """)
     logger.debug("Vue v_croisement_eco_elections créée.")
 

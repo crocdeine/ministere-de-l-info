@@ -16,6 +16,7 @@ from ministere_de_l_info._blocs_politiques import BLOCS_ORDERED as _BLOCS_ORDERE
 from ministere_de_l_info._blocs_politiques import COULEURS_BLOCS as _COULEURS_BLOCS
 from ministere_de_l_info._blocs_politiques import LIBELLES_BLOCS as _LIBELLES_BLOCS
 from ministere_de_l_info._theme import render_page_header
+from ministere_de_l_info.perimetre import DEPTS_HDF
 from ministere_de_l_info.sources import mention
 from ministere_de_l_info.viz.elections_queries import format_pct_fr
 from ministere_de_l_info.viz.legislatif_queries import (
@@ -39,7 +40,7 @@ _COULEURS_BLOCS = {**_COULEURS_BLOCS, BLOC_NON_CLASSE: "#D9D9D9"}
 _LIBELLES_BLOCS = {**_LIBELLES_BLOCS, BLOC_NON_CLASSE: "Non classé"}
 _BLOCS_ORDERED = [*_BLOCS_ORDERED, BLOC_NON_CLASSE]
 
-_DEPTS_HDF = ("02", "59", "60", "62", "80")
+_DEPTS_HDF = DEPTS_HDF
 
 _CHAMBRE_MAP: dict[str, str | None] = {
     "Toutes": None,

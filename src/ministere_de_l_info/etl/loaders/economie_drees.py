@@ -30,6 +30,7 @@ import pandas as pd
 
 from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
+from ministere_de_l_info.perimetre import DEPTS_HDF
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ _DREES_URL = (
     "indicateur_d_accessibilite_potentielle_localisee_apl_aux_medecins_generalistes_xlsx"
 )
 _CACHE_FILENAME = "drees-apl-medecins.xlsx"
-_DEPTS_HDF = ("02", "59", "60", "62", "80")
+_DEPTS_HDF = DEPTS_HDF
 _SEUIL_DESERT = 2.5
 
 

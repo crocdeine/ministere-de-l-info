@@ -6,9 +6,10 @@ import polars as pl
 import streamlit as st
 
 from ministere_de_l_info._sql import ligne_unique
+from ministere_de_l_info.perimetre import DEPTS_HDF_SQL
 from ministere_de_l_info.viz.elections_queries import DB_PATH, _open_ro  # noqa: PLC2701
 
-_HDF_DEPTS_SQL: str = "'02', '59', '60', '62', '80'"
+_HDF_DEPTS_SQL: str = DEPTS_HDF_SQL
 # Filtre HdF sur code_circo « DPT-NN » (la base peut contenir la France entière, vague B)
 _HDF_CIRCO_SQL: str = f"split_part(code_circo, '-', 1) IN ({_HDF_DEPTS_SQL})"
 

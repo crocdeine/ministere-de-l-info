@@ -11,6 +11,9 @@ mapping (NC, LNC) produisent bloc = NULL, agrégées sous "Non classé" dans
 l'UI. pct_exprimes calculé sur le total exprimés de la commune ou du HdF selon
 la vue, via jointure sur resultats_participation.
 
+Définition des vues : schema_elections.create_municipales_views (déplacée le
+2026-10-07, vague B) ; ce script reste le point d'entrée CLI.
+
 Usage :
     uv run python scripts/migrations/0007_add_municipales_views.py
 """
@@ -27,186 +30,18 @@ sys.path.insert(0, str(ROOT / "src"))
 from ministere_de_l_info._sql import ligne_unique  # noqa: E402
 from ministere_de_l_info.config import get_settings  # noqa: E402
 from ministere_de_l_info.etl._common import open_connection  # noqa: E402
+from ministere_de_l_info.etl.schema_elections import (  # noqa: E402
+    _ANNEES_NO_PANNEAU_SYNTHETIQUE,  # noqa: F401  (réexport pour les tests)
+    _create_v_evolution_blocs_hdf_muni,
+    _create_v_listes_commune_muni,
+    _create_v_scores_commune_muni,
+)
 from ministere_de_l_info.logging_config import configure_logging  # noqa: E402
 
 configure_logging()
 logger = logging.getLogger(__name__)
 
 _DB_PATH = get_settings().db_path
-
-
-def _create_v_scores_commune_muni(con) -> None:
-    """Voix agrégés par bloc et commune — 1 ligne par (annee, tour, commune, bloc).
-
-    bloc = NULL pour les nuances sans mapping (NC, LNC, nuance=NULL).
-    pct_exprimes = NULL quand bloc IS NULL : les communes plurinominales (< 1000 hab)
-    ont une sémantique voix candidat (non additive), ce qui rendrait le % faux.
-    Pour les blocs nommés (scrutin de liste ≥ seuil), pct = voix / exprimes_commune.
-    """
-    con.execute("""
-        CREATE OR REPLACE VIEW v_scores_commune_muni AS
-        WITH exprimes_commune AS (
-            SELECT rp.id_election, rp.code_commune, SUM(rp.exprimes) AS exprimes
-            FROM resultats_participation rp
-            JOIN elections e ON e.id_election = rp.id_election
-            WHERE e.type_scrutin = 'muni'
-            GROUP BY rp.id_election, rp.code_commune
-        )
-        SELECT
-            e.annee,
-            e.tour,
-            rc.code_commune,
-            nh.bloc,
-            SUM(rc.voix)                                                          AS voix,
-            CASE WHEN nh.bloc IS NOT NULL
-                 THEN ROUND(100.0 * SUM(rc.voix) / NULLIF(MAX(ex.exprimes), 0), 2)
-                 ELSE NULL END                                                    AS pct_exprimes
-        FROM resultats_candidats rc
-        JOIN elections e
-            ON e.id_election = rc.id_election
-        LEFT JOIN nuances_harmonisees nh
-            ON nh.nuance = rc.nuance AND nh.annee = e.annee
-        JOIN exprimes_commune ex
-            ON ex.id_election = rc.id_election AND ex.code_commune = rc.code_commune
-        WHERE e.type_scrutin = 'muni'
-        GROUP BY e.annee, e.tour, rc.code_commune, nh.bloc
-    """)
-    logger.info("Vue v_scores_commune_muni créée/mise à jour")
-
-
-def _create_v_evolution_blocs_hdf_muni(con) -> None:
-    """Évolution temporelle des blocs sur l'ensemble HdF.
-
-    Filtre explicite sur les 5 départements (vague B : la base peut contenir la France).
-
-    1 ligne par (annee, tour, bloc). voix = SUM(rc.voix) par bloc.
-    pct_exprimes = voix_bloc / exprimes_HdF * 100, SEULEMENT pour les blocs nommés.
-    Pour bloc=NULL (NC/plurinominal), pct_exprimes=NULL : les communes < 1000 hab
-    ont un scrutin plurinominal (voix candidat ≠ voix liste), ce qui rend le %
-    non comparable avec les blocs politiques des communes ≥ seuil.
-    """
-    con.execute("""
-        CREATE OR REPLACE VIEW v_evolution_blocs_hdf_muni AS
-        WITH exprimes_hdf AS (
-            SELECT rp.id_election, SUM(rp.exprimes) AS exprimes
-            FROM resultats_participation rp
-            JOIN elections e ON e.id_election = rp.id_election
-            WHERE e.type_scrutin = 'muni'
-              AND rp.code_departement IN ('02', '59', '60', '62', '80')
-            GROUP BY rp.id_election
-        ),
-        blocs_hdf AS (
-            SELECT
-                e.id_election,
-                e.annee,
-                e.tour,
-                nh.bloc,
-                SUM(rc.voix) AS voix
-            FROM resultats_candidats rc
-            JOIN elections e
-                ON e.id_election = rc.id_election
-            LEFT JOIN nuances_harmonisees nh
-                ON nh.nuance = rc.nuance AND nh.annee = e.annee
-            WHERE e.type_scrutin = 'muni'
-              AND rc.code_departement IN ('02', '59', '60', '62', '80')
-            GROUP BY e.id_election, e.annee, e.tour, nh.bloc
-        )
-        SELECT
-            bh.annee,
-            bh.tour,
-            bh.bloc,
-            bh.voix,
-            CASE WHEN bh.bloc IS NOT NULL
-                 THEN ROUND(100.0 * bh.voix / NULLIF(ex.exprimes, 0), 2)
-                 ELSE NULL END AS pct_exprimes
-        FROM blocs_hdf bh
-        JOIN exprimes_hdf ex ON ex.id_election = bh.id_election
-        ORDER BY bh.annee, bh.tour, bh.bloc
-    """)
-    logger.info("Vue v_evolution_blocs_hdf_muni créée/mise à jour")
-
-
-# Scrutins dont no_panneau est synthétique (NULL dans le Parquet source, ROW_NUMBER par BV
-# au chargement, ADR-0005) : il n'identifie pas une liste d'un BV à l'autre.
-_ANNEES_NO_PANNEAU_SYNTHETIQUE: tuple[int, ...] = (2008,)
-
-
-def _create_v_listes_commune_muni(con) -> None:
-    """Détail liste par liste par commune — clé pour le drill-down D3.3.
-
-    1 ligne par liste : (annee, tour, commune, no_panneau). no_panneau est le numéro
-    de panneau officiel, identique dans tous les BV d'une commune ; dans les communes
-    au scrutin plurinominal, une ligne = un candidat.
-
-    Cas 2008 (no_panneau synthétique, variable d'un BV à l'autre) : no_panneau = NULL
-    dans la vue et la liste est identifiée par (nuance, libellés, tête de liste).
-    Limite résiduelle : deux listes 2008 de même nuance sans libellé ni tête de liste
-    restent fusionnées (information absente de la source).
-
-    Correctif C1 (audit 2026-09-24) : la vue groupait par nuance, fusionnant les listes
-    de même nuance (voix additionnées, tête de liste arbitraire).
-    bloc = NULL pour nuances sans mapping (NC, LNC).
-    pct_exprimes = voix_liste / exprimes_commune * 100 (NULL si bloc NULL).
-    """
-    annees_synth = ", ".join(str(a) for a in _ANNEES_NO_PANNEAU_SYNTHETIQUE)
-    con.execute(f"""
-        CREATE OR REPLACE VIEW v_listes_commune_muni AS
-        WITH exprimes_commune AS (
-            SELECT rp.id_election, rp.code_commune, SUM(rp.exprimes) AS exprimes
-            FROM resultats_participation rp
-            JOIN elections e ON e.id_election = rp.id_election
-            WHERE e.type_scrutin = 'muni'
-            GROUP BY rp.id_election, rp.code_commune
-        ),
-        lignes AS (
-            SELECT
-                rc.id_election,
-                e.annee,
-                e.tour,
-                rc.code_commune,
-                CASE WHEN e.annee IN ({annees_synth}) THEN NULL
-                     ELSE rc.no_panneau END AS no_panneau,
-                rc.nuance,
-                nh.bloc,
-                rc.libelle_abrege_liste,
-                rc.libelle_etendu_liste,
-                rc.nom_tete_liste,
-                rc.prenom_tete_liste,
-                rc.voix
-            FROM resultats_candidats rc
-            JOIN elections e
-                ON e.id_election = rc.id_election
-            LEFT JOIN nuances_harmonisees nh
-                ON nh.nuance = rc.nuance AND nh.annee = e.annee
-            WHERE e.type_scrutin = 'muni'
-        )
-        SELECT
-            l.annee,
-            l.tour,
-            l.code_commune,
-            l.no_panneau,
-            l.nuance,
-            l.bloc,
-            MAX(l.libelle_abrege_liste) AS libelle_abrege_liste,
-            MAX(l.libelle_etendu_liste) AS libelle_etendu_liste,
-            MAX(l.nom_tete_liste)       AS nom_tete_liste,
-            MAX(l.prenom_tete_liste)    AS prenom_tete_liste,
-            SUM(l.voix)                 AS voix,
-            CASE WHEN l.bloc IS NOT NULL
-                 THEN ROUND(100.0 * SUM(l.voix) / NULLIF(MAX(ex.exprimes), 0), 2)
-                 ELSE NULL END          AS pct_exprimes
-        FROM lignes l
-        JOIN exprimes_commune ex
-            ON ex.id_election = l.id_election AND ex.code_commune = l.code_commune
-        GROUP BY
-            l.annee, l.tour, l.code_commune, l.no_panneau, l.nuance, l.bloc,
-            -- 2008 (no_panneau NULL) : la liste est identifiée par ses descripteurs
-            CASE WHEN l.no_panneau IS NULL THEN l.libelle_abrege_liste END,
-            CASE WHEN l.no_panneau IS NULL THEN l.libelle_etendu_liste END,
-            CASE WHEN l.no_panneau IS NULL THEN l.nom_tete_liste END,
-            CASE WHEN l.no_panneau IS NULL THEN l.prenom_tete_liste END
-    """)  # noqa: S608
-    logger.info("Vue v_listes_commune_muni créée/mise à jour")
 
 
 def main() -> None:

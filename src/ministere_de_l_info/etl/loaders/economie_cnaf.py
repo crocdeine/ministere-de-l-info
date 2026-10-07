@@ -32,6 +32,7 @@ import httpx
 
 from ministere_de_l_info._sql import ligne_unique
 from ministere_de_l_info.etl._common import upsert_metadata
+from ministere_de_l_info.perimetre import DEPTS_HDF
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ _CNAF_URL = (
     "?format=csv&timezone=Europe/Berlin&use_labels_for_header=false"
 )
 _CACHE_FILENAME = "cnaf-rsa-commune.csv"
-_DEPTS_HDF = ("02", "59", "60", "62", "80")
+_DEPTS_HDF = DEPTS_HDF
 
 
 def _download_cache(url: str, dest: Path, force: bool = False) -> Path:
