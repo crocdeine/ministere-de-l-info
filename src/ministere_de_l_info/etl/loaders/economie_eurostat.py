@@ -89,36 +89,6 @@ def _parse_eurostat_tsv(path: Path) -> pd.DataFrame:
     return df
 
 
-def _melt_to_rows(
-    df_raw: pd.DataFrame,
-    col0: str,
-    dims: list[str],
-    annee_cols: list[str],
-    indicateur: str,
-    source: str,
-) -> list[tuple]:
-    """Assemble les dimensions + unpivot années → liste de tuples (code_geo, type_geo, annee, …)."""
-    parsed = df_raw[col0].str.split(",", expand=True)
-    parsed.columns = dims
-    full = pd.concat([parsed, df_raw[annee_cols]], axis=1)
-    full.columns = [c.strip() for c in full.columns]
-
-    rows: list[tuple] = []
-    for _, row in full.iterrows():
-        geo = str(row["geo"]).strip()
-        tgeo = _geo_type(geo)
-        for col in annee_cols:
-            try:
-                annee = int(col)
-            except ValueError:
-                continue
-            val = _parse_value(row[col])
-            if val is None:
-                continue
-            rows.append((geo, tgeo, annee, indicateur, val, source))
-    return rows
-
-
 def load_economie_chomage_eurostat(
     con: duckdb.DuckDBPyConnection,
     raw_dir: Path,
