@@ -21,6 +21,12 @@ Après J5 (état de `main` au 2026-10-07) :
 | #5 | Sénat : refus de la page HTML servie à la place d'ODSEN_GENERAL | ✅ fusionnée |
 | #6 | Réflexe documentation (CLAUDE.md, modèle de PR) | ✅ fusionnée |
 | #7 | Brainstorm fonctionnalités et sources, décisions du 2026-10-06 | ✅ fusionnée |
+| #8 | Mise à jour générale de `docs/` | ✅ fusionnée |
+| #9 | **Vague B** : élections France entière 1999-2026, communes fusionnées rattachées | ✅ fusionnée, base `db-2026-10-07` publiée |
+| #10-#12 | Décisions du 2026-10-07, fiches de mission, outillage (ECC, graphify, Antigravity) | ✅ fusionnées |
+| #13 | Nettoyage ponytail (code mort, 5 paquets) | ✅ fusionnée |
+| #14 | **Version 1.0.0** : installateur en une commande | ✅ publiée, remplacée par la 1.0.1 |
+| #15 | **Version 1.0.1** : premier lancement fiable | ✅ publiée (« dernière version ») |
 
 ## Suite (décisions du 2026-10-06, `docs/orientations.md`)
 

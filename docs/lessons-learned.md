@@ -239,3 +239,16 @@ Première relecture déléguée à Antigravity (Gemini 3.1 Pro) sur la vague B :
 absente — elle existe) et 1 juste (pourcentages des listes municipales rattachées). En mode `-p`, il
 ne peut pas lancer `git diff` : lui fournir le diff dans un fichier (`--add-dir`). Règle : chaque
 constat est vérifié par une requête ou un test avant d'être retenu.
+
+### Tester une application installée depuis la session du directeur (2026-10-07)
+- La session Claude Code exporte `PYTHONDONTWRITEBYTECODE=1` : tout programme lancé depuis elle
+  recompile Python à chaque démarrage. Mesurer un temps de lancement « destinataire » avec
+  `env -u PYTHONDONTWRITEBYTECODE`, et ne pas extrapoler une mesure faite dans la session.
+- Un lanceur qui attend le serveur ne doit pas être court-circuité : vérifier après sa sortie, sur le
+  port qu'il a enregistré, et ne jamais désinstaller pendant qu'il attend (son alerte s'affiche
+  ensuite sur l'écran de Mathias, avec un journal déjà supprimé).
+- Garder les journaux d'un test qui échoue (`MI_LOG_DIR` hors du dossier désinstallé, arrêt avant
+  désinstallation).
+- Le disque externe USB est lent pour des milliers de petits fichiers : `import streamlit, plotly`
+  peut y dépasser 2 min. Un délai d'attente doit avoir une large marge (5 min) et un message.
+- Un test « HTTP 200 » sur Streamlit ne prouve que la coquille : vérifier une page réelle (AppTest).
