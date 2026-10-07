@@ -156,9 +156,12 @@ Les scripts de chargement joignent sur `geographies_communes` : `--perimetre hdf
 ne conserve que `code_region = '32'` (02, 59, 60, 62, 80), `--perimetre france` toutes les
 communes du référentiel. Volumes France entière (vague B, 48 scrutins pres/legi/muni/euro/
 regi/dpmt) : 2,87 M bureaux × scrutin, 26,0 M lignes candidats ; base ≈ 1,27 Go compactée, sans
-clé primaire sur les résultats (≈ 0,73 Go compressée). Lignes écartées (commune absente du référentiel) : ~2 000 BV par scrutin
-avant 2017 (communes fusionnées depuis), ~900 après (Français de l'étranger « ZZ »,
-Nouvelle-Calédonie, Polynésie, Wallis). Codes « Z* » de l'outre-mer normalisés en `97x`.
+clé primaire sur les résultats (≈ 0,73 Go compressée). Communes fusionnées depuis le scrutin (~1 850 communes par
+scrutin avant 2017) : rattachées à la commune actuelle par la table de passage INSEE
+(`communes_passage`, COG 2026, mouvements des communes, Licence Ouverte 2.0 :
+`https://www.insee.fr/fr/statistiques/fichier/8740222/v_mvt_commune_2026.csv`). Restent
+écartés et comptés (`elections_ecarts_chargement`) : Français de l'étranger « ZZ »,
+Pacifique, Saint-Martin et Saint-Barthélemy. Codes « Z* » de l'outre-mer normalisés en `97x`.
 Étude d'impact : `reports/etl-elections-france-2026-10-06.md`.
 
 **Références** : `reports/exploration-elections-legislatives.md` (exploration des législatives). Le rapport d'exploration initial `reports/exploration-elections.md`, cité dans les versions précédentes de ce document, n'existe pas dans le dépôt.

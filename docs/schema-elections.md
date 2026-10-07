@@ -22,8 +22,10 @@ vues et requêtes « HdF » de l'interface filtrent explicitement les 5 départe
 (`v_evolution_blocs_hdf_legi`, `v_evolution_blocs_hdf_muni`, `v_croisement_eco_elections`,
 `viz/elections_*queries.py`). Codes département de la source « ZA », « ZB », « ZC »,
 « ZD », « ZM », « ZS » (outre-mer, certaines années) normalisés en `971`…`976` au
-chargement. Les communes absentes du référentiel (fusionnées depuis, Français de
-l'étranger, Pacifique) sont écartées.
+chargement. Les communes fusionnées depuis le scrutin sont **rattachées à la commune
+actuelle** (voir « Rattachement des communes fusionnées ») ; restent écartés les Français
+de l'étranger et les collectivités d'outre-mer absentes du référentiel (Pacifique,
+Saint-Martin, Saint-Barthélemy), comptés dans `elections_ecarts_chargement`.
 
 **Scrutins chargés** : présidentielles, législatives, municipales (2002-2026) et, depuis
 la vague B, européennes (1999-2024), régionales (2004-2021) et départementales (2015,
@@ -322,6 +324,30 @@ La même nuance peut désigner des formations différentes selon l'année. La cl
 3 500 habitants) ont une nuance NULL dans la source : elles restent « Non classé »
 (bloc NULL), comme `NC` et `LNC`. Ce n'est pas une erreur de chargement.
 
+## Rattachement des communes fusionnées (décision Mathias 2026-10-07)
+
+Table **`communes_passage`** (`code_ancien` PK, `code_actuel`, `date_effet`,
+`type_evenement`), construite par `scripts/load_communes_passage.py` depuis le fichier
+des mouvements des communes du COG INSEE 2026 (Licence Ouverte 2.0) : arêtes des
+fusions (MOD 31-34), changements de code (41) et de département (50), arête la plus
+récente par code, chaîne suivie jusqu'à un code de `geographies_communes`
+(4 234 codes anciens). Les loaders lisent la source via `source_rattachee_sql()` :
+
+- `code_commune` = commune actuelle ; **`code_commune_origine`** (nouvelle colonne des
+  deux tables de résultats) = code d'origine, NULL si inchangé ;
+- `code_bv` préfixé du code d'origine (`74011-0001`) : pas de collision avec les bureaux
+  de la commune d'accueil ;
+- `code_departement` = département de la commune actuelle ; la clé de circonscription
+  (législatives 2012-2022) reste construite sur le département **du scrutin**.
+
+Limites : géographie actuelle (une commune absorbée est comptée dans sa commune
+d'accueil, y compris aux municipales, où ses listes restent distinctes dans
+`v_listes_commune_muni` mais s'additionnent dans `v_scores_commune_muni`) ; scissions
+(créations, rétablissements : 999 événements) recensées mais jamais réparties ; une
+commune (code 26383 / 02899) reste non rattachée (≤ 184 exprimés par scrutin).
+Effet mesuré : exprimés HdF en hausse de 0,06 % (2024) à 1,2 % (euro 1999) ; bilan
+France = total de la source (écart 0,000 %).
+
 ## Contrôles de chargement (vague B, 2026-10-07)
 
 Exécutés par `controler_chargement()` (`etl/loaders/elections_agregees.py`) à la fin de
@@ -330,9 +356,9 @@ chaque loader :
 - **Unicité** des clés logiques des tables de résultats (`verifier_unicite_resultats`) :
   `RuntimeError` en cas de doublon.
 - **Lignes écartées** (commune de la source absente de `geographies_communes`), par
-  scrutin et catégorie (`etranger` : département `ZZ` ; `pacifique` : communes `98…` et
-  départements `ZN`, `ZP`, `ZW`, `ZX` ; `reste` : essentiellement des communes fusionnées
-  depuis) : écrites dans la table **`elections_ecarts_chargement`** (`id_election`,
+  scrutin et catégorie (`rattachee` : commune fusionnée rattachée, pour traçabilité ;
+  `etranger` : département `ZZ` ; `outremer_hors_referentiel` : communes `98…`, `977`,
+  `978`, `97123`, `97127`, départements `ZN`, `ZP`, `ZW`, `ZX`, `ZT`, `ZY` ; `reste`) : écrites dans la table **`elections_ecarts_chargement`** (`id_election`,
   `perimetre`, `categorie`, `nb_communes`, `nb_bv`, `exprimes`, `exprimes_total`,
   `pct_exprimes`), journalisées en warning ; `RuntimeError` si `reste` dépasse
   `SEUIL_ECART_RESTE_PCT` (3 %) des exprimés d'un scrutin.

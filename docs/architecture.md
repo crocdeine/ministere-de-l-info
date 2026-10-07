@@ -94,6 +94,7 @@ ministere-de-l-info/
 │   │   └── loaders/
 │   │       ├── regions.py, departements.py, epci.py, communes.py,
 │   │       │   arrondissements_municipaux.py, circonscriptions.py, populations.py
+│   │       ├── communes_passage.py    # Communes fusionnées → commune actuelle (COG INSEE)
 │   │       ├── elections_agregees.py  # Périmètre hdf/france, euro/regi/dpmt (vague B)
 │   │       ├── _http_retry.py
 │   │       ├── economie_filosofi.py    # Dataset OLAP data.gouv → economie_filosofi
@@ -133,6 +134,7 @@ ministere-de-l-info/
 │   ├── etl_territoires.py          # ETL géographie + populations
 │   ├── etl_regions.py              # Ancien ETL régions (toujours présent)
 │   ├── init_elections_schema.py    # Schéma électoral + tables de référence
+│   ├── load_communes_passage.py    # Table de passage COG (avant les loaders électoraux)
 │   ├── load_elections_{presidentielles,legislatives,municipales,autres}.py  # --perimetre hdf|france
 │   ├── load_communes_passage.py    # Table de passage COG (communes fusionnées → commune actuelle)
 │   ├── migrations/                 # 0006 schéma municipales, 0007 vues municipales,
