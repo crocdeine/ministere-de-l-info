@@ -52,6 +52,7 @@ from ministere_de_l_info.etl._common import open_connection  # noqa: E402
 from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
     PERIMETRES,
     code_departement_sql,
+    controler_chargement,
     filtre_perimetre,
     verifier_unicite_resultats,
 )
@@ -243,6 +244,7 @@ def main() -> None:
         _load_participation(con, args.perimetre)
         _load_candidats(con, args.perimetre)
         verifier_unicite_resultats(con, _MUNI_IDS)
+        controler_chargement(con, _PARQUET_PARTICIPATION, _MUNI_IDS, args.perimetre)
         _print_summary(con)
         print("\nChargement municipales terminé.")
     finally:

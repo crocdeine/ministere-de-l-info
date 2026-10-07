@@ -21,7 +21,8 @@ from pathlib import Path
 import duckdb
 
 from ministere_de_l_info._sql import ligne_unique
-from ministere_de_l_info.etl.schema_elections import CLES_RESULTATS
+from ministere_de_l_info.etl.schema_elections import CLES_RESULTATS, ECARTS_DDL
+from ministere_de_l_info.perimetre import DEPTS_HDF_SQL
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,16 @@ PERIMETRES: tuple[str, ...] = ("hdf", "france")
 # Types de scrutin chargés par load_scrutins_listes (vague B). Les cantonales (cant)
 # restent hors périmètre tant que Mathias ne l'a pas décidé.
 TYPES_VAGUE_B: tuple[str, ...] = ("euro", "regi", "dpmt")
+
+# Part maximale des exprimés d'un scrutin écartée hors étranger et Pacifique (« reste »)
+SEUIL_ECART_RESTE_PCT: float = 3.0
+
+# Catégorie d'une ligne de la source dont la commune est absente du référentiel
+_CATEGORIE_ECART_SQL = """CASE
+    WHEN p.code_departement = 'ZZ' THEN 'etranger'
+    WHEN p.code_commune LIKE '98%' OR p.code_departement IN ('ZN', 'ZP', 'ZW', 'ZX')
+        THEN 'pacifique'
+    ELSE 'reste' END"""
 
 
 def filtre_perimetre(perimetre: str, alias: str = "gc") -> str:
@@ -125,6 +136,7 @@ def load_scrutins_listes(
         WHERE {where} AND c.id_election IN {ids}
     """)
     verifier_unicite_resultats(con, ids)
+    controler_chargement(con, parquet_participation, ids, perimetre)
     n_p = ligne_unique(
         con.execute(f"SELECT COUNT(*) FROM resultats_participation WHERE id_election IN {ids}")
     )[0]
@@ -133,3 +145,101 @@ def load_scrutins_listes(
     )[0]
     logger.info("%s (%s) : %d BV, %d lignes candidats/listes", type_scrutin, perimetre, n_p, n_c)
     return int(n_p), int(n_c)
+
+
+def controler_chargement(
+    con: duckdb.DuckDBPyConnection,
+    parquet_participation: Path,
+    ids_sql: str,
+    perimetre: str,
+    seuil_reste_pct: float = SEUIL_ECART_RESTE_PCT,
+) -> None:
+    """Contrôles après chargement (vague B, durcissement du 2026-10-07).
+
+    1. Lignes de la source écartées (commune absente de geographies_communes), par
+       scrutin et catégorie (etranger, pacifique, reste) : écrites dans
+       elections_ecarts_chargement et journalisées (warning) ; RuntimeError si la
+       catégorie « reste » dépasse seuil_reste_pct des exprimés d'un scrutin.
+    2. Hors municipales, bureaux où la somme des voix diffère des exprimés : warning avec
+       les 5 pires écarts (non bloquant).
+    """
+    filtre_perimetre(perimetre)  # valide la valeur (liste blanche)
+    con.execute(ECARTS_DDL)
+    src = f"read_parquet('{parquet_participation}')"
+    perim_src = "TRUE" if perimetre == "france" else f"p.code_departement IN ({DEPTS_HDF_SQL})"
+    con.execute(
+        f"DELETE FROM elections_ecarts_chargement WHERE id_election IN {ids_sql} AND perimetre = ?",
+        [perimetre],
+    )
+    con.execute(
+        f"""
+        INSERT INTO elections_ecarts_chargement
+        WITH src AS (
+            SELECT p.id_election, p.code_commune, p.exprimes,
+                   gc.code_insee IS NULL AS ecartee, {_CATEGORIE_ECART_SQL} AS categorie
+            FROM {src} p
+            LEFT JOIN geographies_communes gc ON gc.code_insee = p.code_commune
+            WHERE p.id_election IN {ids_sql} AND {perim_src}
+        ),
+        tot AS (SELECT id_election, SUM(exprimes) AS t FROM src GROUP BY 1)
+        SELECT s.id_election, ?, s.categorie, COUNT(DISTINCT s.code_commune), COUNT(*),
+               SUM(s.exprimes), MAX(tot.t),
+               ROUND(100.0 * SUM(s.exprimes) / NULLIF(MAX(tot.t), 0), 3)
+        FROM src s JOIN tot USING (id_election)
+        WHERE s.ecartee
+        GROUP BY s.id_election, s.categorie
+        """,
+        [perimetre],
+    )
+    ecarts = con.execute(
+        "SELECT id_election, categorie, nb_communes, nb_bv, exprimes, pct_exprimes "
+        f"FROM elections_ecarts_chargement WHERE id_election IN {ids_sql} AND perimetre = ? "
+        "ORDER BY 1, 2",
+        [perimetre],
+    ).fetchall()
+    for idel, cat, n_com, n_bv, expr, pct in ecarts:
+        logger.warning(
+            "%s : %s écarté(s) — %d communes, %d BV, %d exprimés (%.3f %%)",
+            idel,
+            cat,
+            n_com,
+            n_bv,
+            expr or 0,
+            pct or 0.0,
+        )
+    trop = [(e[0], e[5]) for e in ecarts if e[1] == "reste" and (e[5] or 0) > seuil_reste_pct]
+    if trop:
+        raise RuntimeError(
+            f"Communes absentes du référentiel au-delà de {seuil_reste_pct} % des exprimés : {trop}"
+        )
+
+    pires = con.execute(f"""
+        WITH v AS (
+            SELECT id_election, code_departement, code_commune, code_bv, SUM(voix) AS voix
+            FROM resultats_candidats WHERE id_election IN {ids_sql}
+            GROUP BY ALL
+        )
+        SELECT rp.id_election, rp.code_commune, rp.code_bv, rp.exprimes, v.voix,
+               ABS(COALESCE(v.voix, 0) - COALESCE(rp.exprimes, 0)) AS ecart,
+               COUNT(*) OVER (PARTITION BY rp.id_election) AS n_bv_ecart
+        FROM resultats_participation rp
+        JOIN elections e ON e.id_election = rp.id_election
+        LEFT JOIN v ON v.id_election = rp.id_election
+            AND v.code_departement = rp.code_departement
+            AND v.code_commune = rp.code_commune AND v.code_bv = rp.code_bv
+        WHERE rp.id_election IN {ids_sql} AND e.type_scrutin <> 'muni'
+          AND COALESCE(v.voix, 0) <> COALESCE(rp.exprimes, 0)
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY rp.id_election ORDER BY ecart DESC) <= 5
+        ORDER BY rp.id_election, ecart DESC
+    """).fetchall()
+    for idel, com, bv, expr, voix, ecart, n in pires:
+        logger.warning(
+            "%s : %d BV où somme des voix ≠ exprimés ; ex. %s/%s exprimés %s, voix %s (écart %d)",
+            idel,
+            n,
+            com,
+            bv,
+            expr,
+            voix,
+            ecart,
+        )

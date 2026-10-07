@@ -19,6 +19,8 @@ import logging
 import sys
 from pathlib import Path
 
+import duckdb
+
 ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -36,6 +38,15 @@ configure_logging()
 logger = logging.getLogger(__name__)
 
 
+def appliquer(con: duckdb.DuckDBPyConnection) -> list[str]:
+    """Retire les clés primaires puis recrée les vues dépendantes. Idempotent."""
+    tables = retirer_cles_primaires_resultats(con)
+    create_elections_views(con)
+    create_municipales_views(con)
+    create_economie_views(con)
+    return tables
+
+
 def main() -> None:
     db_path = get_settings().db_path
     if not db_path.exists():
@@ -43,11 +54,7 @@ def main() -> None:
         sys.exit(1)
     con = open_connection(db_path)
     try:
-        tables = retirer_cles_primaires_resultats(con)
-        # Vues dépendantes recréées (liées par nom, mais rebind explicite par sécurité)
-        create_elections_views(con)
-        create_municipales_views(con)
-        create_economie_views(con)
+        tables = appliquer(con)
         con.execute("CHECKPOINT")
         logger.info("Migration 0009 : %s", ", ".join(tables) or "rien à faire (déjà appliquée)")
     finally:

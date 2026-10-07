@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from ministere_de_l_info.etl import schema_elections as se  # noqa: E402
 from ministere_de_l_info.etl.loaders.elections_agregees import (  # noqa: E402
+    controler_chargement,
     filtre_perimetre,
     load_scrutins_listes,
     verifier_unicite_resultats,
@@ -91,8 +92,9 @@ def con() -> Iterator[duckdb.DuckDBPyConnection]:
     se.populate_elections_referentiels(c)
     se.create_elections_views(c)
     c.execute("""CREATE TABLE geographies_communes AS SELECT * FROM (VALUES
-        ('59350', '59', '32'), ('75056', '75', '11'), ('97101', '971', '01'))
-        t(code_insee, code_departement, code_region)""")
+        ('59350', '59', '32', 'Lille'), ('75056', '75', '11', 'Paris'),
+        ('97101', '971', '01', 'Les Abymes'))
+        t(code_insee, code_departement, code_region, nom)""")
     yield c
     c.close()
 
@@ -283,3 +285,87 @@ class TestSansClePrimaire:
         )
         with pytest.raises(RuntimeError, match="Doublons"):
             verifier_unicite_resultats(con, "('2024_euro_t1')")
+
+
+def _charger_migration(nom: str):
+    spec = importlib.util.spec_from_file_location(
+        f"_m_{nom}", ROOT / "scripts" / "migrations" / nom
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestDurcissement:
+    """Fiche « vague B — durcissement » (2026-10-07)."""
+
+    def test_migration_0009_puis_vues_hdf_bornees(self, con) -> None:
+        from ministere_de_l_info.etl.schema_economie import create_economie_schema
+
+        create_economie_schema(con)
+        con.execute(
+            "ALTER TABLE resultats_participation ADD PRIMARY KEY "
+            "(id_election, code_departement, code_commune, code_bv)"
+        )
+        con.execute("""INSERT INTO resultats_participation
+            (id_election, code_departement, code_commune, code_bv, inscrits, votants, exprimes,
+             code_circo) VALUES
+            ('2022_legi_t1', '59', '59350', '0001', 100, 60, 50, '59-01'),
+            ('2022_legi_t1', '75', '75056', '0001', 100, 60, 50, '75-01'),
+            ('2020_muni_t1', '59', '59350', '0001', 100, 60, 50, NULL),
+            ('2020_muni_t1', '75', '75056', '0001', 100, 60, 50, NULL)""")
+        con.execute("""INSERT INTO resultats_candidats
+            (id_election, code_departement, code_commune, code_bv, no_panneau, nuance, voix)
+            VALUES ('2022_legi_t1', '59', '59350', '0001', 1, 'RN', 50),
+            ('2022_legi_t1', '75', '75056', '0001', 1, 'ENS', 50),
+            ('2020_muni_t1', '59', '59350', '0001', 1, 'LSOC', 50),
+            ('2020_muni_t1', '75', '75056', '0001', 1, 'LREM', 50)""")
+        m0009 = _charger_migration("0009_resultats_sans_cle_primaire.py")
+        assert m0009.appliquer(con) == ["resultats_participation"]
+        assert _n(con, "SELECT COUNT(*) FROM resultats_participation") == 4
+        assert con.execute(
+            "SELECT bloc, voix_total FROM v_evolution_blocs_hdf_legi"
+        ).fetchall() == [("EXD", 50)]
+        assert con.execute("SELECT bloc, voix FROM v_evolution_blocs_hdf_muni").fetchall() == [
+            ("GAU", 50)
+        ]
+
+    def test_ecarts_enregistres_et_seuil(self, con, tmp_path) -> None:
+        cand, part = _parquets(tmp_path)
+        load_scrutins_listes(con, "euro", cand, part, "hdf")
+        rows = con.execute(
+            "SELECT id_election, categorie, nb_communes, exprimes, exprimes_total "
+            "FROM elections_ecarts_chargement"
+        ).fetchall()
+        assert rows == [("2024_euro_t1", "reste", 1, 5, 590)]
+        with pytest.raises(RuntimeError, match="référentiel"):
+            controler_chargement(con, part, "('2024_euro_t1')", "hdf", seuil_reste_pct=0.5)
+
+    def test_categories_etranger_et_pacifique(self, con, tmp_path) -> None:
+        c = duckdb.connect()
+        part = tmp_path / "p.parquet"
+        c.execute(f"""COPY (SELECT * FROM (VALUES
+            ('2024_euro_t1', 'ZZ', '99001', '1', 10),
+            ('2024_euro_t1', 'ZN', '98801', '1', 20),
+            ('2024_euro_t1', '75', '75056', '1', 970)
+        ) t(id_election, code_departement, code_commune, code_bv, exprimes))
+        TO '{part}' (FORMAT parquet)""")
+        c.close()
+        controler_chargement(con, part, "('2024_euro_t1')", "france")
+        rows = con.execute(
+            "SELECT categorie, exprimes, pct_exprimes FROM elections_ecarts_chargement ORDER BY 1"
+        ).fetchall()
+        assert rows == [("etranger", 10, 1.0), ("pacifique", 20, 2.0)]
+
+    def test_voix_differentes_des_exprimes_signalees(self, con, tmp_path, caplog) -> None:
+        cand, part = _parquets(tmp_path)
+        load_scrutins_listes(con, "euro", cand, part, "france")
+        con.execute(
+            "UPDATE resultats_participation SET exprimes = 999 WHERE code_commune = '75056'"
+        )
+        with caplog.at_level("WARNING"):
+            controler_chargement(con, part, "('2024_euro_t1')", "france")
+        assert any(
+            "somme des voix" in r.getMessage() and "75056" in r.getMessage() for r in caplog.records
+        )
