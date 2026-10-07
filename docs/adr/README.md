@@ -11,7 +11,7 @@ décision est révisée, un nouvel ADR est créé avec le statut "Remplace 000X"
 | ADR | Titre | Statut |
 |-----|-------|--------|
 | [0001](0001-duckdb-vs-postgres.md) | DuckDB plutôt que PostgreSQL | Accepté |
-| [0002](0002-streamlit-vs-fastapi.md) | Streamlit plutôt que FastAPI + frontend JS | Accepté — révision proposée par 0015 |
+| [0002](0002-streamlit-vs-fastapi.md) | Streamlit plutôt que FastAPI + frontend JS | Révisé par 0015 |
 | [0003](0003-uv-vs-pip-poetry.md) | uv plutôt que pip / poetry | Accepté |
 | [0004](0004-polars-vs-pandas.md) | Polars prioritaire, Pandas en fallback | Accepté |
 | [0005](0005-nuances-et-blocs-officiels.md) | Nomenclature officielle Ministère — 6 blocs | Accepté — partiellement révisé par 0010 |
@@ -24,7 +24,8 @@ décision est révisée, un nouvel ADR est créé avec le statut "Remplace 000X"
 | [0012](0012-execution-native-mac.md) | Exécution native sur le Mac mini (uv + LaunchAgent), Docker en repli | Accepté (décision Mathias 2026-09-24) — installation reportée le 2026-10-06 |
 | [0013](0013-licences-et-mentions-des-sources.md) | Licences du projet et mentions des sources | Accepté (décision Mathias 2026-10-04) |
 | [0014](0014-design-system-direction-editoriale.md) | Design system v2 — direction éditoriale | Accepté (2026-10-06) — révise 0009 |
-| [0015](0015-interface-web-et-application-mac.md) | Interface web emballée en application Mac (Tauri), données précalculées | Proposé (2026-10-07) — révise 0002 |
+| [0015](0015-interface-web-et-application-mac.md) | Interface web emballée en application Mac (Tauri), données précalculées | Accepté (2026-10-07) — révise 0002 |
+| [0016](0016-palette-papier.md) | Couleur d'interface : palette « Papier », étiquettes de méthode, mode sombre à plaque blanche | Accepté (2026-10-07) — complète 0014 |
 
 Statuts relevés dans l'en-tête de chaque fichier le 2026-10-07.
 

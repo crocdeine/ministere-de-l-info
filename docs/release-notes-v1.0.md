@@ -9,9 +9,11 @@ indicateurs économiques et la composition du Parlement, sans compétence techni
 
 - **Géographie** : régions, départements, intercommunalités, communes, circonscriptions ;
   population 2013, 2018 et 2023.
-- **Élections** : France entière, 1999-2026, 48 scrutins (présidentielles, législatives,
-  municipales, européennes, régionales, départementales), jusqu'au bureau de vote ; communes
-  fusionnées rattachées à leur commune actuelle ; classement des nuances en six blocs, sources officielles tracées.
+- **Élections** : Hauts-de-France, présidentielles 2002-2022, législatives 2002-2024, municipales
+  2008-2026, jusqu'au bureau de vote ; communes fusionnées rattachées à leur commune actuelle ;
+  classement des nuances en six blocs, sources officielles tracées. La base téléchargée contient en
+  plus la France entière et les européennes, régionales et départementales (48 scrutins,
+  1999-2026) : leur affichage arrivera avec la prochaine version de l'interface.
 - **Économie** : revenus, pauvreté, chômage, emploi industriel, logement social, prestations
   sociales, accès aux médecins ; croisement avec les votes.
 - **Législatif** : députés (législatures 12 à 17) et sénateurs, groupes classés par législature.

@@ -1,7 +1,7 @@
 # 0015 — Interface web emballée en application Mac (Tauri), données précalculées
 
 Date : 2026-10-07
-Statut : Proposé — révise l'[ADR-0002](0002-streamlit-vs-fastapi.md)
+Statut : Accepté (Mathias, 2026-10-07 : option B, Streamlit gelé puis retiré, prototype A0 d'abord, paquet de données séparé vérifié par SHA256, Apple Silicon seul) — révise l'[ADR-0002](0002-streamlit-vs-fastapi.md)
 Décideurs : Mathias (orientation du 2026-10-06), instruction : agent architecte
 
 ## Résumé
