@@ -1,0 +1,416 @@
+/* Styles de la maquette : uniquement des var(--…) de tokens.css (design system v2). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+}
+
+:focus-visible {
+  outline: 2px solid var(--bleu-france);
+  outline-offset: 3px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.page {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-20) var(--space-20);
+}
+
+/* ---- En-tête ---------------------------------------------------------- */
+
+.entete {
+  padding: var(--space-4) 0 var(--space-12);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-6);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+}
+
+.overline {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--grey-600);
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: var(--fw-black);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+}
+
+.sous-titre {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 22rem;
+  margin: var(--space-8) 0 0 clamp(0px, 40%, 40rem);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.fleche {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---- Sections ---------------------------------------------------------- */
+
+.section {
+  margin-top: var(--space-30);
+}
+
+h2 {
+  margin: 0 0 var(--space-6);
+  padding-top: var(--space-3);
+  border-top: var(--border-w) solid var(--rule);
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 3vw, 2.75rem);
+  font-weight: var(--fw-extrabold);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  text-transform: uppercase;
+}
+
+.chapo {
+  max-width: 48rem;
+  margin: 0 0 var(--space-4);
+  color: var(--grey-800);
+}
+
+/* ---- Filtres : pastilles et select ---------------------------------- */
+
+.filtres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6) var(--space-8);
+  margin-bottom: var(--space-12);
+}
+
+.champ {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.champ legend,
+.libelle {
+  padding: 0;
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+  color: var(--grey-600);
+}
+
+.pastilles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pastille {
+  position: relative;
+}
+
+.pastille input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.pastille span {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h);
+  padding: 0 var(--space-4);
+  border: var(--border-w) solid var(--ink);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+  transition: var(--transition-colors);
+}
+
+.pastille input:checked + span {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.pastille input:hover + span {
+  background: var(--bleu-france);
+  border-color: var(--bleu-france);
+  color: var(--paper);
+}
+
+.pastille input:focus-visible + span {
+  outline: 2px solid var(--bleu-france);
+  outline-offset: 3px;
+}
+
+select {
+  min-height: var(--control-h);
+  min-width: 14rem;
+  max-width: 100%;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-bottom: var(--border-w) solid var(--ink);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-md);
+}
+
+select:focus-visible {
+  outline: none;
+  border-bottom: var(--border-w-strong) solid var(--bleu-france);
+}
+
+/* ---- Chiffres-clés ------------------------------------------------------ */
+
+.chiffres {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-8);
+}
+
+.chiffre {
+  border-top: var(--border-w) solid var(--rule);
+  padding-top: var(--space-3);
+}
+
+.chiffre p {
+  margin: 0;
+}
+
+.chiffre .valeur {
+  margin-top: var(--space-2);
+  font-size: clamp(2.25rem, 3.6vw, 3.5rem);
+  font-weight: var(--fw-black);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.chiffre .note {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--grey-600);
+}
+
+/* ---- Carte ---------------------------------------------------------------- */
+
+figure {
+  margin: 0;
+}
+
+.carte {
+  position: relative;
+  border-top: var(--border-w) solid var(--rule);
+}
+
+.carte-conteneur {
+  height: min(600px, 75vh);
+  background: var(--map-tile-bg);
+}
+
+.infobulle {
+  position: absolute;
+  z-index: 2;
+  transform: translate(12px, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 18rem;
+  padding: var(--space-3);
+  background: var(--paper);
+  border: var(--border-w) solid var(--ink);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  pointer-events: none;
+}
+
+.infobulle .mono {
+  color: var(--grey-600);
+}
+
+.maplibregl-ctrl-group button {
+  width: var(--control-h);
+  height: var(--control-h);
+}
+
+.maplibregl-ctrl-group,
+.maplibregl-ctrl-attrib {
+  border-radius: var(--radius-md);
+}
+
+/* ---- Légendes ------------------------------------------------------------ */
+
+.legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  margin: var(--space-4) 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.legende li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.carre {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  outline: var(--border-w) solid var(--rule-soft);
+}
+
+.trait {
+  display: inline-block;
+  width: 20px;
+  height: 3px;
+}
+
+.legende-score {
+  max-width: 32rem;
+  margin: var(--space-4) 0;
+}
+
+.degrade {
+  height: 12px;
+  outline: var(--border-w) solid var(--rule-soft);
+}
+
+.graduations {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-sm);
+}
+
+.legende-nd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+}
+
+/* ---- Graphique ------------------------------------------------------------ */
+
+.graphique {
+  border-top: var(--border-w) solid var(--rule);
+  padding-top: var(--space-4);
+}
+
+.graphique svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* ---- Source / limite ------------------------------------------------------ */
+
+.source {
+  margin-top: var(--space-4);
+  padding-top: var(--space-2);
+  border-top: var(--border-w) solid var(--rule);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--grey-800);
+}
+
+.source p {
+  margin: 0;
+}
+
+.source-titre {
+  font-size: var(--text-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-overline);
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.alerte {
+  padding-top: var(--space-2);
+  border-top: var(--border-w) solid var(--rouge-marianne);
+}
+
+.pied {
+  margin-top: var(--space-30);
+  padding-top: var(--space-2);
+  border-top: var(--border-w) solid var(--rule);
+  font-size: var(--text-sm);
+  color: var(--grey-600);
+}
+
+/* ---- Mobile (≤ 600 px) ------------------------------------------------------- */
+
+@media (max-width: 600px) {
+  .page {
+    padding: var(--space-4) var(--space-4) var(--space-12);
+  }
+
+  .section {
+    margin-top: var(--space-20);
+  }
+
+  /* « PRÉSIDENTIELLES » (15 capitales) doit tenir sur une ligne à 390 px. */
+  h1 {
+    font-size: 9.5vw;
+  }
+
+  .sous-titre {
+    margin-left: 0;
+  }
+
+  .chiffres {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .carte-conteneur {
+    height: min(70vh, 520px);
+  }
+}

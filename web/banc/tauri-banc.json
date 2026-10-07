@@ -1,0 +1,20 @@
+{
+  "identifier": "fr.ministere-info.banc-a0",
+  "productName": "Banc A0",
+  "app": {
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self' data:",
+        "img-src": "'self' data: blob: https://data.geopf.fr",
+        "connect-src": "'self' ipc: http://ipc.localhost https://data.geopf.fr http://127.0.0.1:8765",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      }
+    }
+  }
+}

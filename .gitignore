@@ -115,3 +115,13 @@ nohup.out
 
 # Graphe du code (graphify), régénérable : graphify update .
 graphify-out/
+
+# Application web (ADR-0015) : dépendances, données exportées, copies de MapLibre, compilation
+web/node_modules/
+web/dist/
+web/public/data/
+web/public/vendor/
+web/src-tauri/target/
+web/src-tauri/gen/
+web/test-results/
+*.dmg
