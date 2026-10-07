@@ -7,7 +7,7 @@ Toutes les évolutions notables de ministere-de-l-info. Format :
 
 ## [Non publié]
 
-## [1.0.0] — date de publication à fixer
+## [1.0.0] — 2026-10-07
 
 Première version de production : l'application Streamlit complète, installée sur un Mac par une
 seule commande.
@@ -27,8 +27,11 @@ seule commande.
   indicateur.
 - Élections : légende du classement propre à chaque scrutin ; « grille officielle » réservée aux
   municipales 2020 et 2026 (ADR-0010).
-<!-- Directeur : ajouter ici les apports de la vague B (élections France entière, etc.) s'ils sont
-     fusionnés avant la publication, et la base `db-AAAA-MM-JJ` retenue. -->
+- Élections France entière, 1999-2026 : 48 scrutins (présidentielles, législatives, municipales,
+  européennes, régionales, départementales) ; communes fusionnées rattachées à la commune
+  actuelle (code d'origine conservé) ; contrôles bloquants au chargement (écarts à la source,
+  voix ≠ exprimés).
+- Base de données de la version : release `db-2026-10-07` (ODbL).
 
 ### Modifications
 - Absences de données affichées « n.d. » au lieu de 0 % ; évolutions en % des exprimés par
@@ -39,6 +42,7 @@ seule commande.
   téléchargement de la base, actions GitHub et images Docker épinglées.
 
 ### Retraits
+- Dépendances inutilisées `feedparser` et `requests-cache`, code mort.
 - Date de naissance des parlementaires (ADR-0013).
 
 ### Corrections

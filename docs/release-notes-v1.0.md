@@ -1,4 +1,4 @@
-# Ministère de l'Info 1.0 — notes de version (brouillon)
+# Ministère de l'Info 1.0 — notes de version (2026-10-07)
 
 ## Pour qui
 
@@ -9,13 +9,12 @@ indicateurs économiques et la composition du Parlement, sans compétence techni
 
 - **Géographie** : régions, départements, intercommunalités, communes, circonscriptions ;
   population 2013, 2018 et 2023.
-- **Élections** : présidentielles 2002-2022, législatives 2002-2024, municipales 2008-2026,
-  jusqu'au bureau de vote ; classement des nuances en six blocs, sources officielles tracées.
+- **Élections** : France entière, 1999-2026, 48 scrutins (présidentielles, législatives,
+  municipales, européennes, régionales, départementales), jusqu'au bureau de vote ; communes
+  fusionnées rattachées à leur commune actuelle ; classement des nuances en six blocs, sources officielles tracées.
 - **Économie** : revenus, pauvreté, chômage, emploi industriel, logement social, prestations
   sociales, accès aux médecins ; croisement avec les votes.
 - **Législatif** : députés (législatures 12 à 17) et sénateurs, groupes classés par législature.
-
-<!-- Directeur : compléter avec les apports de la vague B (France entière, etc.) s'ils sont inclus. -->
 
 ## Installation
 
@@ -33,10 +32,10 @@ compte. Mise à jour : relancer la même commande. Désinstallation : même comm
 ## Limites
 
 - Mac uniquement. Testé sur Mac Apple Silicon ; Mac Intel non testé.
-- 3 Go d'espace libre nécessaires à l'installation, 1,6 Go occupés ensuite ; connexion Internet
+- 3 Go d'espace libre nécessaires à l'installation, environ 2 Go occupés ensuite ; connexion Internet
   nécessaire à l'installation, pas à l'usage (sauf fond de carte).
 - L'application ne fonctionne que sur l'ordinateur où elle est installée (adresse 127.0.0.1).
-- Données figées à la date de la base publiée (`db-AAAA-MM-JJ`) ; les groupes du Sénat issus du
+- Données figées à la date de la base publiée (`db-2026-10-07`) ; les groupes du Sénat issus du
   renouvellement du 27 septembre 2026 ne sont pas encore intégrés.
 - Icône générique (pas de logo).
 
