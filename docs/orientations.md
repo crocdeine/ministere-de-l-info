@@ -152,3 +152,8 @@ rattachée à une seule (limite affichée). Addendum à l'ADR-0010.
   par noms de symboles avant grep. ponytail et karpathy-guidelines : échelle « écrire le moins de code
   possible », changements chirurgicaux. Recherche large déléguée à `caveman:cavecrew-investigator`.
   Règles dans la skill `economie-tokens`.
+- **Antigravity** (2026-10-07) : autorisé pour économiser les jetons Claude, en lecture seule
+  d'abord ; réglages réduits à une liste minimale (23 autorisations, 22 interdictions, sauvegarde
+  `.bak-2026-10-07`) ; télémétrie de l'application coupée (`telemetry.telemetryLevel: off`) ;
+  configuration `.agents/` propre au projet plutôt qu'ECC pour Antigravity ; pas de plugin tiers
+  installé (aucun pertinent pour Python/DuckDB/Streamlit, voir `reports/brainstorm-antigravity-2026-10-07.md`).

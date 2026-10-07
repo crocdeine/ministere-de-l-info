@@ -31,6 +31,16 @@ cité doit toujours être lu dans le code ou la source. On lit **moins**, pas **
 - Recherche large déléguée : `caveman:cavecrew-investigator` (sortie compressée, ≈ 60 % de jetons en moins
   qu'Explore) plutôt qu'`Explore`.
 
+## Déléguer à Antigravity (Gemini, quota Google, 0 jeton Claude)
+- Pour : relectures et recherches en **lecture seule**, analyse de sources, traductions. Pas pour :
+  classements politiques, écriture dans la base, git commit/push/publication, ADR, CLAUDE.md.
+- Gabarit : préparer les entrées (diff, extraits) dans un fichier, puis
+  `agy -p "<consigne ou contenu de la fiche>" --model gemini-3.1-pro-high --mode plan --add-dir <dossier des entrées> --output-format json --print-timeout 1200s`
+  depuis le dépôt ou le worktree. Les commandes shell non autorisées sont refusées en mode `-p`
+  (réglages : `~/.gemini/antigravity-cli/settings.json`, liste minimale du 2026-10-07).
+- **Toute sortie est vérifiée avant usage** : première relecture (vague B) = 1 constat juste sur 3,
+  deux faux « critiques ». Jamais de « validé » repris sans relancer soi-même tests et lint.
+
 ## Écrire moins de code (ponytail, karpathy-guidelines)
 - Échelle avant d'écrire : faut-il le faire ? déjà dans le dépôt ? bibliothèque standard ? dépendance
   installée ? une ligne ? sinon le minimum. Changements chirurgicaux : chaque ligne modifiée se rattache

@@ -232,3 +232,10 @@ E / E+ / E++ (Économie), F (Législatif), du chantier design system, puis de l'
 - **Polices** : charger Google Fonts par une balise `<link>` ; un `@import` dans un bloc CSS injecté par `st.markdown` ne se charge pas de façon fiable.
 - **Icônes de navigation** : la découverte automatique de `pages/` ne permet que l'emoji du nom de fichier ; une icône Material dans la sidebar impose `st.navigation()` / `st.Page(icon=...)` (ADR-0009). Avec le routeur, `set_page_config` et l'injection CSS se font une seule fois dans `app.py`.
 - **Constantes dupliquées = divergence** : `legislatif.py` et `economie.py` avaient chacun leur palette de blocs, différente des tokens `--nuance-*`. Regrouper dans un module partagé (`_blocs_politiques.py`) ; les couleurs restent toutefois recopiées à trois endroits (CSS, module Python, table `blocs_politiques`).
+
+### Antigravity en relecteur (2026-10-07)
+Première relecture déléguée à Antigravity (Gemini 3.1 Pro) sur la vague B : 3 constats, dont 2 faux
+« critiques » (DROP TABLE prétendument bloqué par des vues — DuckDB l'accepte ; colonne prétendument
+absente — elle existe) et 1 juste (pourcentages des listes municipales rattachées). En mode `-p`, il
+ne peut pas lancer `git diff` : lui fournir le diff dans un fichier (`--add-dir`). Règle : chaque
+constat est vérifié par une requête ou un test avant d'être retenu.
