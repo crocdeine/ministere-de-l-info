@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
@@ -15,6 +15,15 @@ const vendorMapLibre: Plugin = {
   },
 };
 
+// CSP de l'application Tauri appliquée aussi par `vite preview` : le test de fumée WebKit
+// (perf/mesure.mjs) vérifie ainsi qu'aucune ressource n'est bloquée par la politique de l'app.
+const csp = Object.entries(
+  JSON.parse(readFileSync(new URL("./src-tauri/tauri.conf.json", import.meta.url), "utf8")).app.security
+    .csp as Record<string, string>,
+)
+  .map(([k, v]) => `${k} ${v}`)
+  .join("; ");
+
 export default defineConfig({
   plugins: [react(), vendorMapLibre],
   // Chemins relatifs : le build s'ouvre depuis n'importe quel dossier (Tauri, hébergement statique).
@@ -22,4 +31,5 @@ export default defineConfig({
   // tokens.css est importé tel quel depuis le skill du design system (hors de web/).
   server: { fs: { allow: [".."] } },
   worker: { format: "es" },
+  preview: { headers: { "Content-Security-Policy": csp } },
 });

@@ -46,11 +46,13 @@ Seul appel réseau : fond Plan IGN (facultatif ; les communes s'affichent hors l
 Prérequis : Rust (rustup), Xcode Command Line Tools, Node ; données exportées (étape 1).
 
 ```bash
-npm run tauri:build -- --bundles app   # .app non signé (arm64), ≈ 2 min hors cache
+npm run tauri:build -- --bundles app   # .app non signé (arm64) ; ≈ 21 min avec 84 Mo de données embarquées
 open "src-tauri/target/release/bundle/macos/Ministère de l'Info.app"
 ```
 
 Le protocole `tauri://` ignore les requêtes par plages : l'archive de tuiles est lue une fois en
-mémoire (`SourceMemoire`). Mesurer dans l'app (session ouverte, écran déverrouillé) : compiler avec
+mémoire (`SourceMemoire`) ; ce chemin se vérifie dans un navigateur avec `?memoire=1`
+(`MESURE_PARAMS="&memoire=1" npm run mesure`). `vite preview` applique la CSP de `tauri.conf.json`,
+donc le test de fumée signale toute ressource qu'elle bloquerait. Mesurer dans l'app (session ouverte, écran déverrouillé) : compiler avec
 `VITE_MESURE="mesure=1&rapport=http://127.0.0.1:8765/"` et une CSP autorisant cette adresse en
 `connect-src`, lancer un écouteur local qui enregistre les POST, puis ouvrir l'app.

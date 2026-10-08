@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description="Export des données de l'application web.")
     parser.add_argument("--db", type=Path, default=get_settings().db_path)
     parser.add_argument("--out", type=Path, default=ROOT / "web" / "public" / "data")
     parser.add_argument("--departements", help="liste séparée par des virgules (échantillon)")

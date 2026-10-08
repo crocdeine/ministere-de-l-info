@@ -8,8 +8,8 @@ Date : 2026-10-07 · Agent : developpeur-ui · Branche `feat/web-socle` (worktre
 - Budget ADR-0015 (WebKit Playwright, Mac mini M4 chargé, charge ≈ 3,9) : JS initial **378 Ko** gzip (cible 450, prototype 499) ; données avant la 1re carte **821 Ko** ; ouverture **401-684 ms** ; changement de tour **86-89 ms** (médiane, p90 96-105) ; mémoire 503-651 Mo (cible 600, seuil 900).
 - Fondu croisé 220 ms entre deux couches à sources séparées : sans surcoût mesuré (recoloration d'une seule couche dans la même session : 88 ms) ; repli sans fondu au-delà de 100 ms ; aucun fondu avec `prefers-reduced-motion` (vérifié).
 - Trois états vides distincts : n.d., non classé, hors périmètre ; égalité en blanc ; étiquette de méthode ; palette Papier hors carte.
-- Vérifications : `pytest` export 7/7 (parité des totaux avec les vues Streamlit pour pres, legi, muni), `vitest` 8/8, `tsc`, `npm audit` 0, `ruff`, budget ; fumée WebKit sur l'échantillon.
-- Tauri : voir § 6 (WKWebView non mesuré : à faire session ouverte).
+- Vérifications : `pytest` hermétique 336 passés / 363 ignorés (couverture 69 %), dont export 7/7 (parité des totaux avec les vues Streamlit pour pres, legi, muni) ; pyright 0 erreur ; `ruff` ; `tsc` ; `vitest` 8/8 ; `npm audit` 0 ; budget ; fumée WebKit (échantillon et France) sous la CSP de l'app.
+- Tauri : `.app` 84,2 Mo compilé (21 min, données embarquées) ; lecture de l'archive en mémoire vérifiée dans WebKit ; app non ouverte (pas de fenêtre à l'écran) : WKWebView à valider session ouverte.
 - Décisions à soumettre : Q1 à Q5 (§ 8).
 
 ## 1. Commits
@@ -19,6 +19,8 @@ Date : 2026-10-07 · Agent : developpeur-ui · Branche `feat/web-socle` (worktre
 | `154351f` | `feat(export)` : export, manifeste, états, tests ; import du prototype |
 | `9787cb7` | `feat(ui)` : application, carte, fondu, worker, tokens Papier, mesures |
 | `3a89692` | `ci(web)` : job CI, documentation (`docs/outils.md`, `architecture.md`, `deployment.md`, `web/README.md`, skill) |
+| `f33f17a` | rapport (brouillon) |
+| suivant | `feat(tauri)` : CSP de l'app en prévisualisation, chemin mémoire vérifiable (`?memoire=1`), correctif pyright, rapport final |
 
 ## 2. Export et contrat de données
 
@@ -57,7 +59,13 @@ Actions par SHA (`setup-node` v7.0.0 `8207627…`) ; tippecanoe compilé au comm
 
 ## 6. Tauri
 
-[À COMPLÉTER]
+- Emballage repris de `poc/tauri` (crate minimal sans plugin ni commande Rust, arm64, non signé). Identifiant `fr.ministere-info.desktop` et nom « Ministère de l'Info » conservés (Q3).
+- `npm run tauri:build -- --bundles app` : **`.app` de 84,2 Mo** (binaire unique, données embarquées), compilation **21 min 29 s** (`target/` 1,1 Go sur le disque externe). Le prototype HdF compilait en ≈ 2 min : l'incorporation des 84 Mo de données dans le binaire domine (compression des ressources au moment de la compilation). Argument pour le paquet de données séparé (Q4).
+- Lecture des tuiles : archive lue une fois en mémoire sous `tauri:` (`SourceMemoire`, `src/maplibre.ts`). Même chemin forcé dans WebKit par `?memoire=1` : carte correcte, 0 erreur, 18,9 Mo lus avant la 1re carte (attendu : archive entière), ouverture 666 ms en HTTP local, changement 88 ms, 594 Mo.
+- CSP (`tauri.conf.json`, inchangée : `script-src 'self'`, `worker-src 'self' blob:`, `connect-src 'self' … https://data.geopf.fr`) : désormais appliquée aussi par `vite preview` (`vite.config.ts`), donc vérifiée à chaque test de fumée WebKit (local et CI) : aucune ressource bloquée.
+- **Non fait** : ouverture de l'`.app` et mesure dans WKWebView (consigne : pas de fenêtre sur l'écran de Mathias ; au prototype A0, l'écran verrouillé empêchait tout rendu). À faire session ouverte : ouvrir l'app, vérifier carte, infobulle, changement de tour, fondu ; mesure possible par `VITE_MESURE` (procédure dans `web/README.md`). Validation visuelle de Mathias requise.
+
+Dernière série (2026-10-08, charge ≈ 2,5, CSP appliquée) : ouverture 846 ms, données 821 Ko, JS 379 Ko, changement médiane 87 / p90 94 / max 98 ms, 30/30 avec fondu, 514 Mo.
 
 ## 7. Limites
 
@@ -65,7 +73,8 @@ Actions par SHA (`setup-node` v7.0.0 `8207627…`) ; tippecanoe compilé au comm
 2. Le module partagé de MapLibre est redemandé par chaque worker (814 Ko transférés en local) ; le prototype avait le même schéma (worker empaqueté). Sans effet réseau dans Tauri (fichiers locaux).
 3. Une seule vue mesurée (France, zoom ≈ 4,6). DROM hors du cadre initial (accessibles en déplaçant la carte).
 4. « Hors périmètre » est défini par les données (aucune ligne alors que le département en a) : une commune absente pour une autre raison serait classée ainsi (0 commune de résultat sans contour constatée).
-5. Données embarquées dans l'app (84 Mo) ; le paquet de données séparé (ADR-0015 Q4) n'est pas réalisé.
+5. Données embarquées dans l'app (84 Mo, compilation 21 min) ; le paquet de données séparé (ADR-0015 Q4) n'est pas réalisé.
+7. `tests/test_legislatif_memoire.py::TestPage::test_rendu_par_defaut` (Streamlit, `AppTest`) a échoué deux fois pendant la compilation Tauri (machine saturée), passe seul (10 s) et dans la suite complète relancée : délai d'`AppTest` sous charge, sans lien avec ce lot.
 6. Étiquette de méthode : infobulle seulement ; panneau Méthodologie en A5. Pas de pictogramme de module (ADR-0016 § 3).
 
 ## 8. Décisions à soumettre (questions fermées)

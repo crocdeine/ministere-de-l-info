@@ -1,7 +1,7 @@
 [package]
 name = "ministere-de-l-info"
 version = "0.1.0"
-description = "Ministère de l'Info — application Mac (POC Tauri)"
+description = "Ministère de l'Info — application Mac (Tauri v2, ADR-0015)"
 edition = "2021"
 publish = false
 

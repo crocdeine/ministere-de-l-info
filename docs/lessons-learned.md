@@ -203,6 +203,14 @@ E / E+ / E++ (Économie), F (Législatif), du chantier design system, puis de l'
 - Convention : `reports/session-YYYY-MM-DD_phase-X-recap.md`
 - Convention : `reports/audit-phase-X.md` pour les audits techniques ponctuels
 
+### Application web et Tauri (lot A1, 2026-10-07)
+
+- Une compilation Tauri lancée en arrière-plan avec sa sortie redirigée vers un tube (`| tail`) s'est figée 25 min (`rustc` en sommeil, 0 % CPU) : sortie vers un fichier (`> log 2>&1 < /dev/null`), jamais vers un tube.
+- Données embarquées dans le binaire Tauri : 84 Mo font passer la compilation de ≈ 2 à 21 min.
+- MapLibre empaqueté par Vite duplique son code commun dans le worker (+145 Ko gzip) : le servir depuis ses fichiers ESM d'origine (`web/public/vendor/`).
+- Avec deux couches sur la même source, un `setPaintProperty` recalcule les tuiles des deux : une source par couche pour le fondu croisé.
+- Le relais `rtk` réécrit `npx vitest` et crée `web/.vitest/` : lancer `node node_modules/vitest/vitest.mjs run` (dossier ignoré par git).
+
 ---
 
 ## Architecture / code

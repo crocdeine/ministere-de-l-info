@@ -34,7 +34,9 @@ export function chargerMapLibre(): Promise<MapLibre> {
   promesse ??= (import(/* @vite-ignore */ vendor("maplibre-gl.mjs")) as Promise<MapLibre>).then(
     (ml) => {
       const protocole = new Protocol();
-      if (location.protocol === "tauri:") protocole.add(new PMTiles(new SourceMemoire(URL_TUILES)));
+      // `?memoire=1` : même chemin hors Tauri (vérifié par perf/mesure.mjs dans WebKit).
+      const memoire = location.protocol === "tauri:" || new URLSearchParams(location.search).has("memoire");
+      if (memoire) protocole.add(new PMTiles(new SourceMemoire(URL_TUILES)));
       ml.addProtocol("pmtiles", protocole.tile);
       ml.setWorkerUrl(vendor("maplibre-gl-worker.mjs"));
       return ml;
