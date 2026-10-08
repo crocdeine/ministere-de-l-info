@@ -111,3 +111,7 @@ Mesures après corrections (WebKit, France, 30 changements, charge ≈ 3-4) : ou
 Export refait (`outils/tmp/a1-export`, 254 fichiers, 87,0 Mo). **Écart constaté** : une exécution intermédiaire, aux options identiques, a produit une archive de 7,6 Mo au lieu de 19,4 Mo (même nombre de communes et de tuiles) ; l'exécution suivante a retrouvé 19,4 Mo. Cause non établie (base modifiée entre-temps par une autre session, ou tippecanoe) ; le contrôle de publication compte les communes, pas le contenu des tuiles. À surveiller : comparer la taille de l'archive d'un export à l'autre.
 
 Le paragraphe Q1 (§ 8) est sans objet : « hors périmètre » est remplacé par « aucun scrutin ».
+
+### Disque externe plein (2026-10-08, 23 h 30)
+
+`/Volumes/le gros stockage` : **53 Mo libres sur 5,5 To**. La recompilation Tauri (CSP modifiée) a échoué à l'édition des liens (`ld: ftruncate() … No space left on device`) : l'`.app` n'est pas reconstruit (il garde l'ancienne CSP, avec `worker-src blob:`) ; la nouvelle CSP est vérifiée par le test de fumée WebKit. Hypothèse probable pour l'archive de 7,6 Mo : tippecanoe à court de place pour ses fichiers temporaires. Parade ajoutée à l'export : refus de tuiler sous 2 Go libres (dossier de sortie et dossier temporaire), et toute sortie de tippecanoe sur stderr fait échouer l'export. Mes fichiers sur ce disque : `web/src-tauri/target` 1,1 Go, `web/dist` 86 Mo, `web/node_modules` 150 Mo, `outils/tmp/a1-export` 84 Mo, `outils/tmp/a1-ech` 16 Mo. Libérer de la place relève du directeur (rien d'autre supprimé).

@@ -26,6 +26,7 @@ import logging
 import shutil
 import struct
 import subprocess
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -283,8 +284,22 @@ def _ecrire_tuiles(
         seq.unlink(missing_ok=True)
 
 
+ESPACE_MIN_OCTETS: int = 2_000_000_000  # tippecanoe écrit des fichiers temporaires volumineux
+
+
+def _verifier_espace(*dossiers: Path) -> None:
+    """Refuse de tuiler sur un disque presque plein (archive incomplète constatée le 2026-10-08)."""
+    for d in dossiers:
+        libre = shutil.disk_usage(d).free
+        if libre < ESPACE_MIN_OCTETS:
+            raise OSError(
+                f"Espace disque insuffisant pour le tuilage : {libre / 1e9:.2f} Go libres sur {d}"
+            )
+
+
 def _tippecanoe(tippecanoe: str, seq: Path, pmtiles: Path, detail_bas: int) -> None:
-    subprocess.run(  # noqa: S603
+    _verifier_espace(pmtiles.parent, Path(tempfile.gettempdir()))
+    resultat = subprocess.run(  # noqa: S603
         [
             tippecanoe,
             *("-o", str(pmtiles), "--force", "--quiet", "-l", "communes"),
@@ -295,7 +310,12 @@ def _tippecanoe(tippecanoe: str, seq: Path, pmtiles: Path, detail_bas: int) -> N
             *("-P", str(seq)),
         ],
         check=True,
+        capture_output=True,
+        text=True,
     )
+    # Avec --quiet, tippecanoe n'écrit sur stderr qu'en cas d'anomalie : on n'en ignore aucune.
+    if resultat.stderr.strip():
+        raise RuntimeError(f"tippecanoe : {resultat.stderr.strip()[:500]}")
 
 
 def nombre_communes_tuiles(pmtiles: Path) -> int:
