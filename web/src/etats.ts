@@ -8,7 +8,7 @@ const TRANSPARENT = "rgba(0, 0, 0, 0)";
 export type Etat = {
   car: string;
   libelle: string;
-  /** Couleur de remplissage ; `null` = aucun remplissage (hors périmètre). */
+  /** Couleur de remplissage ; `null` = aucun remplissage (aucun scrutin). */
   couleur: string | null;
 };
 
@@ -24,8 +24,8 @@ export function etats(m: Manifeste, token: (nom: string) => string): Etat[] {
     },
     { car: m.codage.absent, libelle: "n.d. (donnée non disponible)", couleur: m.couleur_nd },
     {
-      car: m.codage.hors_perimetre,
-      libelle: "Hors périmètre (aucun résultat pour la commune à ce tour)",
+      car: m.codage.aucun_scrutin,
+      libelle: "Aucun scrutin (pas de résultat pour la commune à ce tour)",
       couleur: null,
     },
   ];

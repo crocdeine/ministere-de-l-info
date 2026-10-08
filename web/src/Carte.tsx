@@ -9,6 +9,7 @@ import type {
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
 import type { Manifeste } from "./donnees";
+import { type Bascule, creerBascule } from "./bascule";
 import { couleurScrutin, dureeFondu, type Etat } from "./etats";
 import { chargerMapLibre, URL_TUILES } from "./maplibre";
 
@@ -32,33 +33,34 @@ const COUCHE_TUILES = "communes"; // tippecanoe -l
 // des données d'ouverture).
 const COUCHES = ["communes-a", "communes-b"] as const;
 const OPACITE = 0.85;
-/** Au-delà de ce délai de recoloration, le fondu est abandonné (budget ADR-0015). */
-export const BUDGET_CHANGEMENT_MS = 100;
 
 export function token(nom: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(nom).trim();
 }
 
 /**
- * Appelle `rappel` au premier rendu où toutes les tuiles des communes sont (re)calculées, sans
- * attendre le fond Plan IGN (réseau, facultatif) ; `idle` sert de filet de sécurité.
+ * Appelle `fin(true)` au premier rendu où toutes les tuiles des communes sont (re)calculées, sans
+ * attendre le fond Plan IGN (réseau, facultatif). Filet de sécurité : `idle` ; si la carte est
+ * au repos sans que la source soit chargée (tuiles en échec), `fin(false)`.
  */
-function apresRecalcul(m: CarteML, source: string, rappel: () => void): void {
+function apresRecalcul(m: CarteML, source: string, fin: (ok: boolean) => void): void {
   let fait = false;
-  const fin = () => {
+  const terminer = (ok: boolean) => {
     if (fait) return;
     fait = true;
     m.off("sourcedata", donnees);
-    m.off("idle", fin);
-    rappel();
+    m.off("idle", repos);
+    fin(ok);
   };
+  const repos = () => terminer(m.isSourceLoaded(source));
   const donnees = (e: MapSourceDataEvent) => {
     if (e.sourceId !== source || !e.tile || !m.isSourceLoaded(source)) return;
-    m.once("render", fin);
+    m.once("render", () => terminer(true));
     m.triggerRepaint(); // garantit un rendu même si la carte n'en prévoyait plus
   };
   m.on("sourcedata", donnees);
-  m.once("idle", fin);
+  m.once("idle", repos);
+  m.triggerRepaint(); // couleurs inchangées (retour à un tour déjà calculé) : `idle` suivra
 }
 
 function remplissage(id: string, couleur: ExpressionSpecification, opacite: number): LayerSpecification {
@@ -75,12 +77,13 @@ function remplissage(id: string, couleur: ExpressionSpecification, opacite: numb
   };
 }
 
+const ERREUR_TUILES = "Contours des communes non chargés (fichier de tuiles absent ou illisible).";
+
 export function Carte({ manifeste, etats, scrutin, onSurvol, onRendu }: Props) {
   const conteneur = useRef<HTMLDivElement>(null);
-  const carte = useRef<CarteML | null>(null);
-  const affiche = useRef(scrutin); // scrutin dont les couleurs sont visibles
-  const visible = useRef(0); // indice de la couche visible dans COUCHES
-  const generation = useRef(0);
+  const bascule = useRef<Bascule | null>(null);
+  const voulu = useRef(scrutin); // dernier tour demandé (couleurs initiales d'une carte recréée)
+  voulu.current = scrutin;
   const rappels = useRef({ onSurvol, onRendu });
   rappels.current = { onSurvol, onRendu };
   const [prete, setPrete] = useState(false);
@@ -89,10 +92,12 @@ export function Carte({ manifeste, etats, scrutin, onSurvol, onRendu }: Props) {
   useEffect(() => {
     let annule = false;
     let m: CarteML | undefined;
+    setErreur(null);
     chargerMapLibre()
       .then((ml) => {
         if (annule || !conteneur.current) return;
-        const couleur = couleurScrutin(etats, manifeste.couleur_nd, affiche.current);
+        const initial = voulu.current;
+        const couleur = couleurScrutin(etats, manifeste.couleur_nd, initial);
         const tuiles = (attribution?: string): SourceSpecification => ({
           type: "vector",
           url: `pmtiles://${URL_TUILES}`,
@@ -100,7 +105,7 @@ export function Carte({ manifeste, etats, scrutin, onSurvol, onRendu }: Props) {
           attribution,
         });
         const [a, b] = COUCHES;
-        m = new ml.Map({
+        const carte = new ml.Map({
           container: conteneur.current,
           style: {
             version: 8,
@@ -142,71 +147,76 @@ export function Carte({ manifeste, etats, scrutin, onSurvol, onRendu }: Props) {
             "NavigationControl.ZoomOut": "Zoom arrière",
           },
         });
-        m.addControl(new ml.NavigationControl({ showCompass: false }), "top-right");
-        const carteML = m;
-        apresRecalcul(carteML, a, () => {
+        m = carte;
+        carte.addControl(new ml.NavigationControl({ showCompass: false }), "top-right");
+        // Erreurs des tuiles des communes : message visible (le fond IGN, facultatif, est ignoré).
+        carte.on("error", (e) => {
+          if ((e as { sourceId?: string }).sourceId !== "fond") setErreur(ERREUR_TUILES);
+        });
+        // Nouvelle carte : nouvelle bascule (couche visible = 0, aucun recalcul en attente).
+        bascule.current = creerBascule(
+          {
+            colorer: (k, i) =>
+              carte.setPaintProperty(COUCHES[k] as string, "fill-color", couleurScrutin(etats, manifeste.couleur_nd, i)),
+            attendre: (k, fin) => apresRecalcul(carte, COUCHES[k] as string, fin),
+            afficher: (visible, duree) =>
+              COUCHES.forEach((c, k) => {
+                carte.setPaintProperty(c, "fill-opacity-transition", { duration: duree, delay: 0 });
+                carte.setPaintProperty(c, "fill-opacity", k === visible ? OPACITE : 0);
+              }),
+            maintenant: () => performance.now(),
+            dureeFondu: () => dureeFondu(token("--duration-map-fade")),
+            rendu: (r) => rappels.current.onRendu?.({ type: "changement", ...r }),
+            erreur: () => setErreur(ERREUR_TUILES),
+          },
+          initial,
+        );
+        apresRecalcul(carte, a, (ok) => {
+          if (!ok) {
+            setErreur(ERREUR_TUILES); // la carte n'est pas déclarée prête
+            return;
+          }
           rappels.current.onRendu?.({ type: "premiere", ms: performance.now(), fondu: false });
-          carteML.addSource(b, tuiles());
-          carteML.addLayer(remplissage(b, couleur, 0), "communes-trait");
+          carte.addSource(b, tuiles());
+          carte.addLayer(remplissage(b, couleur, 0), "communes-trait");
           setPrete(true);
         });
         const survol = (e: MapLayerMouseEvent) => {
           const p = e.features?.[0]?.properties;
           if (typeof p?.code !== "string" || typeof p.s !== "string") return;
-          rappels.current.onSurvol({
-            x: e.point.x,
-            y: e.point.y,
-            code: p.code,
-            s: p.s,
-          });
+          rappels.current.onSurvol({ x: e.point.x, y: e.point.y, code: p.code, s: p.s });
         };
-        m.on("mousemove", [...COUCHES], survol);
-        m.on("mouseleave", [...COUCHES], () => rappels.current.onSurvol(null));
-        carte.current = m;
+        carte.on("mousemove", [...COUCHES], survol);
+        carte.on("mouseleave", [...COUCHES], () => rappels.current.onSurvol(null));
       })
-      .catch((e: unknown) => setErreur(String(e)));
+      .catch((e: unknown) => setErreur(`MapLibre non chargé (${String(e)}).`));
     return () => {
       annule = true;
       m?.remove();
-      carte.current = null;
+      bascule.current = null;
       setPrete(false);
     };
   }, [manifeste, etats]);
 
-  // Changement de scrutin : couleurs du nouveau scrutin sur la couche cachée (un seul
-  // setPaintProperty, sans boucle sur les communes), puis fondu croisé des opacités. Si la
-  // recoloration dépasse le budget, bascule immédiate (le fondu ajouterait du retard).
+  // Changement de tour : voir bascule.ts (un setPaintProperty, fondu croisé, abandons).
   useEffect(() => {
-    const m = carte.current;
-    if (!m || !prete || affiche.current === scrutin) return;
-    const gen = ++generation.current;
-    const t0 = performance.now();
-    const avant = COUCHES[visible.current] as string;
-    const apres = COUCHES[1 - visible.current] as string;
-    m.setPaintProperty(apres, "fill-color", couleurScrutin(etats, manifeste.couleur_nd, scrutin));
-    apresRecalcul(m, apres, () => {
-      if (gen !== generation.current) return; // remplacé par un changement plus récent
-      const ms = performance.now() - t0;
-      const duree = ms <= BUDGET_CHANGEMENT_MS ? dureeFondu(token("--duration-map-fade")) : 0;
-      for (const c of COUCHES) m.setPaintProperty(c, "fill-opacity-transition", { duration: duree, delay: 0 });
-      m.setPaintProperty(apres, "fill-opacity", OPACITE);
-      m.setPaintProperty(avant, "fill-opacity", 0);
-      visible.current = 1 - visible.current;
-      affiche.current = scrutin;
-      rappels.current.onRendu?.({ type: "changement", ms, fondu: duree > 0 });
-    });
-    m.triggerRepaint();
-  }, [manifeste, etats, scrutin, prete]);
+    if (prete) bascule.current?.choisir(scrutin);
+  }, [scrutin, prete]);
 
-  if (erreur)
-    return <p className="alerte">Carte non disponible ({erreur}).</p>;
   return (
-    <div
-      ref={conteneur}
-      className="carte-conteneur"
-      role="region"
-      aria-label={`Carte des communes, ${manifeste.scrutins[scrutin]?.libelle ?? ""}`}
-      aria-busy={!prete}
-    />
+    <>
+      {erreur && (
+        <p className="alerte" role="alert">
+          Carte non disponible : {erreur}
+        </p>
+      )}
+      <div
+        ref={conteneur}
+        className="carte-conteneur"
+        role="region"
+        aria-label={`Carte des communes, ${manifeste.scrutins[scrutin]?.libelle ?? ""}`}
+        aria-busy={!prete}
+      />
+    </>
   );
 }

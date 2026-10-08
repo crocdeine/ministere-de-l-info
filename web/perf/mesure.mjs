@@ -60,6 +60,19 @@ try {
   const legende = await page.locator(".legende li").count();
   const etiquette = await page.locator(".etiquette-methode").textContent();
   if (legende < 10) erreurs.push(`légende incomplète (${legende} entrées)`);
+  // Fumée : commune choisie au clavier (fichiers gzip vérifiés par SHA256 dans le worker).
+  await page.fill("#commune", "Amiens");
+  await page.keyboard.press("Tab"); // vers le premier résultat
+  const premier = page.locator(".liste-communes button").first();
+  await premier.waitFor({ timeout: 10000 }).catch(async () =>
+    erreurs.push(`recherche sans résultat : ${(await page.locator(".recherche").textContent()) ?? ""}`),
+  );
+  await premier.focus().catch(() => {});
+  await page.keyboard.press("Enter");
+  const choisie = page.locator(".commune-choisie");
+  await choisie.getByText("Participation").waitFor({ timeout: 10000 }).catch(async () =>
+    erreurs.push(`commune choisie sans résultats : ${(await choisie.textContent()) ?? ""}`),
+  );
 
   const changements = [];
   for (let k = 1; k <= N; k++) {

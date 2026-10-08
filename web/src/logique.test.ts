@@ -1,6 +1,16 @@
 import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { decoderJsonGz, entier, ErreurDonnees, type Manifeste, pct, verifierManifeste } from "./donnees";
+import { creerBascule, type OpsBascule } from "./bascule";
+import {
+  decoderJsonGz,
+  entier,
+  ErreurDonnees,
+  type Manifeste,
+  pct,
+  verifierEmpreinte,
+  verifierManifeste,
+} from "./donnees";
+import { normaliser, rechercherCommunes } from "./recherche";
 import {
   annees,
   choisir,
@@ -18,7 +28,7 @@ const s = (id: string, methode: "officielle" | "reconstruit" = "reconstruit") =>
 };
 
 const M = {
-  schema: 1,
+  schema: 2,
   scrutins: [s("2017_pres_t1"), s("2017_pres_t2"), s("2020_muni_t1", "officielle"), s("2022_pres_t1"), s("2022_pres_t2"), s("2024_legi_t1")],
   blocs: ["EXG", "GAU", "DIV", "CENT", "DTE", "EXD"].map((code, i) => ({
     code,
@@ -26,15 +36,15 @@ const M = {
     libelle: code,
     couleur: `#00000${i}`,
   })),
-  codage: { egalite: "=", non_classe: "n", absent: ".", hors_perimetre: "x" },
+  codage: { egalite: "=", non_classe: "n", absent: ".", aucun_scrutin: "x" },
   couleur_nd: "#5F6368",
 } as unknown as Manifeste;
 
 describe("contrat de données", () => {
   it("refuse une version de schéma inconnue", () => {
-    expect(() => verifierManifeste({ schema: 2 })).toThrow(ErreurDonnees);
+    expect(() => verifierManifeste({ schema: 1 })).toThrow(ErreurDonnees);
     expect(() => verifierManifeste(null)).toThrow(/Version des données/);
-    expect(verifierManifeste({ schema: 1 }).schema).toBe(1);
+    expect(verifierManifeste({ schema: 2 }).schema).toBe(2);
   });
 
   it("décode un JSON gzip, ou déjà décompressé par le serveur", async () => {
@@ -54,7 +64,7 @@ describe("contrat de données", () => {
 describe("états de la carte", () => {
   const liste = etats(M, (t) => `var(${t})`);
 
-  it("distingue blocs, égalité, non classé, n.d. et hors périmètre", () => {
+  it("distingue blocs, égalité, non classé, n.d. et aucun scrutin", () => {
     expect(liste.map((e) => e.car)).toEqual(["a", "b", "c", "d", "e", "f", "=", "n", ".", "x"]);
     expect(new Set(liste.map((e) => e.libelle)).size).toBe(liste.length);
     expect(liste.find((e) => e.car === "x")?.couleur).toBeNull();
@@ -88,5 +98,86 @@ describe("sélection du scrutin", () => {
     expect(M.scrutins[choisir(M, "legi", 2017, 2)]?.id).toBe("2024_legi_t1");
     expect(M.scrutins[choisir(M, "muni", 2022, 1)]?.id).toBe("2020_muni_t1");
     expect(M.scrutins[scrutinInitial(M)]?.id).toBe("2022_pres_t1");
+  });
+});
+
+describe("bascule entre tours", () => {
+  // Opérations simulées : les recalculs en attente sont terminés à la main.
+  function simuler() {
+    const attentes: ((ok: boolean) => void)[] = [];
+    const journal: string[] = [];
+    let horloge = 0;
+    const ops: OpsBascule = {
+      colorer: (k, i) => journal.push(`colorer ${k} ${i}`),
+      attendre: (_k, fin) => attentes.push(fin),
+      afficher: (v, d) => journal.push(`afficher ${v} ${d}`),
+      maintenant: () => horloge,
+      dureeFondu: () => 220,
+      rendu: () => journal.push("rendu"),
+      erreur: () => journal.push("erreur"),
+    };
+    return { attentes, journal, ops, avancer: (ms: number) => (horloge += ms) };
+  }
+
+  it("A → B → A : le recalcul de B, arrivé après le retour à A, ne change pas la carte", () => {
+    const { attentes, journal, ops } = simuler();
+    const b = creerBascule(ops, 0);
+    b.choisir(1); // B demandé
+    b.choisir(0); // retour à A avant la fin du recalcul de B
+    attentes[0]?.(true);
+    expect(b.affiche()).toBe(0);
+    expect(journal).toEqual(["colorer 1 1"]);
+  });
+
+  it("bascule avec fondu sous le budget, sans fondu au-delà", () => {
+    const { attentes, journal, ops, avancer } = simuler();
+    const b = creerBascule(ops, 0);
+    b.choisir(1);
+    avancer(50);
+    attentes[0]?.(true);
+    expect(b.affiche()).toBe(1);
+    avancer(1000);
+    b.choisir(2);
+    avancer(150);
+    attentes[1]?.(true);
+    expect(journal).toEqual(["colorer 1 1", "afficher 1 220", "rendu", "colorer 0 2", "afficher 0 0", "rendu"]);
+  });
+
+  it("coupe un fondu en cours avant de recolorer la couche qui disparaît", () => {
+    const { attentes, journal, ops, avancer } = simuler();
+    const b = creerBascule(ops, 0);
+    b.choisir(1);
+    attentes[0]?.(true); // fondu jusqu'à t = 220
+    avancer(100);
+    b.choisir(2);
+    expect(journal.slice(-2)).toEqual(["afficher 1 0", "colorer 0 2"]);
+  });
+
+  it("tuiles en échec : erreur, aucune bascule", () => {
+    const { attentes, journal, ops } = simuler();
+    const b = creerBascule(ops, 0);
+    b.choisir(1);
+    attentes[0]?.(false);
+    expect(b.affiche()).toBe(0);
+    expect(journal).toContain("erreur");
+  });
+});
+
+describe("recherche et empreintes", () => {
+  it("cherche par code, début de nom puis nom contenant le texte, sans accents", () => {
+    const codes = ["80021", "42218", "80001", "75056"];
+    const noms = ["Amiens", "Saint-Étienne", "Abbeville", "Paris"];
+    expect(rechercherCommunes(codes, noms, "etienne").map((c) => c.code)).toEqual(["42218"]);
+    expect(rechercherCommunes(codes, noms, "800").map((c) => c.code)).toEqual(["80001", "80021"]);
+    expect(rechercherCommunes(codes, noms, "a").length).toBe(0); // deux caractères au moins
+    expect(normaliser("Saint-Étienne")).toBe("saint etienne");
+  });
+
+  it("refuse un fichier dont l'empreinte diffère du manifeste", async () => {
+    const octets = new TextEncoder().encode("abc");
+    const sha = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+    await expect(verifierEmpreinte(octets, sha, "x")).resolves.toBeUndefined();
+    await expect(verifierEmpreinte(octets, "0".repeat(64), "x")).rejects.toThrow(/altéré/);
+    await expect(verifierEmpreinte(octets, undefined, "x")).rejects.toThrow(ErreurDonnees);
   });
 });
