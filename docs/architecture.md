@@ -164,7 +164,7 @@ Nouvelle interface, construite à côté de Streamlit (gelé) et appelée à le 
 base DuckDB (lecture seule)
   └─ scripts/export_web.py → src/ministere_de_l_info/export_web/  (agrégats SQL, tippecanoe)
        └─ web/public/data/  (non commité)
-            manifest.json              contrat de données : schéma, SHA256, sources, licences
+            manifest.json              contrat (schéma 2) : SHA256 des fichiers et du JSON brut, sources, licences
             communes.pmtiles           contours + état de chaque commune pour chaque tour (`s`)
             communes.json.gz           codes et noms (ordre de référence des colonnes)
             scrutins/<id>.json.gz      résultats par commune d'un tour (infobulle)
@@ -177,6 +177,11 @@ base DuckDB (lecture seule)
   `setPaintProperty` ; fondu croisé de 220 ms entre deux couches (deux sources), supprimé si la
   recoloration dépasse 100 ms ou si `prefers-reduced-motion` (`--duration-map-fade`).
 - L'interface ne calcule rien : participation et part du bloc en tête viennent de l'export.
+- Export publié atomiquement : écrit dans `.<sortie>.prepa/`, contrôlé (fichiers non vides,
+  un fichier par tour, communes des tuiles), manifeste en dernier, puis substitué à la sortie.
+- Chaque JSON lu par l'interface est vérifié contre `sha256_brut` (empreinte du JSON
+  décompressé, valable même si le serveur décompresse en route) ; l'archive de tuiles lue en
+  mémoire (Tauri) est vérifiée contre `sha256`.
 - MapLibre est servi depuis ses fichiers ESM d'origine (`public/vendor/`, copiés par
   `vite.config.ts`) pour ne pas dupliquer son code commun dans le worker.
 - Commandes : `web/README.md`.

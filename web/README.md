@@ -29,9 +29,10 @@ Options : `--strict` (échec au-delà des seuils de l'ADR-0015), `--changements 
 
 | Fichier | Rôle |
 |---|---|
-| `src/donnees.ts` | type unique du manifeste, contrôle de version de schéma, lecture des JSON gzip, formats français |
-| `src/etats.ts` | états de la carte (blocs, égalité, non classé, n.d., hors périmètre), choix du tour, expression de couleur |
-| `src/Carte.tsx` | MapLibre, tuiles PMTiles, fondu croisé entre deux couches |
+| `src/donnees.ts` | type unique du manifeste (schéma 2), contrôle de version, lecture des JSON gzip vérifiés (`sha256_brut`), formats français |
+| `src/etats.ts` | états de la carte (blocs, égalité, non classé, n.d., aucun scrutin), choix du tour, expression de couleur |
+| `src/Carte.tsx`, `src/bascule.ts` | MapLibre, tuiles PMTiles ; changement de tour et fondu croisé (logique pure, testée) |
+| `src/recherche.ts` | choix d'une commune au clavier (nom ou code), en attendant le lot A4 |
 | `src/maplibre.ts` | chargement de MapLibre (fichiers ESM d'origine), lecture de l'archive en mémoire sous Tauri |
 | `src/worker/details.ts` | résultats détaillés de l'infobulle, décodés hors du thread principal |
 | `src/PageElections.tsx`, `src/Legende.tsx`, `src/App.tsx` | page, légende et étiquette de méthode, navigation |

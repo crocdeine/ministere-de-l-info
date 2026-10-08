@@ -7,7 +7,8 @@ Date : 2026-10-07 · Agent : developpeur-ui · Branche `feat/web-socle` (worktre
 - Livré : export France entière (`src/ministere_de_l_info/export_web/`, 75 s, 84 Mo, 254 fichiers, manifeste SHA256 versionné), application `web/` (navigation 5 entrées, carte Élections des 48 tours), job CI `web`, documentation.
 - Budget ADR-0015 (WebKit Playwright, Mac mini M4 chargé, charge ≈ 3,9) : JS initial **378 Ko** gzip (cible 450, prototype 499) ; données avant la 1re carte **821 Ko** ; ouverture **401-684 ms** ; changement de tour **86-89 ms** (médiane, p90 96-105) ; mémoire 503-651 Mo (cible 600, seuil 900).
 - Fondu croisé 220 ms entre deux couches à sources séparées : sans surcoût mesuré (recoloration d'une seule couche dans la même session : 88 ms) ; repli sans fondu au-delà de 100 ms ; aucun fondu avec `prefers-reduced-motion` (vérifié).
-- Trois états vides distincts : n.d., non classé, hors périmètre ; égalité en blanc ; étiquette de méthode ; palette Papier hors carte.
+- États vides distincts : n.d., non classé, aucun scrutin (remplace « hors périmètre », § 9) ; égalité en blanc ; étiquette de méthode ; palette Papier hors carte.
+- Corrections après relecture ECC (2026-10-08, § 9) : 14 points traités ; export atomique, SHA256 vérifié à la lecture, choix de commune au clavier.
 - Vérifications : `pytest` hermétique 336 passés / 363 ignorés (couverture 69 %), dont export 7/7 (parité des totaux avec les vues Streamlit pour pres, legi, muni) ; pyright 0 erreur ; `ruff` ; `tsc` ; `vitest` 8/8 ; `npm audit` 0 ; budget ; fumée WebKit (échantillon et France) sous la CSP de l'app.
 - Tauri : `.app` 84,2 Mo compilé (21 min, données embarquées) ; lecture de l'archive en mémoire vérifiée dans WebKit ; app non ouverte (pas de fenêtre à l'écran) : WKWebView à valider session ouverte.
 - Décisions à soumettre : Q1 à Q5 (§ 8).
@@ -84,3 +85,29 @@ Dernière série (2026-10-08, charge ≈ 2,5, CSP appliquée) : ouverture 846 ms
 - **Q3** Identifiant de bundle et nom : (a) `fr.ministere-info.desktop`, « Ministère de l'Info » (prototype, conservés) ; (b) autre.
 - **Q4** Données dans l'app pour A1 : (a) embarquées (84 Mo) jusqu'au paquet séparé ; (b) paquet séparé dès maintenant.
 - **Q5** Bureaux de vote (28,7 Mo) dans l'app avant A3 : (a) oui ; (b) non, export seulement.
+
+## 9. Corrections après relecture (2026-10-08)
+
+Relectures `ecc:react-reviewer` et `ecc:silent-failure-hunter`, points retenus par le directeur.
+
+| # | Point | Correction | Preuve |
+|---|---|---|---|
+| 1 | Retour au tour affiché pendant un recalcul | `web/src/bascule.ts` : toute demande incrémente la génération avant le test « déjà affiché » | vitest « A → B → A » |
+| 2 | Erreurs de tuiles silencieuses | `SourceMemoire` : statut HTTP, signature `PMTiles`, SHA256, promesse réinitialisée en échec ; `error` de la carte et repos sans source chargée → message `role="alert"`, carte non déclarée prête | vitest « tuiles en échec » ; `?memoire=1` dans WebKit |
+| 3 | Accessibilité | Champ « Commune » (nom ou code) + liste de boutons ; `aria-live` seulement sur la commune choisie ; infobulle `aria-hidden` | fumée WebKit (saisie, Tab, Entrée) |
+| 4 | SHA256 non vérifié | `verifierEmpreinte` (`crypto.subtle`) sur chaque JSON (`sha256_brut`, empreinte du JSON décompressé : `vite preview` envoie les `.gz` en `Content-Encoding: gzip`) et sur l'archive lue en mémoire (`sha256`) | vitest ; fumée WebKit |
+| 5 | Worker dans `useMemo` | créé et arrêté dans un effet | — |
+| 6 | `eslint-disable` | supprimés (dépendances complètes) | — |
+| 7-8 | Couche visible, fondu en cours | bascule recréée avec chaque carte ; fondu coupé avant de recolorer la couche qui disparaît | vitest |
+| 9 | `worker-src blob:` | retiré de la CSP | fumée WebKit sous la CSP de l'app |
+| 10 | Écriture non atomique | dossier `.<sortie>.prepa/`, contrôles (fichiers non vides, un fichier par tour, communes des tuiles = attendu via les métadonnées PMTiles), manifeste en dernier, substitution ; `geojsonl` en `try/finally` ; plus d'ancien pmtiles avec `--sans-tuiles` | pytest `test_publication_atomique` |
+| 11 | « Hors périmètre » ambigu | état `x` « Aucun scrutin » (aucune ligne pour la commune à ce tour), règle départementale supprimée ; schéma de données 2 | pytest `test_etats_carte` |
+| 12 | Département `NR` | département pris dans les résultats (97501, 97502 → `975`) | requête sur la base |
+| 13 | 0 voix dans la source | reste n.d. ; colonne `total` ; infobulle « 0 voix dans la source » | pytest `test_zero_voix_nd` |
+| 14 | Définition du bloc en tête | `docs/schema-elections.md` et texte de source : somme des voix du bloc, pas le bloc de la liste en tête ; 172 communes en 2026_muni_t1 selon ma mesure (liste = numéro de panneau, égalités exclues), 230 selon la relecture | requête du 2026-10-08 |
+
+Mesures après corrections (WebKit, France, 30 changements, charge ≈ 3-4) : ouverture 441-495 ms, données avant la 1re carte 819-837 Ko, JS initial 380 Ko, changement médiane 80 / p90 91-98 / max 103-170 ms, 28-29/30 avec fondu, mémoire 456-567 Mo ; mouvement réduit : 0 fondu ; échantillon (CI) : 0 erreur. Vérifications : pytest hermétique 338 passés, pyright 0, ruff, tsc, vitest 14/14, budget.
+
+Export refait (`outils/tmp/a1-export`, 254 fichiers, 87,0 Mo). **Écart constaté** : une exécution intermédiaire, aux options identiques, a produit une archive de 7,6 Mo au lieu de 19,4 Mo (même nombre de communes et de tuiles) ; l'exécution suivante a retrouvé 19,4 Mo. Cause non établie (base modifiée entre-temps par une autre session, ou tippecanoe) ; le contrôle de publication compte les communes, pas le contenu des tuiles. À surveiller : comparer la taille de l'archive d'un export à l'autre.
+
+Le paragraphe Q1 (§ 8) est sans objet : « hors périmètre » est remplacé par « aucun scrutin ».
