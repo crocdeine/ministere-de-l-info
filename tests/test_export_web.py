@@ -55,6 +55,8 @@ def test_manifeste(export: Path) -> None:
         assert info["octets"] == len(octets)
         assert info["sha256"] == hashlib.sha256(octets).hexdigest()
         assert info["brut"] <= TAILLE_MAX_BRUTE
+        brut = gzip.decompress(octets)
+        assert info["sha256_brut"] == hashlib.sha256(brut).hexdigest()
 
 
 def test_scrutins_alignes_et_nd(export: Path) -> None:

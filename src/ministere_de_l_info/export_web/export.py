@@ -191,7 +191,12 @@ def _json_gz(chemin: Path, contenu: Any, fichiers: dict[str, dict[str, Any]], ra
         logger.warning("%s : %d octets bruts (> %d)", chemin.name, len(brut), TAILLE_MAX_BRUTE)
     chemin.parent.mkdir(parents=True, exist_ok=True)
     chemin.write_bytes(gzip.compress(brut, compresslevel=9, mtime=0))
-    fichiers[chemin.relative_to(racine).as_posix()] = {"brut": len(brut)}
+    # `sha256_brut` : empreinte du JSON décompressé, vérifiée par l'interface même quand le
+    # serveur décompresse le fichier en route (`Content-Encoding: gzip`, cas de `vite preview`).
+    fichiers[chemin.relative_to(racine).as_posix()] = {
+        "brut": len(brut),
+        "sha256_brut": hashlib.sha256(brut).hexdigest(),
+    }
 
 
 def _colonnes(df: pl.DataFrame) -> dict[str, list[Any]]:
