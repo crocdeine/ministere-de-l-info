@@ -24,6 +24,7 @@ import hashlib
 import json
 import logging
 import shutil
+import struct
 import subprocess
 import time
 from datetime import UTC, datetime
@@ -45,10 +46,13 @@ from ministere_de_l_info.viz._display import COULEUR_ND
 
 logger = logging.getLogger(__name__)
 
-VERSION_SCHEMA: int = 1
+VERSION_SCHEMA: int = 2  # 2 : état « aucun scrutin », colonnes etat et total
 # Caractères de la propriété `s` des tuiles : a-f = blocs (ordre de BLOCS_ORDERED).
 CARACTERES: dict[str, str] = {b: "abcdef"[i] for i, b in enumerate(BLOCS_ORDERED)}
-EGALITE, NON_CLASSE, ABSENT, HORS_PERIMETRE = "=", "n", ".", "x"
+# `.` n.d. : lignes de résultat sans voix exploitables (dont 0 voix dans la source) ;
+# `x` aucun scrutin : aucune ligne pour la commune à ce tour (pas de second tour, commune
+# hors du champ publié, comme les municipales 2008 sous 3 500 habitants).
+EGALITE, NON_CLASSE, ABSENT, AUCUN_SCRUTIN = "=", "n", ".", "x"
 # Voix par bloc, puis voix des candidats ou listes sans bloc (nuance non classée).
 COLONNES_VOIX: list[str] = [*BLOCS_ORDERED, "NC"]
 COLONNES_SCRUTIN: list[str] = [
@@ -57,6 +61,8 @@ COLONNES_SCRUTIN: list[str] = [
     "exprimes",
     "participation",
     "part_tete",
+    "etat",  # caractère d'état, comme dans les tuiles (sélection au clavier)
+    "total",  # somme des voix de la source (0 voix : n.d. signalé dans l'infobulle)
     *COLONNES_VOIX,
 ]
 TYPES_SCRUTIN: dict[str, str] = {
@@ -129,8 +135,7 @@ def _sql_etat() -> str:
     )
     return f"""
         CASE
-            WHEN c.code_commune IS NULL THEN
-                CASE WHEN dep.couvert THEN '{HORS_PERIMETRE}' ELSE '{ABSENT}' END
+            WHEN c.code_commune IS NULL THEN '{AUCUN_SCRUTIN}'
             WHEN m IS NULL OR m <= 0 THEN '{ABSENT}'
             WHEN {tete} > 1 THEN '{EGALITE}'
             ELSE CASE {quel} END
@@ -147,11 +152,20 @@ def _preparer(con: duckdb.DuckDBPyConnection, departements: list[str] | None) ->
         WHERE EXISTS (SELECT 1 FROM resultats_candidats r WHERE r.id_election = e.id_election)
         """
     )
+    # Département pris dans les résultats quand ils existent : `geographies_communes` porte
+    # `NR` pour Saint-Pierre-et-Miquelon (97501, 97502), les résultats `975`.
     con.execute(
         f"""
         CREATE OR REPLACE TEMP TABLE _communes AS
-        SELECT code_insee, nom, code_departement FROM geographies_communes
-        WHERE geometry_simplified_communal IS NOT NULL {_filtre_dep(departements)}
+        SELECT * FROM (
+            SELECT g.code_insee, g.nom, COALESCE(r.dep, g.code_departement) AS code_departement
+            FROM geographies_communes g
+            LEFT JOIN (
+                SELECT code_commune, ANY_VALUE(code_departement) AS dep
+                FROM resultats_participation GROUP BY ALL
+            ) r ON r.code_commune = g.code_insee
+            WHERE g.geometry_simplified_communal IS NOT NULL
+        ) WHERE TRUE {_filtre_dep(departements)}
         """  # noqa: S608
     )
     con.execute(f"CREATE OR REPLACE TEMP TABLE _c AS {_sql_agregat(departements, bureau=False)}")
@@ -159,9 +173,6 @@ def _preparer(con: duckdb.DuckDBPyConnection, departements: list[str] | None) ->
     con.execute(
         f"""
         CREATE OR REPLACE TEMP TABLE _e AS
-        WITH dep AS (
-            SELECT DISTINCT id_election, code_departement, TRUE AS couvert FROM _c
-        )
         SELECT s.id_election, g.code_insee, g.code_departement, c.inscrits, c.votants,
                c.exprimes, c.total, {", ".join(f'c."{x}"' for x in COLONNES_VOIX)},
                GREATEST({greatest}) AS m,
@@ -169,8 +180,6 @@ def _preparer(con: duckdb.DuckDBPyConnection, departements: list[str] | None) ->
         FROM _communes g
         CROSS JOIN _scrutins s
         LEFT JOIN _c c ON c.code_commune = g.code_insee AND c.id_election = s.id_election
-        LEFT JOIN dep ON dep.id_election = s.id_election
-                     AND dep.code_departement = g.code_departement
         """  # noqa: S608
     )
 
@@ -202,7 +211,7 @@ def _ecrire_scrutins(
                -- des voix ne dépasse pas les exprimés (scrutin plurinominal : non comparable).
                CASE WHEN etat IN ({lettres}) AND exprimes > 0 AND total <= exprimes
                     THEN ROUND(100.0 * m / exprimes, 2)::DOUBLE END AS part_tete,
-               {", ".join(f'"{c}"' for c in COLONNES_VOIX)}
+               etat, total, {", ".join(f'"{c}"' for c in COLONNES_VOIX)}
         FROM _e ORDER BY id_election, code_insee
         """  # noqa: S608
     ).pl()
@@ -259,14 +268,21 @@ def _ecrire_tuiles(
         GROUP BY g.code_insee ORDER BY g.code_insee
         """
     ).fetchall()
-    with seq.open("w", encoding="utf-8") as f:
-        for code, s, geojson in rows:
-            props = json.dumps({"code": code, "s": s}, separators=(",", ":"))
-            f.write(f'{{"type":"Feature","properties":{props},"geometry":{geojson}}}\n')
+    try:
+        with seq.open("w", encoding="utf-8") as f:
+            for code, s, geojson in rows:
+                props = json.dumps({"code": code, "s": s}, separators=(",", ":"))
+                f.write(f'{{"type":"Feature","properties":{props},"geometry":{geojson}}}\n')
+        _tippecanoe(tippecanoe, seq, sortie / "communes.pmtiles", detail_bas)
+    finally:
+        seq.unlink(missing_ok=True)
+
+
+def _tippecanoe(tippecanoe: str, seq: Path, pmtiles: Path, detail_bas: int) -> None:
     subprocess.run(  # noqa: S603
         [
             tippecanoe,
-            *("-o", str(sortie / "communes.pmtiles"), "--force", "--quiet", "-l", "communes"),
+            *("-o", str(pmtiles), "--force", "--quiet", "-l", "communes"),
             *("-Z3", "-z10", "--detect-shared-borders", "--no-feature-limit"),
             "--no-tile-size-limit",
             # Précision des zooms < 10 : 2**detail_bas unités par tuile (décision A0 : 10).
@@ -275,7 +291,20 @@ def _ecrire_tuiles(
         ],
         check=True,
     )
-    seq.unlink()
+
+
+def nombre_communes_tuiles(pmtiles: Path) -> int:
+    """Nombre d'entités de la couche ``communes`` (métadonnées tippecanoe de l'archive)."""
+    with pmtiles.open("rb") as f:
+        entete = f.read(127)
+        if entete[:7] != b"PMTiles":
+            raise ValueError(f"{pmtiles} : archive PMTiles invalide")
+        debut, longueur = struct.unpack("<QQ", entete[24:40])
+        f.seek(debut)
+        brut = f.read(longueur)
+    meta = json.loads(gzip.decompress(brut) if entete[97] == 2 else brut)  # 2 = gzip
+    couches = {c["layer"]: c["count"] for c in meta["tilestats"]["layers"]}
+    return int(couches["communes"])
 
 
 def _manifeste(
@@ -339,7 +368,7 @@ def _manifeste(
             "egalite": EGALITE,
             "non_classe": NON_CLASSE,
             "absent": ABSENT,
-            "hors_perimetre": HORS_PERIMETRE,
+            "aucun_scrutin": AUCUN_SCRUTIN,
         },
         "couleur_nd": COULEUR_ND,
         "colonnes_scrutin": COLONNES_SCRUTIN,
@@ -349,8 +378,33 @@ def _manifeste(
 def _empreintes(sortie: Path, fichiers: dict[str, dict[str, Any]]) -> None:
     for rel, info in fichiers.items():
         octets = (sortie / rel).read_bytes()
+        if not octets:
+            raise ValueError(f"Export incomplet : {rel} est vide")
         info["octets"] = len(octets)
         info["sha256"] = hashlib.sha256(octets).hexdigest()
+
+
+def _controler(
+    sortie: Path, fichiers: dict[str, dict[str, Any]], n_communes: int, n_scrutins: int
+) -> None:
+    """Contrôles avant publication : un fichier par tour, toutes les communes dans les tuiles."""
+    n = sum(1 for rel in fichiers if rel.startswith("scrutins/"))
+    if n != n_scrutins:
+        raise ValueError(f"Export incomplet : {n} fichiers de tours pour {n_scrutins} tours")
+    if "communes.pmtiles" in fichiers:
+        dans_tuiles = nombre_communes_tuiles(sortie / "communes.pmtiles")
+        if dans_tuiles != n_communes:
+            raise ValueError(f"Tuiles : {dans_tuiles} communes pour {n_communes} attendues")
+
+
+def _publier(prepa: Path, sortie: Path) -> None:
+    """Remplace ``sortie`` par l'export préparé (renommages sur le même disque)."""
+    ancien = sortie.with_name(f".{sortie.name}.ancien")
+    shutil.rmtree(ancien, ignore_errors=True)
+    if sortie.exists():
+        sortie.rename(ancien)
+    prepa.rename(sortie)
+    shutil.rmtree(ancien, ignore_errors=True)
 
 
 def exporter(
@@ -363,40 +417,49 @@ def exporter(
 ) -> dict[str, Any]:
     """Écrit l'export complet dans ``sortie`` et renvoie le manifeste.
 
+    Tout est écrit dans un dossier voisin, contrôlé, puis substitué à ``sortie`` (manifeste
+    écrit en dernier) : un export interrompu ou invalide laisse l'export précédent intact.
     ``tippecanoe=None`` : pas de tuiles (tests). ``departements`` : échantillon.
     """
     t0 = time.perf_counter()
-    sortie.mkdir(parents=True, exist_ok=True)
-    for ancien in ("scrutins", "departements"):
-        shutil.rmtree(sortie / ancien, ignore_errors=True)
+    sortie = sortie.resolve()
+    prepa = sortie.with_name(f".{sortie.name}.prepa")
+    shutil.rmtree(prepa, ignore_errors=True)
+    prepa.mkdir(parents=True)
     fichiers: dict[str, dict[str, Any]] = {}
-    con = duckdb.connect(str(db_path), read_only=True)  # lecture seule, jamais d'écriture
-    con.execute("LOAD spatial")
     try:
-        _preparer(con, departements)
-        communes = con.execute("SELECT code_insee, nom FROM _communes ORDER BY 1").pl()
-        _json_gz(
-            sortie / "communes.json.gz",
-            {"codes": communes["code_insee"].to_list(), "noms": communes["nom"].to_list()},
-            fichiers,
-            sortie,
+        con = duckdb.connect(str(db_path), read_only=True)  # lecture seule, jamais d'écriture
+        try:
+            con.execute("LOAD spatial")
+            _preparer(con, departements)
+            communes = con.execute("SELECT code_insee, nom FROM _communes ORDER BY 1").pl()
+            _json_gz(
+                prepa / "communes.json.gz",
+                {"codes": communes["code_insee"].to_list(), "noms": communes["nom"].to_list()},
+                fichiers,
+                prepa,
+            )
+            _ecrire_scrutins(con, prepa, fichiers)
+            logger.info("Scrutins écrits (%.1f s)", time.perf_counter() - t0)
+            _ecrire_departements(con, prepa, fichiers, departements)
+            logger.info("Départements écrits (%.1f s)", time.perf_counter() - t0)
+            if tippecanoe:
+                _ecrire_tuiles(con, prepa, tippecanoe, detail_bas)
+                fichiers["communes.pmtiles"] = {}
+                logger.info("Tuiles écrites (%.1f s)", time.perf_counter() - t0)
+            manifeste = _manifeste(con, departements, communes.height)
+        finally:
+            con.close()
+        _empreintes(prepa, fichiers)
+        _controler(prepa, fichiers, communes.height, len(manifeste["scrutins"]))
+        manifeste["fichiers"] = dict(sorted(fichiers.items()))
+        (prepa / "manifest.json").write_text(
+            json.dumps(manifeste, ensure_ascii=False, indent=1), encoding="utf-8"
         )
-        _ecrire_scrutins(con, sortie, fichiers)
-        logger.info("Scrutins écrits (%.1f s)", time.perf_counter() - t0)
-        _ecrire_departements(con, sortie, fichiers, departements)
-        logger.info("Départements écrits (%.1f s)", time.perf_counter() - t0)
-        if tippecanoe:
-            _ecrire_tuiles(con, sortie, tippecanoe, detail_bas)
-            fichiers["communes.pmtiles"] = {}
-            logger.info("Tuiles écrites (%.1f s)", time.perf_counter() - t0)
-        manifeste = _manifeste(con, departements, communes.height)
-    finally:
-        con.close()
-    _empreintes(sortie, fichiers)
-    manifeste["fichiers"] = dict(sorted(fichiers.items()))
-    (sortie / "manifest.json").write_text(
-        json.dumps(manifeste, ensure_ascii=False, indent=1), encoding="utf-8"
-    )
+        _publier(prepa, sortie)
+    except BaseException:
+        shutil.rmtree(prepa, ignore_errors=True)
+        raise
     total = sum(f["octets"] for f in fichiers.values())
     logger.info(
         "Export : %d fichiers, %.1f Mo, %.1f s",

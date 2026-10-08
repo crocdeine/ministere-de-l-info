@@ -173,7 +173,7 @@ base DuckDB (lecture seule)
 ```
 
 - Carte : un caractère par tour dans la propriété `s` des tuiles (`a`-`f` blocs, `=` égalité,
-  `n` non classé, `.` n.d., `x` hors périmètre) ; changement de tour par un seul
+  `n` non classé, `.` n.d., `x` aucun scrutin ; voir `docs/schema-elections.md`) ; changement de tour par un seul
   `setPaintProperty` ; fondu croisé de 220 ms entre deux couches (deux sources), supprimé si la
   recoloration dépasse 100 ms ou si `prefers-reduced-motion` (`--duration-map-fade`).
 - L'interface ne calcule rien : participation et part du bloc en tête viennent de l'export.

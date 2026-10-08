@@ -141,7 +141,7 @@ def test_departements(export: Path) -> None:
 
 
 def test_etats_carte(echantillon_con: duckdb.DuckDBPyConnection) -> None:
-    """Caractère d'état : bloc seul en tête, égalité, non classé, n.d., hors périmètre."""
+    """Caractère d'état : bloc seul en tête, égalité, non classé, n.d., aucun scrutin."""
     cur = echantillon_con.cursor()
     _preparer(cur, None)
     lignes = cur.execute(
@@ -162,3 +162,40 @@ def test_etats_carte(echantillon_con: duckdb.DuckDBPyConnection) -> None:
             tete = COLONNES_VOIX[voix.index(m)]
             assert etat == CARACTERES.get(tete, "n")
     assert {"a", "b", "c", "d", "e", "f"} & vus and "n" in vus and "x" in vus
+
+
+def test_publication_atomique(
+    echantillon_db_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un export qui échoue laisse le précédent intact ; un export réussi ne garde rien d'ancien."""
+    from ministere_de_l_info.export_web import export as module
+
+    sortie = tmp_path / "data"
+    exporter(echantillon_db_path, sortie, tippecanoe=None)
+    (sortie / "communes.pmtiles").write_bytes(b"ancien")  # reste d'un export avec tuiles
+    avant = (sortie / "manifest.json").read_text(encoding="utf-8")
+
+    def echec(*_: object) -> None:
+        raise ValueError("contrôle en échec")
+
+    monkeypatch.setattr(module, "_controler", echec)
+    with pytest.raises(ValueError, match="contrôle"):
+        exporter(echantillon_db_path, sortie, tippecanoe=None)
+    assert (sortie / "manifest.json").read_text(encoding="utf-8") == avant
+    assert not list(tmp_path.glob(".data.*"))  # dossier de préparation supprimé
+
+    monkeypatch.undo()
+    exporter(echantillon_db_path, sortie, tippecanoe=None)  # --sans-tuiles
+    assert not (sortie / "communes.pmtiles").exists()
+
+
+def test_zero_voix_nd(export: Path) -> None:
+    """Commune avec des lignes mais 0 voix : n.d. (`.`), total 0 (signalé dans l'infobulle)."""
+    m = json.loads((export / "manifest.json").read_text(encoding="utf-8"))
+    for s in m["scrutins"]:
+        col = _lire(export / "scrutins" / f"{s['id']}.json.gz")
+        for etat, total in zip(col["etat"], col["total"], strict=True):
+            if total == 0:
+                assert etat == "."
+            if etat == "x":
+                assert total is None
