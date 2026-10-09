@@ -3,7 +3,7 @@ import { Carte, type Rendu, type Survol, token } from "./Carte";
 import { date, entier, type Manifeste, pct, urlDonnees } from "./donnees";
 import { annees, choisir, type Etat, etats as listeEtats, libelleEtat, scrutinInitial, tours } from "./etats";
 import { ecrireUrl, lireUrl } from "./etat-url";
-import { EtiquetteMethode, Legende } from "./Legende";
+import { EtiquetteMethode, Legende, LienMethode } from "./Legende";
 import { journal, noter } from "./mesure";
 import type { Demande, Fichier, Reponse, Valeurs } from "./worker/details";
 
@@ -32,7 +32,8 @@ function Resultats({ m, etats, car, v, erreur }: { m: Manifeste; etats: Etat[]; 
   );
 }
 
-const PAGES_URL = ["accueil", "geographie", "elections", "economie", "legislatif"];
+// Doit suivre PAGES (App.tsx) : une page absente serait réécrite en #/elections.
+const PAGES_URL = ["accueil", "geographie", "elections", "economie", "legislatif", "methodologie"];
 const depuisUrl = (m: Manifeste) =>
   lireUrl(location.hash, PAGES_URL, m.scrutins.map((x) => x.id), "elections");
 
@@ -334,7 +335,10 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
             commune est en blanc (aucun bloc favorisé). n.d. : résultats présents mais sans voix
             exploitables (dont 0 voix dans la source).
             {sans.length > 0 &&
-              ` Tours déclarés sans résultats chargés : ${sans.map((x) => x.libelle).join(", ")}.`}
+              ` Tours déclarés sans résultats chargés : ${sans.map((x) => x.libelle).join(", ")}.`}{" "}
+            <LienMethode ancre="bloc-en-tete" className="lien-methode">
+              Méthode
+            </LienMethode>
           </p>
         </div>
       </section>

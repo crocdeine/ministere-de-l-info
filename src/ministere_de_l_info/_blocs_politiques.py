@@ -59,15 +59,18 @@ def legende_classement_blocs(type_scrutin: str, annee: int) -> str:
     """
     grille = _GRILLES_OFFICIELLES.get((type_scrutin, annee))
     if grille:
-        # ponytail: 23 codes sur 48 (2020, 2026) restent à rattacher ligne à ligne (J2)
+        # Identique à la grille code pour code (ADR-0010 ; test_elections_nuances_adr0010).
         return (
             f"Classement des blocs : grille officielle du ministère de l'Intérieur ({grille}), "
-            "reportée par le projet ; vérification code par code en cours."
+            "reportée par le projet."
         )
     reference = "IOMA2322276J, 2023" if annee >= 2023 else "INTA1931378J, 2020"
     return (
         "Classement des blocs : reconstruction par le projet, aucune grille officielle "
         f"pour ce scrutin ; grille officielle la plus proche ({reference}) appliquée "
-        "aux codes qu'elle couvre. "
-        "Méthode : docs/adr/0010-revision-nuances-et-blocs.md."
+        "aux codes qu'elle couvre. " + RENVOI_METHODE
     )
+
+
+# Renvoi des légendes Streamlit ; l'application web le remplace par son panneau Méthodologie.
+RENVOI_METHODE: str = "Méthode : docs/adr/0010-revision-nuances-et-blocs.md."
