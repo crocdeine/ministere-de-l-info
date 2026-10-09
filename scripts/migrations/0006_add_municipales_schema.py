@@ -92,6 +92,9 @@ def _verify_elections_type_scrutin(con) -> None:
 
 
 def main(dry_run: bool = False) -> None:
+    from ministere_de_l_info.espace_disque import verifier_espace
+
+    verifier_espace(_DB_PATH.parent)
     if not _DB_PATH.exists():
         logger.error("Base introuvable : %s", _DB_PATH)
         sys.exit(1)

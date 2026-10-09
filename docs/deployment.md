@@ -302,6 +302,11 @@ Vérification : l'app répond et les pages affichent des données. Supprimer ens
 
 ### 2.6 Dépannage
 
+- **Refus « Espace disque insuffisant »** : chargements ETL, migrations, `publish_db.sh`, tuilage et
+  `npm run tauri:build` (dans `web/`) refusent de démarrer sous 10 Go libres (message : espace libre
+  et seuil). Libérer de la place ; seuil réglable via `MINISTERE_ESPACE_MIN_GO` (ex. `=1`).
+  Code : `src/ministere_de_l_info/espace_disque.py`, `web/verifier-espace.mjs`.
+
 | Symptôme | Diagnostic | Solution |
 |---|---|---|
 | `status.sh` : `NE RÉPOND PAS` | `tail -n 50 ~/Library/Logs/ministere-info/app.err.log` | Corriger l'erreur affichée, puis `./deploy/native/start.sh` |

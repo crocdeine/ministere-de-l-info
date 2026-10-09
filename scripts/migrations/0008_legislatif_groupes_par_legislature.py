@@ -116,6 +116,9 @@ def appliquer_migration(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
 
 
 def main() -> None:
+    from ministere_de_l_info.espace_disque import verifier_espace
+
+    verifier_espace(_DB_PATH.parent)
     configure_logging()
     con = open_connection(_DB_PATH)
     try:

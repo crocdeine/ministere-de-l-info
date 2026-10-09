@@ -40,6 +40,9 @@ _PARQUET_PARTICIPATION = ROOT / "data" / "exploration" / "candidats-results.parq
 
 
 def main() -> None:
+    from ministere_de_l_info.espace_disque import verifier_espace
+
+    verifier_espace(get_settings().db_path.parent)
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--perimetre", choices=PERIMETRES, default="hdf")
     parser.add_argument("--types", nargs="+", choices=TYPES_VAGUE_B, default=list(TYPES_VAGUE_B))

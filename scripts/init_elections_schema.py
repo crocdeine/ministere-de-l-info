@@ -47,6 +47,9 @@ _DB_PATH = get_settings().db_path
 
 
 def main() -> None:
+    from ministere_de_l_info.espace_disque import verifier_espace
+
+    verifier_espace(_DB_PATH.parent)
     logger.info("Initialisation du schéma électoral → %s", _DB_PATH)
     con = open_connection(_DB_PATH)
 

@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
+    from ministere_de_l_info.espace_disque import verifier_espace
+
+    verifier_espace(get_settings().db_path.parent)
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--force", action="store_true", help="re-télécharger le fichier INSEE")
     args = parser.parse_args()
