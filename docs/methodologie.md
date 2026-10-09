@@ -147,7 +147,13 @@ Sources : mesure dans la base le 9 octobre 2026 (tables des correspondances et 
 - **Exprimés** : votants moins les bulletins blancs et nuls.
 - **Participation** : somme des votants divisée par la somme des inscrits, sur l'ensemble des bureaux de vote de la commune.
 
-Sources : schéma de la base électorale, table de participation ; code électoral, art. L. 65 et L. 66 (blancs et nuls décomptés à part).
+Sources : schéma de la base électorale, table de participation ; code électoral, art. L. 65 et L. 66 (blancs et nuls décomptés à part).
+
+### Bulletins blancs et nuls {#blancs-nuls}
+
+Depuis la loi n° 2014-172 du 21 février 2014, les bulletins blancs sont décomptés à part des bulletins nuls. Dans la source utilisée (élections agrégées, data.gouv.fr), les blancs et les nuls ne sont distingués qu'à partir de 2017. Pour les scrutins de 2015 et avant, y compris les européennes et les municipales de 2014 et les départementales et les régionales de 2015, la colonne des blancs est vide et celle des nuls réunit blancs et nuls. Le vote blanc ne peut donc pas être comparé avant 2017, et toute comparaison des nuls doit en tenir compte.
+
+Sources : loi n° 2014-172 du 21 février 2014 ; code électoral, art. L. 65 (blancs) et L. 66 (nuls) ; vérification dans la base par le directeur du projet (lecture seule), octobre 2026.
 
 ### Bloc en tête {#bloc-en-tete}
 
@@ -184,8 +190,9 @@ Comparer deux scrutins demande de la prudence. L'application affiche une mention
 - **Codes de nuance.** Les codes changent à chaque circulaire ; seule la comparaison par bloc reste possible sur longue période.
 - **Seuil de nuançage.** Aux municipales 2020 et 2026, seules les listes des communes de 3 500 habitants et plus et des chefs-lieux d'arrondissement reçoivent une nuance.
 - **Circonscriptions.** Les législatives 2002 et 2007 ont eu lieu avant le redécoupage de 2010.
+- **Blancs et nuls.** La source ne les distingue qu'à partir de 2017 : avant, les nuls incluent les blancs (voir « Bulletins blancs et nuls »).
 
-Sources : schéma de la base électorale, « Classements — blocs politiques » et vues législatives ; ADR-0010, § e, point 4 ; index des circulaires archivées par le projet.
+Sources : schéma de la base électorale, « Classements — blocs politiques » et vues législatives ; ADR-0010, § e, point 4 ; index des circulaires archivées par le projet ; vérification dans la base (blancs et nuls), octobre 2026.
 
 ## Limites connues {#limites}
 
@@ -221,4 +228,4 @@ Sources : schéma de la base électorale, « Rattachement des communes fusionn
 | Tour | Chacun des deux votes d'une même élection ; le second tour n'a pas toujours lieu. |
 | Votants | Inscrits qui ont pris part au vote. |
 
-Sources : schéma de la base électorale ; code électoral, art. L. 65 et L. 66 ; définitions de l'INSEE (code commune, EPCI).
+Sources : schéma de la base électorale ; code électoral, art. L. 65 et L. 66 ; définitions de l'INSEE (code commune, EPCI).
