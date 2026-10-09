@@ -17,6 +17,7 @@ npm run dev           # http://localhost:5173
 npm test              # vitest (logique pure)
 npm run build         # tsc --noEmit puis build dans dist/
 npm run budget        # JS initial gzip < 450 Ko (bloquant en CI)
+npm run e2e:url       # état dans l'URL : lien, rechargement, retour arrière (WebKit + Chromium)
 npm run mesure        # WebKit sans fenêtre : ouverture, données, changement de tour, mémoire
 ```
 

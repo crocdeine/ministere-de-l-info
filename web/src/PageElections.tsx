@@ -84,7 +84,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
       const i = manifeste.scrutins.findIndex((x) => x.id === u.scrutin);
       setScrutin((a) => (i >= 0 ? i : a));
       setChoisie((c) => (u.commune ? (c?.code === u.commune ? c : { code: u.commune, nom: "" }) : null));
-      setAvis(u.avertissements);
+      if (u.avertissements.length) setAvis(u.avertissements); // popstate + hashchange : ne pas effacer
     };
     addEventListener("hashchange", suivre);
     addEventListener("popstate", suivre);
