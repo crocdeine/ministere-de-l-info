@@ -42,6 +42,7 @@ from ministere_de_l_info._blocs_politiques import (
     legende_classement_blocs,
     methode_classement,
 )
+from ministere_de_l_info.espace_disque import verifier_espace
 from ministere_de_l_info.sources import SOURCES, mention
 from ministere_de_l_info.viz._display import COULEUR_ND
 
@@ -284,21 +285,8 @@ def _ecrire_tuiles(
         seq.unlink(missing_ok=True)
 
 
-ESPACE_MIN_OCTETS: int = 2_000_000_000  # tippecanoe écrit des fichiers temporaires volumineux
-
-
-def _verifier_espace(*dossiers: Path) -> None:
-    """Refuse de tuiler sur un disque presque plein (archive incomplète constatée le 2026-10-08)."""
-    for d in dossiers:
-        libre = shutil.disk_usage(d).free
-        if libre < ESPACE_MIN_OCTETS:
-            raise OSError(
-                f"Espace disque insuffisant pour le tuilage : {libre / 1e9:.2f} Go libres sur {d}"
-            )
-
-
 def _tippecanoe(tippecanoe: str, seq: Path, pmtiles: Path, detail_bas: int) -> None:
-    _verifier_espace(pmtiles.parent, Path(tempfile.gettempdir()))
+    verifier_espace(pmtiles.parent, Path(tempfile.gettempdir()))
     resultat = subprocess.run(  # noqa: S603
         [
             tippecanoe,
