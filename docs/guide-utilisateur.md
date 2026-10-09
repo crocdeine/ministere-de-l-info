@@ -202,7 +202,8 @@ Dans la nouvelle application (page Élections), l'étiquette placée à côté d
 Le panneau explique les sources, le classement en blocs, les calculs, les valeurs absentes, les
 ruptures et les limites, avec un glossaire et la table consultable des correspondances
 nuance → bloc (filtre par année). Fermeture : bouton « Fermer », touche Échap ou clic hors du
-panneau. Captures : `docs/captures/a5/`. Texte source : `docs/methodologie.md`.
+panneau. Le même texte est aussi une page à part entière, entrée « 05 — Méthodologie » de la
+navigation (adresse `#/methodologie`). Captures : `docs/captures/a5/`. Texte source : `docs/methodologie.md`.
 
 ---
 

@@ -1,6 +1,6 @@
 # Méthodologie
 
-Cette page explique d'où viennent les chiffres de l'application et comment ils sont calculés. Elle est affichée dans le panneau « Méthodologie » de l'application ; chaque affirmation est suivie de sa source. Les références du type « ADR-0010 » désignent les décisions écrites du projet, conservées dans son dépôt public.
+Cette page explique d'où viennent les chiffres de l'application et comment ils sont calculés. Elle est affichée dans la page « Méthodologie » et dans le panneau du même nom, ouvert depuis chaque carte ; chaque affirmation est suivie de sa source. Les références du type « ADR-0010 » désignent les décisions écrites du projet, conservées dans son dépôt public.
 
 Chiffres mesurés dans la base le 9 octobre 2026.
 

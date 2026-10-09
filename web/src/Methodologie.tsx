@@ -116,7 +116,9 @@ function Correspondances({ d, m }: { d: Donnees["correspondances"]; m: Manifeste
 function rendre(b: Bloc, i: number, insertions: Record<string, ReactNode>): ReactNode {
   switch (b.t) {
     case "titre": {
-      const Titre = b.niveau <= 1 ? "h2" : b.niveau === 2 ? "h3" : "h4";
+      // Titre du document : porté par l'en-tête de la page ou la barre du panneau.
+      if (b.niveau <= 1) return null;
+      const Titre = b.niveau === 2 ? "h2" : "h3";
       return (
         <Titre key={i} id={b.id}>
           {b.texte}

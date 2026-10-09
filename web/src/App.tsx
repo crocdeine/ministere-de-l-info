@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { chargerManifeste, type Manifeste } from "./donnees";
+import { PageMethodologie } from "./Legende";
 import { PageElections } from "./PageElections";
 
-// Navigation : 5 entrées (comme l'application Streamlit). Pages non portées : renvoi vers
+// Navigation : 5 entrées de l'application Streamlit + Méthodologie. Pages non portées : renvoi vers
 // la version Streamlit. Numérotation « 0X — » (ADR-0016 : pas de code couleur par module).
 export const PAGES = [
   { id: "accueil", numero: "00", titre: "Accueil" },
@@ -10,6 +11,7 @@ export const PAGES = [
   { id: "elections", numero: "02", titre: "Élections" },
   { id: "economie", numero: "03", titre: "Économie" },
   { id: "legislatif", numero: "04", titre: "Législatif" },
+  { id: "methodologie", numero: "05", titre: "Méthodologie" }, // validé par Mathias le 2026-10-09
 ] as const;
 type IdPage = (typeof PAGES)[number]["id"];
 const PORTEES: ReadonlySet<IdPage> = new Set(["elections"]);
@@ -54,7 +56,15 @@ export function App() {
         </nav>
       </header>
       <main className="page">
-        {!PORTEES.has(page) ? (
+        {page === "methodologie" ? (
+          <>
+            <section className="entete">
+              <p className="overline">{info.numero} —</p>
+              <h1>{info.titre}</h1>
+            </section>
+            <PageMethodologie />
+          </>
+        ) : !PORTEES.has(page) ? (
           <section className="entete">
             <p className="overline">{info.numero} —</p>
             <h1>{info.titre}</h1>

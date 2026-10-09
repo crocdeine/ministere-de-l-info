@@ -24,6 +24,19 @@ class Repli extends Component<{ reessayer: () => void; children: ReactNode }, { 
   }
 }
 
+/** Méthodologie affichée en page (`#/methodologie`) : même contenu que le panneau. */
+export function PageMethodologie() {
+  const [essai, setEssai] = useState(0);
+  const Methodologie = useMemo(() => lazy(() => import("./Methodologie")), [essai]);
+  return (
+    <Repli key={essai} reessayer={() => setEssai((n) => n + 1)}>
+      <Suspense fallback={<p aria-busy="true">Chargement…</p>}>
+        <Methodologie ancre="" />
+      </Suspense>
+    </Repli>
+  );
+}
+
 /** Panneau unique de la page : une seule fenêtre `<dialog>`, quel que soit le nombre de liens. */
 function Panneau({ initiale, enregistrer }: { initiale: Ancre; enregistrer: (f: (a: Ancre) => void) => void }) {
   const panneau = useRef<HTMLDialogElement>(null);

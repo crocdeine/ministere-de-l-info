@@ -36,6 +36,16 @@ try {
       await page.mouse.click(20, 450); // fond, hors du panneau
       if (await page.locator("dialog[open]").count()) throw new Error("panneau non refermé par un clic sur le fond");
       console.log("une seule fenêtre ; fermeture par clic sur le fond : ok");
+      await page.locator(".source .lien-methode").click();
+      await page.locator("dialog[open] #bloc-en-tete").waitFor({ timeout: 15000 });
+      await page.keyboard.press("Escape");
+      console.log("note sous la carte : panneau ouvert sur #bloc-en-tete");
+      // Depuis la page Élections (état d'URL du lot A2) : clic dans la navigation.
+      const p2 = page;
+      await p2.locator('nav a[href="#/methodologie"]').click();
+      await p2.locator("main .methodologie .meth-table td").first().waitFor({ timeout: 15000 });
+      await p2.screenshot({ path: `${sortie}/methodologie-page.png` });
+      console.log("page #/methodologie :", await p2.locator("main h1").textContent());
     }
   }
 } finally {
