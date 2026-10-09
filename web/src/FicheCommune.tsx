@@ -43,8 +43,19 @@ const ECONOMIE: { cle: string; libelle: string; format: (v: number) => string; s
 type Donnees = { dep: string; communes: ColonnesDep; fiches: FichesDep };
 type Tri = { cle: string; sens: 1 | -1 };
 
-function fichierDep(m: Manifeste, rel: string) {
-  return lireJsonGz<never>(urlDonnees(rel), m.fichiers[rel]?.sha256_brut, rel);
+type Bureaux = { dep: string; etat: ColonnesDep | "chargement" | string };
+
+// Fichiers par département lus une fois (décompression, SHA256, JSON) : cache par chemin ;
+// un échec est retiré du cache (nouvel essai à la demande suivante).
+const cache = new Map<string, Promise<unknown>>();
+function fichierDep<T>(m: Manifeste, rel: string): Promise<T> {
+  let p = cache.get(rel);
+  if (!p) {
+    p = lireJsonGz<T>(urlDonnees(rel), m.fichiers[rel]?.sha256_brut, rel);
+    p.catch(() => cache.delete(rel));
+    cache.set(rel, p);
+  }
+  return p as Promise<T>;
 }
 
 const ordinal = (n: number) => (n === 1 ? "1re" : `${n}e`);
@@ -69,7 +80,7 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
   const [tour, setTour] = useState(1);
   const [tri, setTri] = useState<Tri>({ cle: "rang", sens: 1 });
   const [copie, setCopie] = useState<"ok" | "echec" | null>(null);
-  const [bureaux, setBureaux] = useState<ColonnesDep | "chargement" | string | null>(null);
+  const [bureaux, setBureaux] = useState<Bureaux | null>(null);
   const [rangBv, setRangBv] = useState<number | null>(null);
 
   useEffect(() => {
@@ -80,15 +91,12 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
 
   const dep = code ? departementDe(code, m) : null;
   useEffect(() => {
-    setDonnees(null);
     setErreur(null);
-    setBureaux(null);
-    setRangBv(null);
     if (!dep) return;
     let annule = false;
     Promise.all([
-      fichierDep(m, `departements/${dep}/communes.json.gz`),
-      fichierDep(m, `departements/${dep}/fiches.json.gz`),
+      fichierDep<ColonnesDep>(m, `departements/${dep}/communes.json.gz`),
+      fichierDep<FichesDep>(m, `departements/${dep}/fiches.json.gz`),
     ])
       .then(([communes, fiches]) => {
         if (!annule) setDonnees({ dep, communes, fiches });
@@ -99,12 +107,28 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
     };
   }, [m, dep]);
 
-  const info = code && donnees ? donnees.fiches.communes[code] : undefined;
+  // Choix du bureau de vote propre à une commune : remis à zéro au changement de commune.
+  useEffect(() => setRangBv(null), [code]);
+
+  // Données d'un autre département (navigation en cours) : jamais affichées.
+  const actuelles = donnees?.dep === dep ? donnees : null;
+  const info = code && actuelles ? actuelles.fiches.communes[code] : undefined;
   const toutes = useMemo(
-    () => (code && donnees ? lignesCommune(m, donnees.communes, code, info) : []),
-    [m, donnees, code, info],
+    () => (code && actuelles ? lignesCommune(m, actuelles.communes, code, info) : []),
+    [m, actuelles, code, info],
   );
   const serie = useMemo(() => avecRuptures(filtrer(toutes, type, tour)), [toutes, type, tour]);
+  const triees = useMemo(() => {
+    const valeur = (l: Ligne): number | null =>
+      tri.cle === "rang" ? l.rang : tri.cle === "inscrits" ? l.inscrits : tri.cle === "participation" ? l.participation : (l.parts[tri.cle] ?? null);
+    return [...serie].sort((a, b) => {
+      const va = valeur(a);
+      const vb = valeur(b);
+      if (va === null) return vb === null ? 0 : 1; // n.d. toujours en fin de tableau
+      if (vb === null) return -1;
+      return (va - vb) * tri.sens;
+    });
+  }, [serie, tri]);
 
   useEffect(() => {
     if (copie !== "ok") return;
@@ -128,7 +152,7 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
         Données non disponibles : {erreur}
       </p>
     );
-  if (!donnees)
+  if (!actuelles)
     return (
       <p className="overline" aria-busy="true">
         Chargement de la fiche…
@@ -139,26 +163,17 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
   const blocs = m.blocs;
   const libelleBloc = (c: string | null) =>
     c === null ? ND : c === "=" ? "Égalité entre blocs" : (blocs.find((b) => b.code === c)?.libelle ?? NC.libelle);
-  const fd = donnees.fiches.departement;
+  const fd = actuelles.fiches.departement;
   const derniere = toutes.at(-1);
   const pop = info.population.filter((p) => p[1] !== null).at(-1);
   const raisons = raisonsSerie(serie);
   const methodes = [...new Set(serie.map((l) => l.scrutin.methode))];
   const typesPresents = Object.entries(m.types).filter(([t]) => toutes.some((l) => l.scrutin.type === t));
   const sansResultat = m.scrutins.length - toutes.length;
-  const deputes = donnees.fiches.elus.filter((e) => e.chambre === "AN" && e.circo && info.circos.includes(e.circo));
-  const senateurs = donnees.fiches.elus.filter((e) => e.chambre === "SENAT");
+  const deputes = actuelles.fiches.elus.filter((e) => e.chambre === "AN" && e.circo && info.circos.includes(e.circo));
+  const senateurs = actuelles.fiches.elus.filter((e) => e.chambre === "SENAT");
   const colonnes = [...blocs.map((b) => ({ code: b.code, libelle: b.libelle, couleur: b.couleur })), { ...NC, couleur: m.couleur_nd }];
 
-  const valeurTri = (l: Ligne): number | null =>
-    tri.cle === "rang" ? l.rang : tri.cle === "inscrits" ? l.inscrits : tri.cle === "participation" ? l.participation : (l.parts[tri.cle] ?? null);
-  const triees = [...serie].sort((a, b) => {
-    const va = valeurTri(a);
-    const vb = valeurTri(b);
-    if (va === null) return vb === null ? 0 : 1; // n.d. toujours en fin de tableau
-    if (vb === null) return -1;
-    return (va - vb) * tri.sens;
-  });
   const enTeteTri = (cle: string, contenu: ReactNode) => (
     <th scope="col" aria-sort={tri.cle === cle ? (tri.sens === 1 ? "ascending" : "descending") : undefined}>
       <button type="button" className="tri" onClick={() => setTri((t) => ({ cle, sens: t.cle === cle ? ((-t.sens) as 1 | -1) : cle === "rang" ? 1 : -1 }))}>
@@ -169,20 +184,25 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
   const remarques = (l: Ligne) =>
     [
       ...(l.raisons.length ? [`Rupture avec la ligne précédente : ${l.raisons.map((r) => LIBELLES_RAISONS[r]).join(", ")}`] : []),
-      mentionFusion(l.anciennes),
+      mentionFusion(l.anciennes, info.noms_anciennes),
       l.plurinominal ? "Scrutin plurinominal : somme des voix supérieure aux exprimés, parts non calculées" : null,
       l.nonClasseSeul ? "Aucune nuance attribuée : toutes les voix sont non classées" : null,
     ].filter(Boolean);
 
-  const choixBv = rangBv ?? serie.at(-1)?.rang ?? derniere?.rang ?? null;
+  // Rang choisi validé contre les scrutins de la commune ; sinon dernier scrutin affiché.
+  const choixBv = toutes.some((l) => l.rang === rangBv) ? rangBv : (serie.at(-1)?.rang ?? derniere?.rang ?? null);
+  const etatBv = bureaux?.dep === dep ? bureaux.etat : null;
   const ouvrirBv = (ouvert: boolean) => {
-    if (!ouvert || bureaux !== null) return;
-    setBureaux("chargement");
-    fichierDep(m, `departements/${donnees.dep}/bureaux.json.gz`)
-      .then((b) => setBureaux(b as ColonnesDep))
-      .catch((e: unknown) => setBureaux(`Détail non disponible : ${e instanceof Error ? e.message : String(e)}`));
+    if (!ouvert || etatBv !== null) return;
+    const d = dep;
+    // Garde : un résultat arrivé après un changement de département est ignoré.
+    const poser = (etat: Bureaux["etat"]) => setBureaux((b) => (b?.dep === d ? { dep: d, etat } : b));
+    setBureaux({ dep: d, etat: "chargement" });
+    fichierDep<ColonnesDep>(m, `departements/${d}/bureaux.json.gz`)
+      .then(poser)
+      .catch((e: unknown) => poser(`Détail non disponible : ${e instanceof Error ? e.message : String(e)}`));
   };
-  const bv = typeof bureaux === "object" && bureaux !== null && choixBv !== null ? lignesBureaux(m, bureaux, code, choixBv) : [];
+  const bv = typeof etatBv === "object" && etatBv !== null && choixBv !== null ? lignesBureaux(m, etatBv, code, choixBv) : [];
 
   const copier = async () => {
     try {
@@ -373,11 +393,11 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
           Niveau : commune (bureaux de vote agrégés). {m.licence_base.mention} Export du {date(m.date_export)}.
         </Source>
 
-        <details className="details-bv" onToggle={(e) => ouvrirBv(e.currentTarget.open)}>
+        <details key={dep} className="details-bv" onToggle={(e) => ouvrirBv(e.currentTarget.open)}>
           <summary>Détail par bureau de vote</summary>
-          {bureaux === "chargement" && <p aria-busy="true">Chargement des bureaux de vote…</p>}
-          {typeof bureaux === "string" && bureaux !== "chargement" && <p className="erreur-detail">{bureaux}</p>}
-          {typeof bureaux === "object" && bureaux !== null && (
+          {etatBv === "chargement" && <p aria-busy="true">Chargement des bureaux de vote…</p>}
+          {typeof etatBv === "string" && etatBv !== "chargement" && <p className="erreur-detail">{etatBv}</p>}
+          {typeof etatBv === "object" && etatBv !== null && (
             <>
               <div className="champ">
                 <label className="libelle" htmlFor="fiche-bv">
@@ -487,7 +507,10 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
         <Source m={m} cles={["datan", "senat", "circos"]}>
           Élus en cours de mandat ; bloc : celui du groupe parlementaire pour la législature (non-inscrits : bloc
           de leur nuance d'élection). Sénat : composition chargée avant le renouvellement du 27 septembre 2026.
-          Circonscriptions : intersection des contours de la commune et des circonscriptions (découpage de 2010).
+          Circonscriptions : intersection des contours de la commune et des circonscriptions (découpage de 2010) ;
+          une circonscription est retenue si elle couvre au moins 1 % de la surface communale.
+          {info.circos_origine === "resultats" &&
+            " Pour cette commune, sans contour commun avec une circonscription : circonscription de ses derniers résultats législatifs."}
         </Source>
       </section>
 
@@ -564,7 +587,10 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
           </table>
         )}
         <Source m={m} cles={["insee_filosofi_rp", "cnaf", "drees"]}>
-          Niveau : commune. APL : consultations accessibles par an et par habitant.
+          Niveau : commune. APL : consultations accessibles par an et par habitant. Les millésimes 2015 et
+          2016 du taux de chômage (reconstitués dans la page Économie de Streamlit) ne sont pas repris ici.
+          Indicateurs publiés sous le code d'une ancienne commune : non repris (des taux ne s'additionnent
+          pas).
         </Source>
       </section>
     </>

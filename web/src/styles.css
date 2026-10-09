@@ -746,3 +746,12 @@ h3 {
     min-width: 560px;
   }
 }
+
+/* Mouvement réduit : aucune transition sur la fiche (les durées des jetons passent déjà à 0). */
+@media (prefers-reduced-motion: reduce) {
+  .tri,
+  .details-bv summary,
+  .liste-communes button {
+    transition: none;
+  }
+}

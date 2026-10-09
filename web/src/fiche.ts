@@ -19,9 +19,13 @@ export type InfoCommune = {
   nom: string;
   epci: string | null;
   circos: string[];
+  /** `contours` (intersection) ; `resultats` (repli : derniers résultats législatifs) ; `null` : aucune. */
+  circos_origine: "contours" | "resultats" | null;
   population: [number, number | null][];
   /** Rang du scrutin (chaîne) -> codes des anciennes communes rattachées. */
   fusions: Record<string, string[]>;
+  /** Code -> nom de l'ancienne commune (COG INSEE) ; `null` si le nom manque. */
+  noms_anciennes: Record<string, string | null>;
   /** `null` : hors périmètre (Hauts-de-France seulement). */
   economie: Record<string, (number | null)[]> | null;
 };
@@ -175,11 +179,12 @@ export function blocEnTete(l: Ligne): string | null {
 }
 
 /** Mention des communes rattachées (garde-fou : commune fusionnée signalée). */
-export function mentionFusion(anciennes: string[]): string | null {
+export function mentionFusion(anciennes: string[], noms: Record<string, string | null> = {}): string | null {
   if (anciennes.length === 0) return null;
+  const libelles = anciennes.map((c) => (noms[c] ? `${noms[c]} (${c})` : `de code INSEE ${c}`));
   return anciennes.length === 1
-    ? `Inclut les résultats de l'ancienne commune ${anciennes[0]} (code INSEE)`
-    : `Inclut les résultats des anciennes communes ${anciennes.join(", ")} (codes INSEE)`;
+    ? `Inclut les résultats de l'ancienne commune ${libelles[0]}`
+    : `Inclut les résultats des anciennes communes ${libelles.join(", ")}`;
 }
 
 /** Dernière valeur renseignée d'un indicateur économique : [année, valeur] ou `null`. */

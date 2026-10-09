@@ -88,8 +88,11 @@ describe("fiche commune", () => {
 
   it("mentionne les communes rattachées et la dernière valeur économique", () => {
     expect(mentionFusion([])).toBeNull();
-    expect(mentionFusion(["80830"])).toContain("ancienne commune 80830");
-    expect(mentionFusion(["1", "2"])).toContain("anciennes communes 1, 2");
+    expect(mentionFusion(["80830"], { "80830": "Yaucourt-Bussus" })).toBe(
+      "Inclut les résultats de l'ancienne commune Yaucourt-Bussus (80830)",
+    );
+    expect(mentionFusion(["80830"])).toBe("Inclut les résultats de l'ancienne commune de code INSEE 80830");
+    expect(mentionFusion(["1", "2"], { "1": "A", "2": null })).toContain("anciennes communes A (1), de code INSEE 2");
     expect(derniereValeur({ annee: [2020, 2021, 2022], x: [1, 2, null] }, "x")).toEqual([2021, 2]);
     expect(derniereValeur({ annee: [2020], x: [null] }, "x")).toBeNull();
   });
