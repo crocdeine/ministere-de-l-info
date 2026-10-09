@@ -260,3 +260,7 @@ constat est vérifié par une requête ou un test avant d'être retenu.
 - Le disque externe USB est lent pour des milliers de petits fichiers : `import streamlit, plotly`
   peut y dépasser 2 min. Un délai d'attente doit avoir une large marge (5 min) et un message.
 - Un test « HTTP 200 » sur Streamlit ne prouve que la coquille : vérifier une page réelle (AppTest).
+
+- Le disque externe s'est rempli deux fois (téléchargements personnels) : export de tuiles tronqué,
+  compilations en échec. Toute écriture lourde est désormais précédée d'un contrôle de 10 Go libres
+  (`MINISTERE_ESPACE_MIN_GO`) ; aucun nettoyage automatique.
