@@ -1,59 +1,98 @@
-import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { Component, lazy, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
 import type { Scrutin } from "./donnees";
 import type { Etat } from "./etats";
 import type { Ancre } from "./markdown";
 import "./methodologie.css";
 
-// Contenu du panneau chargé à la demande (texte et tables hors du JS initial).
-const Methodologie = lazy(() => import("./Methodologie"));
+/** Échec de chargement du contenu (morceau paresseux) : message et nouvel essai, jamais de page blanche. */
+class Repli extends Component<{ reessayer: () => void; children: ReactNode }, { echec: boolean }> {
+  state = { echec: false };
+  static getDerivedStateFromError() {
+    return { echec: true };
+  }
+  render() {
+    if (!this.state.echec) return this.props.children;
+    return (
+      <p className="alerte" role="alert">
+        Méthodologie indisponible.{" "}
+        <button type="button" className="lien-methode" onClick={this.props.reessayer}>
+          Réessayer
+        </button>
+      </p>
+    );
+  }
+}
 
-/**
- * Ouvre le panneau Méthodologie à la section `ancre`, sans quitter la vue (ADR-0016, point 6 ;
- * décision du 2026-10-07, point 5). Fenêtre modale native : Échap et « Fermer » la referment.
- */
-export function LienMethode({ ancre, className, titre, children }: { ancre: Ancre; className: string; titre?: string; children: ReactNode }) {
+/** Panneau unique de la page : une seule fenêtre `<dialog>`, quel que soit le nombre de liens. */
+function Panneau({ initiale, enregistrer }: { initiale: Ancre; enregistrer: (f: (a: Ancre) => void) => void }) {
   const panneau = useRef<HTMLDialogElement>(null);
+  const [ancre, setAncre] = useState<Ancre>(initiale);
   const [ouvert, setOuvert] = useState(false);
+  const [essai, setEssai] = useState(0);
+  const fondPresse = useRef(false);
+  // Contenu chargé à la demande ; recréé à chaque nouvel essai (React garde l'échec d'un `lazy`).
+  const Methodologie = useMemo(() => lazy(() => import("./Methodologie")), [essai]);
+
+  useEffect(() => {
+    const ouvrir = (a: Ancre) => {
+      setAncre(a);
+      setOuvert(true);
+      if (!panneau.current?.open) panneau.current?.showModal();
+    };
+    enregistrer(ouvrir);
+    ouvrir(initiale);
+  }, [enregistrer, initiale]);
+
   return (
-    <>
-      <button
-        type="button"
-        className={className}
-        title={titre}
-        aria-haspopup="dialog"
-        onClick={() => {
-          setOuvert(true);
-          panneau.current?.showModal();
-        }}
-      >
-        {children}
-      </button>
-      {/* Portail : un <dialog> ne peut pas être imbriqué dans un paragraphe de légende. */}
-      {createPortal(
-      <dialog
-        ref={panneau}
-        className="panneau-methodologie"
-        aria-label="Méthodologie"
-        onClose={() => setOuvert(false)}
-        // Clic sur le fond (hors du contenu) : fermeture.
-        onClick={(e) => e.target === panneau.current && panneau.current.close()}
-      >
-        <div className="panneau-barre">
-          <p className="overline">Méthodologie</p>
-          <button type="button" className="panneau-fermer" onClick={() => panneau.current?.close()}>
-            Fermer
-          </button>
-        </div>
-        {ouvert && (
+    <dialog
+      ref={panneau}
+      className="panneau-methodologie"
+      aria-label="Méthodologie"
+      onClose={() => setOuvert(false)}
+      // Clic sur le fond : fermeture seulement si l'appui et le relâchement y ont lieu tous deux
+      // (une sélection de texte commencée dans le panneau ne le ferme pas).
+      onPointerDown={(e) => (fondPresse.current = e.target === panneau.current)}
+      onPointerUp={(e) => {
+        if (fondPresse.current && e.target === panneau.current) panneau.current.close();
+        fondPresse.current = false;
+      }}
+    >
+      <div className="panneau-barre">
+        <p className="overline">Méthodologie</p>
+        <button type="button" className="panneau-fermer" onClick={() => panneau.current?.close()}>
+          Fermer
+        </button>
+      </div>
+      {ouvert && (
+        <Repli key={essai} reessayer={() => setEssai((n) => n + 1)}>
           <Suspense fallback={<p aria-busy="true">Chargement…</p>}>
             <Methodologie ancre={ancre} />
           </Suspense>
-        )}
-      </dialog>,
-      document.body,
+        </Repli>
       )}
-    </>
+    </dialog>
+  );
+}
+
+let ouvrirPanneau: ((a: Ancre) => void) | null = null;
+
+/** Ouvre le panneau Méthodologie à la section `ancre` (racine React propre, créée au premier appel). */
+export function ouvrirMethodologie(ancre: Ancre) {
+  if (ouvrirPanneau) return ouvrirPanneau(ancre);
+  const hote = document.body.appendChild(document.createElement("div"));
+  createRoot(hote).render(<Panneau initiale={ancre} enregistrer={(f) => (ouvrirPanneau = f)} />);
+}
+
+/**
+ * Bouton qui ouvre la Méthodologie à la section `ancre`, sans quitter la vue (ADR-0016, point 6 ;
+ * décision du 2026-10-07, point 5). Fenêtre modale native : Échap et « Fermer » la referment.
+ */
+export function LienMethode({ ancre, className, titre, children }: { ancre: Ancre; className: string; titre?: string; children: ReactNode }) {
+  return (
+    <button type="button" className={className} title={titre} aria-haspopup="dialog" onClick={() => ouvrirMethodologie(ancre)}>
+      {children}
+    </button>
   );
 }
 

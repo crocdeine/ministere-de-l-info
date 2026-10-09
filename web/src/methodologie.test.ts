@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { ANCRES, analyser, ancres, morceaux } from "./markdown";
+import { ANCRES, analyser, ancres, lienSur, morceaux } from "./markdown";
 
 const texte = readFileSync(new URL("../../docs/methodologie.md", import.meta.url), "utf8");
 const blocs = analyser(texte);
@@ -45,6 +45,16 @@ describe("Méthodologie (docs/methodologie.md)", () => {
 });
 
 describe("analyseur Markdown", () => {
+  it("ne produit de lien que pour #, http: et https:", () => {
+    expect(morceaux("[x](javascript:alert(1))")).toEqual([{ t: "texte", v: "x" }, { t: "texte", v: ")" }]);
+    expect(morceaux("[x](data:text/html,a)")).toEqual([{ t: "texte", v: "x" }]);
+    expect(lienSur("javascript:alert(1)")).toBe(false);
+    expect(lienSur("pas une url")).toBe(false);
+    expect(lienSur("https://www.insee.fr/")).toBe(true);
+    expect(lienSur("http://exemple.fr/")).toBe(true);
+    expect(lienSur("#blocs")).toBe(true);
+  });
+
   it("reconnaît titres, listes, tableaux, sources et morceaux en ligne", () => {
     const b = analyser("## Titre {#t}\n\nUn **gras** et `code`.\n\n- a\n- b\n\n| X | Y |\n|---|---|\n| 1 | 2 |\n\nSource : ADR.\n");
     expect(b.map((x) => x.t)).toEqual(["titre", "p", "ul", "table", "source"]);

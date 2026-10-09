@@ -60,6 +60,16 @@ export type Morceau =
   | { t: "code"; v: string }
   | { t: "lien"; v: string; cible: string };
 
+/** Seules les ancres internes et les adresses http(s) deviennent des liens. */
+export function lienSur(cible: string): boolean {
+  if (cible.startsWith("#")) return true;
+  try {
+    return ["https:", "http:"].includes(new URL(cible).protocol);
+  } catch {
+    return false;
+  }
+}
+
 export function morceaux(texte: string): Morceau[] {
   const res: Morceau[] = [];
   const motif = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g;
@@ -68,7 +78,8 @@ export function morceaux(texte: string): Morceau[] {
     if (m.index > debut) res.push({ t: "texte", v: texte.slice(debut, m.index) });
     if (m[1] !== undefined) res.push({ t: "gras", v: m[1] });
     else if (m[2] !== undefined) res.push({ t: "code", v: m[2] });
-    else res.push({ t: "lien", v: m[3] as string, cible: m[4] as string });
+    else if (lienSur(m[4] as string)) res.push({ t: "lien", v: m[3] as string, cible: m[4] as string });
+    else res.push({ t: "texte", v: m[3] as string }); // schéma refusé (javascript:, data:…) : texte simple
     debut = m.index + m[0].length;
   }
   if (debut < texte.length) res.push({ t: "texte", v: texte.slice(debut) });

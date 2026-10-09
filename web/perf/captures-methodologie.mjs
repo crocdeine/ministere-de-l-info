@@ -31,6 +31,11 @@ try {
       await page.locator(".lien-methode").first().click();
       await page.locator("dialog[open] #blocs").waitFor({ timeout: 15000 });
       console.log("lien « Méthode » : panneau ouvert sur #blocs ; hash :", await page.evaluate(() => location.hash));
+      const n = await page.locator("dialog").count();
+      if (n !== 1) throw new Error(`${n} fenêtres <dialog> (attendu : 1)`);
+      await page.mouse.click(20, 450); // fond, hors du panneau
+      if (await page.locator("dialog[open]").count()) throw new Error("panneau non refermé par un clic sur le fond");
+      console.log("une seule fenêtre ; fermeture par clic sur le fond : ok");
     }
   }
 } finally {

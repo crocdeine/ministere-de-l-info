@@ -3,7 +3,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import texte from "../../docs/methodologie.md?raw";
 import { chargerManifeste, ErreurDonnees, entier, lireJsonGz, type Manifeste, urlDonnees } from "./donnees";
-import { analyser, type Bloc, morceaux } from "./markdown";
+import { analyser, type Bloc, lienSur, morceaux } from "./markdown";
 
 type Donnees = {
   sources: { donnees: string; producteur: string; licence: string; url: string }[];
@@ -195,9 +195,14 @@ export default function Methodologie({ ancre }: { ancre: string }) {
                   s.donnees,
                   s.producteur,
                   s.licence,
-                  <a href={s.url} target="_blank" rel="noreferrer">
-                    {new URL(s.url).hostname}
-                  </a>,
+                  // URL non http(s) ou invalide : texte simple, jamais de lien.
+                  lienSur(s.url) && !s.url.startsWith("#") ? (
+                    <a href={s.url} target="_blank" rel="noreferrer">
+                      {new URL(s.url).hostname}
+                    </a>
+                  ) : (
+                    s.url
+                  ),
                 ])}
               />
             ),
