@@ -60,6 +60,15 @@ for (const [nom, type] of [["webkit", webkit], ["chromium", chromium]]) {
     verifie(`${nom} Paris économie hors périmètre`, paris.includes("Hauts-de-France uniquement"));
     verifie(`${nom} Paris circonscriptions`, paris.includes("18 circonscriptions"));
 
+    // 5 bis. Commune fusionnée : nom de l'ancienne commune ; outre-mer : département nommé.
+    await page.goto(`${BASE}#/commune?code=80155`);
+    await page.locator("#fiche-type").waitFor({ timeout: 15000 });
+    await page.selectOption("#fiche-type", "");
+    await page.getByText("ancienne commune Yaucourt-Bussus (80830)").first().waitFor({ timeout: 5000 }).catch(() => echecs.push(`${nom} nom de l'ancienne commune`));
+    await page.goto(`${BASE}#/commune?code=97502`);
+    await page.locator("h1", { hasText: "Saint-Pierre" }).waitFor({ timeout: 15000 });
+    verifie(`${nom} 975`, ((await page.locator("main").textContent()) ?? "").includes("Saint-Pierre-et-Miquelon (975)"));
+
     // 6. Codes invalide ou inconnu : message, jamais d'écran vide.
     await page.goto(`${BASE}#/commune?code=1001`);
     await page.getByText("Commune inconnue").waitFor({ timeout: 5000 }).catch(() => echecs.push(`${nom} code invalide`));
