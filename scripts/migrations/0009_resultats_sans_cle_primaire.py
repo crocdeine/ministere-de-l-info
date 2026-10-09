@@ -50,6 +50,9 @@ def appliquer(con: duckdb.DuckDBPyConnection) -> list[str]:
 
 
 def main() -> None:
+    from ministere_de_l_info.espace_disque import verifier_espace
+
+    verifier_espace(get_settings().db_path.parent)
     db_path = get_settings().db_path
     if not db_path.exists():
         logger.error("Base introuvable : %s", db_path)

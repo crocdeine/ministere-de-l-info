@@ -150,6 +150,9 @@ def _print_summary(con) -> None:
 
 
 def main() -> None:
+    from ministere_de_l_info.espace_disque import verifier_espace
+
+    verifier_espace(_DB_PATH.parent)
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument(
         "--perimetre",

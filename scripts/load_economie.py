@@ -254,6 +254,9 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    from ministere_de_l_info.espace_disque import verifier_espace
+
+    verifier_espace(_DB_PATH.parent)
     args = _parse_args()
 
     millesimes: list[int] | None = None

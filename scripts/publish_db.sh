@@ -43,12 +43,24 @@ file_size() {
     stat -f%z "$1" 2>/dev/null || stat -c%s "$1"
 }
 
+# Garde d'espace disque : refuse de compresser sous le seuil (défaut 10 Go)
+verifier_espace() {
+    local min_go="${MINISTERE_ESPACE_MIN_GO:-10}" libre_ko
+    libre_ko=$(df -Pk "$1" | awk 'NR==2 {print $4}')
+    if ! awk -v l="$libre_ko" -v m="$min_go" 'BEGIN { exit !(l * 1024 >= m * 1e9) }'; then
+        echo "ERREUR : espace disque insuffisant sur $1 : $((libre_ko / 1048576)) Go libres, seuil ${min_go} Go (MINISTERE_ESPACE_MIN_GO)" >&2
+        exit 1
+    fi
+}
+
 # Vérifier que la DB source existe
 if [ ! -f "$DB_FILE" ]; then
     echo "ERREUR : $DB_FILE introuvable" >&2
     echo "Lancer l'ETL d'abord : uv run python scripts/etl_territoires.py --yes" >&2
     exit 1
 fi
+
+verifier_espace "$DATA_DIR"
 
 DB_SIZE=$(du -h "$DB_FILE" | cut -f1)
 log "DB source : $DB_FILE ($DB_SIZE)"

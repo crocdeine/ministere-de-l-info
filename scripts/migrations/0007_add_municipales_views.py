@@ -45,6 +45,9 @@ _DB_PATH = get_settings().db_path
 
 
 def main() -> None:
+    from ministere_de_l_info.espace_disque import verifier_espace
+
+    verifier_espace(_DB_PATH.parent)
     if not _DB_PATH.exists():
         logger.error("Base introuvable : %s", _DB_PATH)
         sys.exit(1)
