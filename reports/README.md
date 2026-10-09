@@ -25,6 +25,7 @@ sommaire (`grep -n '^## ' <fichier>`) avant d'ouvrir une section.
 |---|---|---|
 | [ui-vague-a-socle-web-2026-10-07.md](ui-vague-a-socle-web-2026-10-07.md) | Vague A, lot A1 : export web France entière, application web (carte Élections), CI `web`, mesures du budget | 9 Ko |
 | [ui-vague-a-url-etat-2026-10-09.md](ui-vague-a-url-etat-2026-10-09.md) | Vague A, lot A2 : état de la vue dans l'URL, copier le lien, e2e WebKit/Chromium | 2 Ko |
+| [ui-vague-a-fiche-commune-2026-10-09.md](ui-vague-a-fiche-commune-2026-10-09.md) | Vague A, lot A3 : fiche commune web (historique, ruptures, bureaux de vote, élus, économie), export `fiches.json.gz`, schéma 3 | 4 Ko |
 | [session-2026-10-07_v1-recap.md](session-2026-10-07_v1-recap.md) | Récapitulatif : vague B en production, versions 1.0.0 puis 1.0.1, outillage | 4 Ko |
 | [release-v1-installateur-2026-10-07.md](release-v1-installateur-2026-10-07.md) | Version 1.0 : installateur en une commande, scénario de test, liste de publication | 6 Ko |
 | [synthese-brainstorm-fonctionnalites-2026-10-06.md](synthese-brainstorm-fonctionnalites-2026-10-06.md) | Synthèse de l'équipe de réflexion : feuille de route A-D, garde-fous, 9 décisions | 5 Ko |

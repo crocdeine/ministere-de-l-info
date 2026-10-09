@@ -264,3 +264,11 @@ constat est vérifié par une requête ou un test avant d'être retenu.
 - Le disque externe s'est rempli deux fois (téléchargements personnels) : export de tuiles tronqué,
   compilations en échec. Toute écriture lourde est désormais précédée d'un contrôle de 10 Go libres
   (`MINISTERE_ESPACE_MIN_GO`) ; aucun nettoyage automatique.
+
+### Application web : ports de test partagés et codes de Corse (2026-10-09, lot A3)
+
+- Plusieurs agents lancent `vite preview` en parallèle : un port déjà pris (4174) fait échouer
+  `--strictPort` silencieusement et le test interroge le serveur d'un **autre** build. Chaque
+  script e2e a son port (`fiche.mjs` 4175, `captures.mjs` 4177 ; `url.mjs` accepte `PORT=`).
+- `v_elus_actuels` porte les députés de Corse en `2a`/`2b` (minuscules, source Datan) : toute
+  jointure par département doit comparer en capitales (`upper(code_departement)`).
