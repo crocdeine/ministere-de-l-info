@@ -28,7 +28,7 @@ inscrits, tour, circonscription, EPCI…). Chaque visualisation renvoie à la se
 | Fichier | Action | Raison |
 |---|---|---|
 | `docs/methodologie.md` | créer | texte source unique (Markdown), versionné et relu |
-| `src/ministere_de_l_info/export_web/` | modifier | export de la table des sources et de la table nuance → bloc (229 correspondances) en JSON |
+| `src/ministere_de_l_info/export_web/` | modifier | export de la table des sources et de la table nuance → bloc (384 correspondances et 57 classements individuels, mesure en base du 2026-10-09) en JSON |
 | `web/src/pages/Methodologie.tsx` | créer | rendu du Markdown (sans bibliothèque si possible : texte compilé au build) + ancres |
 
 ## Tâches

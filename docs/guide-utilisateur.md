@@ -193,6 +193,17 @@ propres sélecteurs, placés au-dessus de la carte.
   Roubaix, Tourcoing, etc. en sont absentes). Ce n'est pas une erreur de l'application.
 - **Pas de clic sur la carte** pour ouvrir le détail : utiliser les listes déroulantes.
 
+### Nouvelle application : panneau Méthodologie
+
+Dans la nouvelle application (page Élections), l'étiquette placée à côté du titre de la carte
+(« Grille officielle » ou « Reconstruit ») est un bouton : elle ouvre le panneau
+**Méthodologie** par-dessus la page, sans la quitter. Les liens « Méthode » sous la légende et
+« Ruptures entre scrutins » (mention « Limite ») ouvrent le même panneau à la bonne section.
+Le panneau explique les sources, le classement en blocs, les calculs, les valeurs absentes, les
+ruptures et les limites, avec un glossaire et la table consultable des correspondances
+nuance → bloc (filtre par année). Fermeture : bouton « Fermer », touche Échap ou clic hors du
+panneau. Captures : `docs/captures/a5/`. Texte source : `docs/methodologie.md`.
+
 ---
 
 ## Législatif
