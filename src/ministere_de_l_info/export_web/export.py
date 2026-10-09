@@ -465,13 +465,15 @@ def exporter(
             _ecrire_scrutins(con, prepa, fichiers)
             logger.info("Scrutins écrits (%.1f s)", time.perf_counter() - t0)
             _ecrire_departements(con, prepa, fichiers, departements)
-            ecrire_fiches(con, prepa, lambda c, x: _json_gz(c, x, fichiers, prepa))
+            ecarts_fiches = ecrire_fiches(con, prepa, lambda c, x: _json_gz(c, x, fichiers, prepa))
             logger.info("Départements écrits (%.1f s)", time.perf_counter() - t0)
             if tippecanoe:
                 _ecrire_tuiles(con, prepa, tippecanoe, detail_bas)
                 fichiers["communes.pmtiles"] = {}
                 logger.info("Tuiles écrites (%.1f s)", time.perf_counter() - t0)
             manifeste = _manifeste(con, departements, communes.height)
+            # Données non affichées dans les fiches (élus hors communes, économie d'anciennes communes).
+            manifeste["perimetre"] |= ecarts_fiches
         finally:
             con.close()
         _empreintes(prepa, fichiers)

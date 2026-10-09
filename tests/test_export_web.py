@@ -225,6 +225,13 @@ def test_fiches(export: Path, echantillon_con: duckdb.DuckDBPyConnection) -> Non
         assert (c["economie"] is None) == (code not in avec_eco)
         assert all(len(x) == 2 and (x[1] is None or x[1] > 0) for x in c["population"])
         assert all(cir.startswith("80-") for cir in c["circos"])
+        assert c["circos_origine"] in {"contours", "resultats", None}
+        assert bool(c["circos"]) == (c["circos_origine"] is not None)
+        anciennes = {a for liste in c["fusions"].values() for a in liste}
+        assert set(c["noms_anciennes"]) == anciennes
+    # Données non affichées : comptées dans le manifeste, jamais réparties.
+    assert isinstance(m["perimetre"]["elus_hors_perimetre"], int)
+    assert isinstance(m["perimetre"]["economie_communes_anciennes"], int)
     assert all(e["chambre"] in {"AN", "SENAT"} for e in f["elus"])
     assert all((e["circo"] is None) == (e["chambre"] == "SENAT") for e in f["elus"])
 
