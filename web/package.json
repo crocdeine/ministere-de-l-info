@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "budget": "node perf/budget.mjs",
     "mesure": "node perf/mesure.mjs",
+    "e2e:url": "node perf/url.mjs",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

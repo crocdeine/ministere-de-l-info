@@ -302,6 +302,21 @@ de 15 à 64 ans.
 
 ---
 
+## Application web (Mac) : copier le lien d'une vue
+
+Dans la page Élections de l'application web, le scrutin et la commune choisie sont inscrits dans
+l'adresse (par exemple `#/elections?scrutin=2022_pres_t2&commune=80021`). Le bouton
+**Copier le lien de cette vue** place cette adresse dans le presse-papiers ; la coller dans le
+navigateur rouvre exactement la même vue. Le bouton « Retour » du navigateur ramène à la commune
+précédente. Une valeur invalide (scrutin inconnu, code commune sans zéro de tête comme `1001`)
+est ignorée et un message l'indique.
+
+Limites : le zoom et le centre de la carte ne sont pas conservés. Dans l'application Mac, le lien
+copié commence par `tauri://localhost` : il se conserve comme texte mais ne s'ouvre pas depuis
+l'extérieur de l'application (pas de schéma d'URL macOS pour l'instant).
+
+---
+
 ## Comprendre les sources
 
 | Domaine | Source |
