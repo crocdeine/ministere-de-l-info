@@ -38,6 +38,7 @@ cité doit toujours être lu dans le code ou la source. On lit **moins**, pas **
   `agy -p "<consigne ou contenu de la fiche>" --model gemini-3.1-pro-high --mode plan --add-dir <dossier des entrées> --output-format json --print-timeout 1200s`
   depuis le dépôt ou le worktree. Les commandes shell non autorisées sont refusées en mode `-p`
   (réglages : `~/.gemini/antigravity-cli/settings.json`, liste minimale du 2026-10-07).
+- Procédure outillée (script, journal, modèles, vérification) : skill `deleguer-agy`.
 - **Toute sortie est vérifiée avant usage** : première relecture (vague B) = 1 constat juste sur 3,
   deux faux « critiques ». Jamais de « validé » repris sans relancer soi-même tests et lint.
 

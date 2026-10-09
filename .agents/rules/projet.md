@@ -1,3 +1,7 @@
+---
+trigger: model_decision
+description: Règles du projet ministere-de-l-info (lecture seule, pas de classement politique, conventions, aucune image générée sans validation)
+---
 # ministere-de-l-info — règles pour Antigravity
 
 - Lire `CLAUDE.md` (contexte, stack, conventions, gotchas) avant toute analyse.
@@ -9,3 +13,4 @@
 - Conventions utiles : skills `.claude/skills/projet-conventions`, `data-viz-politique`,
   `insee-duckdb-loader` (lecture directe des `SKILL.md`).
 - Réponses en français, concises.
+- Ne génère aucune image ni vidéo sans validation explicite de Mathias.

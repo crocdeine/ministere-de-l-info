@@ -264,3 +264,7 @@ constat est vérifié par une requête ou un test avant d'être retenu.
 - Le disque externe s'est rempli deux fois (téléchargements personnels) : export de tuiles tronqué,
   compilations en échec. Toute écriture lourde est désormais précédée d'un contrôle de 10 Go libres
   (`MINISTERE_ESPACE_MIN_GO`) ; aucun nettoyage automatique.
+
+- Antigravity ignore silencieusement une règle `.agents/rules/*.md` sans frontmatter `trigger` : notre
+  `projet.md` n'était pas vue. Après tout changement de règle ou de skill, tester avec
+  `agy -p "Quelles règles vois-tu ?" --mode plan --model gemini-3.8-flash-low`.

@@ -38,6 +38,12 @@ c'était déjà le cas avant cette session, rien n'a été réinstallé.
 - Constat : il a déclaré une relecture « validée » sans exécuter de tests. **Ne pas lui confier de
   validation** ; le limiter à la documentation et au rangement (règles de `docs/reprise.md`).
 
+**Pont de délégation (2026-10-09)** : `scripts/agy_deleguer.sh <modele> <mission>` (plan, sandbox, JSON,
+délai 900 s, journal `logs/agy-delegations.csv`) et skill `deleguer-agy`. `agy` lit `AGENTS.md`, la règle
+`.agents/rules/projet.md` (`trigger: model_decision`) et les skills du projet via `.agents/skills/*`
+(liens symboliques vers `.claude/skills/`, suivis par agy 1.3.2). `agy plugin import claude` : « No claude
+extensions found », rien d'importé. Ruflo non installé.
+
 ## Outils projet déjà présents
 
 - Skills projet (`.claude/skills/`, relevé du 2026-10-07) : `canvas-design`, `code-review-excellence`,
