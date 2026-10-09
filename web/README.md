@@ -18,6 +18,7 @@ npm test              # vitest (logique pure)
 npm run build         # tsc --noEmit puis build dans dist/
 npm run budget        # JS initial gzip < 450 Ko (bloquant en CI)
 npm run e2e:url       # état dans l'URL : lien, rechargement, retour arrière (WebKit + Chromium)
+npm run e2e:fiche     # fiche commune : URL, carte, ruptures, bureaux de vote (données : dép. 80 et 75)
 npm run mesure        # WebKit sans fenêtre : ouverture, données, changement de tour, mémoire
 ```
 
@@ -30,12 +31,13 @@ Options : `--strict` (échec au-delà des seuils de l'ADR-0015), `--changements 
 
 | Fichier | Rôle |
 |---|---|
-| `src/donnees.ts` | type unique du manifeste (schéma 2), contrôle de version, lecture des JSON gzip vérifiés (`sha256_brut`), formats français |
+| `src/donnees.ts` | type unique du manifeste (schéma 3), contrôle de version, lecture des JSON gzip vérifiés (`sha256_brut`), formats français |
 | `src/etats.ts` | états de la carte (blocs, égalité, non classé, n.d., aucun scrutin), choix du tour, expression de couleur |
 | `src/Carte.tsx`, `src/bascule.ts` | MapLibre, tuiles PMTiles ; changement de tour et fondu croisé (logique pure, testée) |
 | `src/recherche.ts` | choix d'une commune au clavier (nom ou code), en attendant le lot A4 |
 | `src/maplibre.ts` | chargement de MapLibre (fichiers ESM d'origine), lecture de l'archive en mémoire sous Tauri |
 | `src/worker/details.ts` | résultats détaillés de l'infobulle, décodés hors du thread principal |
+| `src/FicheCommune.tsx`, `src/fiche.ts`, `src/GraphiqueEvolution.tsx` | fiche commune (`#/commune?code=…`) : historique, ruptures (logique pure, testée), graphique SVG, bureaux de vote chargés à l'ouverture |
 | `src/PageElections.tsx`, `src/Legende.tsx`, `src/App.tsx` | page, légende et étiquette de méthode, navigation |
 | `src/mesure.ts`, `perf/` | instrumentation (`?mesure=1`), budget de taille, mesures WebKit |
 
