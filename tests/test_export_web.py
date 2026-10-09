@@ -19,6 +19,7 @@ from ministere_de_l_info.export_web.export import (
     TAILLE_MAX_BRUTE,
     _preparer,
 )
+from ministere_de_l_info.sources import SOURCES
 
 pytestmark = pytest.mark.spatial
 
@@ -201,3 +202,22 @@ def test_zero_voix_nd(export: Path) -> None:
                 assert etat == "."
             if etat == "x":
                 assert total is None
+
+
+def test_methodologie(export: Path, echantillon_con: duckdb.DuckDBPyConnection) -> None:
+    """Registre des sources complet, correspondances lues en base, aucun renvoi vers docs/adr/."""
+    m = json.loads((export / "manifest.json").read_text(encoding="utf-8"))
+    assert "methodologie.json.gz" in m["fichiers"]
+    assert not any("docs/adr" in s["legende"] for s in m["scrutins"])
+    meth = _lire(export / "methodologie.json.gz")
+    assert [s["donnees"] for s in meth["sources"]] == [s.donnees for s in SOURCES.values()]
+    corr = meth["correspondances"]
+    attendu = echantillon_con.execute(
+        "SELECT (SELECT COUNT(*) FROM nuances_harmonisees), "
+        "(SELECT COUNT(*) FROM candidats_presidentielle)"
+    ).fetchone()
+    assert attendu is not None
+    assert corr["origine"].count("nuance") == attendu[0] > 0
+    assert corr["origine"].count("candidat") == attendu[1]
+    assert set(corr["bloc"]) <= {"EXG", "GAU", "DIV", "CENT", "DTE", "EXD"}
+    assert all(corr["justification"])

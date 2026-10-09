@@ -11,7 +11,9 @@ Lit la base DuckDB en LECTURE SEULE (vues ``v_resultats_candidats_avec_bloc``,
 - ``scrutins/<id>.json.gz`` : résultats d'un scrutin par commune, colonnes alignées sur
   ``communes.json.gz`` (carte nationale, infobulle) ;
 - ``departements/<dep>/communes.json.gz`` et ``bureaux.json.gz`` : tous scrutins, par commune et
-  par bureau de vote (fiche territoire, lot A3).
+  par bureau de vote (fiche territoire, lot A3) ;
+- ``methodologie.json.gz`` : registre des sources (``sources.py``) et correspondances
+  nuance (ou candidat) → bloc, avec leur justification (panneau Méthodologie, lot A5).
 
 Toutes les agrégations sont faites en SQL. Absence = ``null`` (affichée « n.d. »), jamais 0.
 Participation = Σ votants / Σ inscrits (même formule que ``v_participation_commune_pres``).
@@ -39,6 +41,7 @@ from ministere_de_l_info._blocs_politiques import (
     BLOCS_ORDERED,
     COULEURS_BLOCS,
     LIBELLES_BLOCS,
+    RENVOI_METHODE,
     legende_classement_blocs,
     methode_classement,
 )
@@ -362,7 +365,8 @@ def _manifeste(
                 "tour": tour,
                 "libelle": lib,
                 "methode": methode_classement(t, a),
-                "legende": legende_classement_blocs(t, a),
+                # Le panneau Méthodologie remplace le renvoi vers l'ADR (fichier du dépôt).
+                "legende": legende_classement_blocs(t, a).removesuffix(" " + RENVOI_METHODE),
             }
             for i, t, a, tour, lib in scrutins
         ],
@@ -410,6 +414,41 @@ def _controler(
             raise ValueError(f"Tuiles : {dans_tuiles} communes pour {n_communes} attendues")
 
 
+def _ecrire_methodologie(
+    con: duckdb.DuckDBPyConnection, sortie: Path, fichiers: dict[str, dict[str, Any]]
+) -> None:
+    """Sources et correspondances → bloc, lues dans le registre et la base (jamais recopiées)."""
+    corr = con.execute(
+        """
+        -- origine : code de nuance (`nuances_harmonisees`) ou candidat / liste sans nuance
+        -- dans la source (`candidats_presidentielle` : présidentielles 2017-2022, européennes 2019).
+        SELECT annee, 'nuance' AS origine, nuance AS code, bloc, source_bloc AS justification
+        FROM nuances_harmonisees
+        UNION ALL
+        SELECT annee, 'candidat', COALESCE(libelle, nom), bloc, source_bloc
+        FROM candidats_presidentielle
+        ORDER BY annee, bloc, code
+        """
+    ).pl()
+    _json_gz(
+        sortie / "methodologie.json.gz",
+        {
+            "sources": [
+                {
+                    "donnees": s.donnees,
+                    "producteur": s.producteur,
+                    "licence": s.licence,
+                    "url": s.url,
+                }
+                for s in SOURCES.values()
+            ],
+            "correspondances": _colonnes(corr),
+        },
+        fichiers,
+        sortie,
+    )
+
+
 def _publier(prepa: Path, sortie: Path) -> None:
     """Remplace ``sortie`` par l'export préparé (renommages sur le même disque)."""
     ancien = sortie.with_name(f".{sortie.name}.ancien")
@@ -455,6 +494,7 @@ def exporter(
             _ecrire_scrutins(con, prepa, fichiers)
             logger.info("Scrutins écrits (%.1f s)", time.perf_counter() - t0)
             _ecrire_departements(con, prepa, fichiers, departements)
+            _ecrire_methodologie(con, prepa, fichiers)
             logger.info("Départements écrits (%.1f s)", time.perf_counter() - t0)
             if tippecanoe:
                 _ecrire_tuiles(con, prepa, tippecanoe, detail_bas)
