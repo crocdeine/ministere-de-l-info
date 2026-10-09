@@ -40,6 +40,13 @@
   --grey-300: #d9d9d9;
   --grey-100: #f2f2f2; /* zones sans donnée, survols */
 
+  /* Palette « Papier » (ADR-0016) : neutres chauds du DSFR, surfaces seulement.
+     Jamais sous une carte ou un graphique partisan (plaque blanche --paper). */
+  --papier-50: #f9f6f2; /* fond de section — encre 18,4:1 */
+  --papier-100: #f3ede5; /* en-tête de module, ligne survolée */
+  --papier-200: #eee4d9; /* sélection de ligne de tableau */
+  --sable-700: #6a6156; /* métadonnées sur fond papier — 5,6:1 sur --papier-50 */
+
   /* Retours (sobres : un carré de couleur + texte, jamais un fond plein) */
   --success-700: #18753c;
   --warning-700: #b34000;
@@ -63,6 +70,9 @@
   --surface-inverse: var(--ink);
   --surface-accent: var(--bleu-france);
   --surface-accent-soft: var(--blue-50);
+  --surface-section: var(--papier-50);
+  --surface-header: var(--papier-100);
+  --text-meta-warm: var(--sable-700);
 
   --border-default: var(--rule);
   --border-strong: var(--rule);
@@ -197,6 +207,7 @@
   --duration-fast: 140ms;
   --duration-base: 220ms;
   --duration-slow: 360ms;
+  --duration-map-fade: var(--duration-base); /* fondu de couleurs de la carte entre scrutins */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --transition-colors: color var(--duration-fast) var(--ease-standard),
@@ -209,6 +220,7 @@
     --duration-fast: 0ms;
     --duration-base: 0ms;
     --duration-slow: 0ms;
+    --duration-map-fade: 0ms; /* coupure explicite de chaque jeton de durée */
   }
 }
 

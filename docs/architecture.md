@@ -156,6 +156,36 @@ ministere-de-l-info/
 └── data/                           # ministere.duckdb + raw/ (caches) — non versionné
 ```
 
+## Application web (ADR-0015, vague A)
+
+Nouvelle interface, construite à côté de Streamlit (gelé) et appelée à le remplacer page par page :
+
+```
+base DuckDB (lecture seule)
+  └─ scripts/export_web.py → src/ministere_de_l_info/export_web/  (agrégats SQL, tippecanoe)
+       └─ web/public/data/  (non commité)
+            manifest.json              contrat (schéma 2) : SHA256 des fichiers et du JSON brut, sources, licences
+            communes.pmtiles           contours + état de chaque commune pour chaque tour (`s`)
+            communes.json.gz           codes et noms (ordre de référence des colonnes)
+            scrutins/<id>.json.gz      résultats par commune d'un tour (infobulle)
+            departements/<dep>/{communes,bureaux}.json.gz   tous tours (fiche territoire, A3)
+  └─ web/  Vite + React + TypeScript, MapLibre  →  web/src-tauri/  application Mac (Tauri v2)
+```
+
+- Carte : un caractère par tour dans la propriété `s` des tuiles (`a`-`f` blocs, `=` égalité,
+  `n` non classé, `.` n.d., `x` aucun scrutin ; voir `docs/schema-elections.md`) ; changement de tour par un seul
+  `setPaintProperty` ; fondu croisé de 220 ms entre deux couches (deux sources), supprimé si la
+  recoloration dépasse 100 ms ou si `prefers-reduced-motion` (`--duration-map-fade`).
+- L'interface ne calcule rien : participation et part du bloc en tête viennent de l'export.
+- Export publié atomiquement : écrit dans `.<sortie>.prepa/`, contrôlé (fichiers non vides,
+  un fichier par tour, communes des tuiles), manifeste en dernier, puis substitué à la sortie.
+- Chaque JSON lu par l'interface est vérifié contre `sha256_brut` (empreinte du JSON
+  décompressé, valable même si le serveur décompresse en route) ; l'archive de tuiles lue en
+  mémoire (Tauri) est vérifiée contre `sha256`.
+- MapLibre est servi depuis ses fichiers ESM d'origine (`public/vendor/`, copiés par
+  `vite.config.ts`) pour ne pas dupliquer son code commun dans le worker.
+- Commandes : `web/README.md`.
+
 ## Navigation et thème
 
 `app.py` est le seul script exécuté par Streamlit à chaque interaction. Il configure la
@@ -395,6 +425,7 @@ Tests shell de l'infrastructure : `deploy/tests/` (`test_native.sh`, `test_backu
 | **Lint & Format** | `ruff check .` + `ruff format --check .` |
 | **Tests & Coverage** | `uv sync --frozen --group etl`, extension `spatial` installée (cache `~/.duckdb/extensions`), `pytest` (seuil de couverture 60 %, bloquant) avec rapport de couverture en artefact |
 | **Typage (pyright basic)** | `uvx pyright@1.1.408` en mode `basic`, bloquant (0 erreur depuis le 2026-10-06) |
+| **Application web** | tippecanoe compilé (mis en cache), export de l'échantillon, `npm ci`, `tsc --noEmit`, `vitest run`, `vite build`, budget du JS initial (`perf/budget.mjs`, < 450 Ko gzip, bloquant), `npm audit --audit-level=high`, test de fumée et mesures WebKit (`perf/mesure.mjs`, temps indicatifs ; avec et sans mouvement réduit) |
 
 Les actions GitHub sont épinglées par SHA de commit ; permissions du workflow limitées à
 `contents: read`.

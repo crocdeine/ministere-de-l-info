@@ -421,6 +421,23 @@ et [l'index des circulaires](sources-officielles/nuances/index.md) pour les sour
 
 Toute modification doit être tracée (commit motivé + mise à jour de `source_bloc`).
 
+### Bloc en tête d'une commune (carte de l'application web, export `export_web`)
+
+- **Bloc en tête** = bloc qui totalise le plus de voix dans la commune, somme des voix de tous
+  les candidats ou listes du bloc (règle de la carte « bloc dominant » de Streamlit,
+  `viz/maps_elections.py`). Ce n'est pas le bloc de la liste arrivée en tête : les deux
+  diffèrent quand plusieurs listes d'un même bloc se partagent les voix. Municipales 2026,
+  1er tour : 172 communes sur 34 803 (mesure du 2026-10-08, liste = numéro de panneau,
+  égalités exclues ; la relecture du directeur compte 230 communes selon une autre méthode).
+- Voix sans bloc (nuance non classée) sommées ensemble : si elles sont en tête, l'état est
+  « non classé ». Égalité de voix entre les premiers : commune en blanc.
+- États vides : **n.d.** (lignes de résultat sans voix exploitables, dont les communes à
+  0 voix dans la source, signalées « 0 voix dans la source » dans l'infobulle) ; **aucun
+  scrutin** (aucune ligne pour la commune à ce tour : pas de second tour, commune hors du champ
+  publié, ex. municipales 2008 limitées aux communes de 3 500 habitants et plus).
+- Département d'une commune : celui des résultats (`geographies_communes` porte `NR` pour
+  97501 et 97502, les résultats `975`).
+
 ---
 
 ## Vues d'agrégation

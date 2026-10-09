@@ -47,6 +47,11 @@ _GRILLES_OFFICIELLES: dict[tuple[str, int], str] = {
 }
 
 
+def methode_classement(type_scrutin: str, annee: int) -> str:
+    """``officielle`` si le scrutin a une grille officielle de blocs, sinon ``reconstruit``."""
+    return "officielle" if (type_scrutin, annee) in _GRILLES_OFFICIELLES else "reconstruit"
+
+
 def legende_classement_blocs(type_scrutin: str, annee: int) -> str:
     """Légende honnête de l'origine du classement des blocs pour un scrutin.
 

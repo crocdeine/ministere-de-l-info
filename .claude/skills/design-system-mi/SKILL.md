@@ -36,6 +36,8 @@ Fichiers de référence (dans ce dossier de skill) :
 | Action / sélection | `--bleu-france` | `#000091` |
 | Alerte / limite | `--rouge-marianne` | `#e1000f` |
 
+**Palette « Papier » (ADR-0016, application web uniquement)** : `--papier-50` `#f9f6f2` (fond de section, `--surface-section`), `--papier-100` `#f3ede5` (en-tête de module, `--surface-header`), `--papier-200` `#eee4d9` (sélection de ligne), `--sable-700` `#6a6156` (métadonnées sur papier, `--text-meta-warm`). Jamais sous une carte ou un graphique partisan (plaque blanche `--paper`). Pas de couleur par module : numérotation « 0X — ». Étiquette de méthode « Grille officielle » / « Reconstruit » sur chaque visualisation partisane.
+
 **Data-viz — ne jamais inventer d'autres couleurs** (source unique : `_blocs_politiques.py`, `viz/_display.py`, `viz/maps_elections.py`) :
 
 - Nuances : EXG `#8b0000` · GAU `#e84c61` · DIV `#9e9e9e` · CENT `#f5b800` · DTE `#3b7dd8` · EXD `#1f3864` (ordre gauche → droite).
@@ -71,7 +73,7 @@ Une famille d'interface : **Hanken Grotesk** (400–900). Données : **IBM Plex 
 - Traits : 1 px `--ink` (structure) · 1 px `--rule-soft` (lignes de tableau).
 - Focus : `outline: 2px solid #000091; outline-offset: 3px` — jamais supprimé.
 - Cible tactile minimale : 44 px de haut.
-- Mouvement : 140–360 ms, `cubic-bezier(0.2,0,0,1)`, pas de rebond, respecter `prefers-reduced-motion`.
+- Mouvement : 140–360 ms, `cubic-bezier(0.2,0,0,1)`, pas de rebond, respecter `prefers-reduced-motion` (tous les jetons de durée, dont `--duration-map-fade`, passent à 0 ms).
 - Signe de marque unique : la flèche diagonale ↘ (SVG `M6 6 L18 18 M18 8 V18 H8`, trait 3, extrémités carrées).
 
 ## 5. Composants
