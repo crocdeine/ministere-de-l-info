@@ -80,41 +80,59 @@ export type Ligne = {
 
 const nombre = (v: number | string | null | undefined) => (typeof v === "number" ? v : null);
 
+/** Ligne `i` d'un fichier par département (commune ou bureau de vote). */
+function ligne(m: Manifeste, cols: ColonnesDep, i: number, anciennes: (rang: number) => string[]): Ligne | null {
+  const rang = nombre(cols.scrutin?.[i]);
+  const scrutin = rang === null ? undefined : m.scrutins[rang];
+  if (rang === null || !scrutin) return null;
+  const voix = [...m.blocs.map((b) => b.code), "NC"];
+  const get = (c: string) => nombre(cols[c]?.[i]);
+  const inscrits = get("inscrits");
+  const votants = get("votants");
+  const exprimes = get("exprimes");
+  const v = voix.map(get);
+  const total = v.every((x) => x === null) ? null : v.reduce<number>((a, x) => a + (x ?? 0), 0);
+  const plurinominal = total !== null && exprimes !== null && total > exprimes;
+  const calculable = total !== null && total > 0 && exprimes !== null && exprimes > 0 && !plurinominal;
+  return {
+    rang,
+    scrutin,
+    inscrits,
+    votants,
+    exprimes,
+    participation: inscrits && votants !== null ? (100 * votants) / inscrits : null,
+    parts: Object.fromEntries(
+      voix.map((c, j) => [c, calculable && v[j] !== null ? (100 * (v[j] as number)) / (exprimes as number) : null]),
+    ),
+    plurinominal,
+    nonClasseSeul: total !== null && total > 0 && get("NC") === total,
+    anciennes: anciennes(rang),
+    raisons: [],
+  };
+}
+
 /** Lignes d'une commune, dans l'ordre des scrutins (chronologique) ; `raisons` vides ici. */
 export function lignesCommune(m: Manifeste, cols: ColonnesDep, code: string, info?: InfoCommune): Ligne[] {
-  const voix = [...m.blocs.map((b) => b.code), "NC"];
   const lignes: Ligne[] = [];
   const codes = cols.code_commune ?? [];
   for (let i = 0; i < codes.length; i++) {
     if (codes[i] !== code) continue;
-    const rang = nombre(cols.scrutin?.[i]);
-    const scrutin = rang === null ? undefined : m.scrutins[rang];
-    if (rang === null || !scrutin) continue;
-    const get = (c: string) => nombre(cols[c]?.[i]);
-    const inscrits = get("inscrits");
-    const votants = get("votants");
-    const exprimes = get("exprimes");
-    const v = voix.map(get);
-    const total = v.every((x) => x === null) ? null : v.reduce<number>((a, x) => a + (x ?? 0), 0);
-    const plurinominal = total !== null && exprimes !== null && total > exprimes;
-    const calculable = total !== null && total > 0 && exprimes !== null && exprimes > 0 && !plurinominal;
-    lignes.push({
-      rang,
-      scrutin,
-      inscrits,
-      votants,
-      exprimes,
-      participation: inscrits && votants !== null ? (100 * votants) / inscrits : null,
-      parts: Object.fromEntries(
-        voix.map((c, j) => [c, calculable && v[j] !== null ? (100 * (v[j] as number)) / (exprimes as number) : null]),
-      ),
-      plurinominal,
-      nonClasseSeul: total !== null && total > 0 && get("NC") === total,
-      anciennes: info?.fusions[String(rang)] ?? [],
-      raisons: [],
-    });
+    const l = ligne(m, cols, i, (rang) => info?.fusions[String(rang)] ?? []);
+    if (l) lignes.push(l);
   }
   return lignes.sort((a, b) => a.rang - b.rang);
+}
+
+/** Bureaux de vote d'une commune pour un scrutin (`bureaux.json.gz`), par code de bureau. */
+export function lignesBureaux(m: Manifeste, cols: ColonnesDep, code: string, rang: number): (Ligne & { bv: string })[] {
+  const r: (Ligne & { bv: string })[] = [];
+  const codes = cols.code_commune ?? [];
+  for (let i = 0; i < codes.length; i++) {
+    if (codes[i] !== code || cols.scrutin?.[i] !== rang) continue;
+    const l = ligne(m, cols, i, () => []);
+    if (l) r.push({ ...l, bv: String(cols.code_bv?.[i] ?? "") });
+  }
+  return r;
 }
 
 /** Ruptures entre lignes consécutives d'une série (comparaison entre scrutins). */

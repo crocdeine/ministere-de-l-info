@@ -4,7 +4,7 @@
 import { spawn } from "node:child_process";
 import { chromium, webkit } from "playwright-core";
 
-const PORT = 4174;
+const PORT = Number(process.env.PORT ?? 4174);
 const BASE = `http://127.0.0.1:${PORT}/`;
 const serveur = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "preview", "--host", "127.0.0.1", "--port", String(PORT), "--strictPort"], { stdio: "ignore" });
 for (let i = 0; i < 100; i++) {

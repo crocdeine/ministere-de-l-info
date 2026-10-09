@@ -7,6 +7,7 @@ import {
   departementDe,
   derniereValeur,
   filtrer,
+  lignesBureaux,
   lignesCommune,
   mentionFusion,
   raisonsSerie,
@@ -25,7 +26,7 @@ const M = {
 } as unknown as Manifeste;
 
 const vide = { EXG: 0, GAU: 0, DIV: 0, CENT: 0, DTE: 0, EXD: 0, NC: 0 };
-type L = { scrutin: number; code_commune: string; inscrits: number | null; votants: number | null; exprimes: number | null } & Partial<typeof vide> & Record<string, number | string | null>;
+type L = { scrutin: number; code_commune: string; inscrits: number | null; votants: number | null; exprimes: number | null } & Partial<Record<keyof typeof vide, number | null>> & Record<string, number | string | null>;
 const colonnes = (lignes: L[]) => {
   const cles = ["scrutin", "code_commune", "inscrits", "votants", "exprimes", ...Object.keys(vide)];
   return Object.fromEntries(cles.map((c) => [c, lignes.map((l) => l[c] ?? null)]));
@@ -75,6 +76,14 @@ describe("fiche commune", () => {
     expect(tous[2]?.raisons).toContain("type");
     expect(raisonsSerie(tous)[0]).toBe("type");
     expect(raisonsSerie(avecRuptures(filtrer(l, "pres", 1)))).toEqual([]);
+  });
+
+  it("lit les bureaux de vote d'une commune pour un scrutin", () => {
+    const bv = { ...COLS, code_bv: ["0001", "0001", "0001", "0001", "0001", "0001"] };
+    const r = lignesBureaux(M, bv, "80021", 4);
+    expect(r).toHaveLength(1);
+    expect(r[0]?.bv).toBe("0001");
+    expect(r[0]?.parts.GAU).toBe(40);
   });
 
   it("mentionne les communes rattachées et la dernière valeur économique", () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { chargerManifeste, type Manifeste } from "./donnees";
+import { FicheCommune } from "./FicheCommune";
 import { PageElections } from "./PageElections";
 
 // Navigation : 5 entrées (comme l'application Streamlit). Pages non portées : renvoi vers
@@ -11,11 +12,14 @@ export const PAGES = [
   { id: "economie", numero: "03", titre: "Économie" },
   { id: "legislatif", numero: "04", titre: "Législatif" },
 ] as const;
-type IdPage = (typeof PAGES)[number]["id"];
-const PORTEES: ReadonlySet<IdPage> = new Set(["elections"]);
+// Fiche commune (lot A3) : page hors navigation, ouverte depuis la carte, la commune choisie
+// ou un lien (`#/commune?code=80021`).
+type IdPage = (typeof PAGES)[number]["id"] | "commune";
+const PORTEES: ReadonlySet<IdPage> = new Set(["elections", "commune"]);
 
 function pageCourante(): IdPage {
   const id = location.hash.replace(/^#\/?/, "").split(/[/?]/)[0];
+  if (id === "commune") return "commune";
   return PAGES.find((p) => p.id === id)?.id ?? "elections";
 }
 
@@ -72,6 +76,8 @@ export function App() {
           <p className="overline" aria-busy="true">
             Chargement…
           </p>
+        ) : page === "commune" ? (
+          <FicheCommune manifeste={manifeste} />
         ) : (
           <PageElections manifeste={manifeste} numero={info.numero} />
         )}
