@@ -40,7 +40,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
   const etats = useMemo(() => listeEtats(manifeste, token), [manifeste]);
   const [initial] = useState(() => depuisUrl(manifeste));
   const [avis, setAvis] = useState(initial.avertissements);
-  const [copie, setCopie] = useState(false);
+  const [copie, setCopie] = useState<"ok" | "echec" | null>(null);
   const [scrutin, setScrutin] = useState(() => {
     const i = manifeste.scrutins.findIndex((x) => x.id === initial.scrutin);
     return i >= 0 ? i : scrutinInitial(manifeste);
@@ -64,27 +64,39 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
     setRupture(avant?.type !== apres.type || avant.methode !== apres.methode);
     setScrutin(i);
   };
-  // État -> URL : replaceState pour le scrutin, pushState pour un changement de territoire.
+  // État -> URL : replaceState pour le scrutin, pushState pour un changement de territoire voulu
+  // par l'utilisateur. Un changement venu de l'URL (suivre) écrit déjà le hachage canonique :
+  // l'effet n'a alors rien à faire, donc jamais de pushState en retour arrière.
   const idCourant = manifeste.scrutins[scrutin]?.id;
   const communeUrl = choisie?.code;
   const precedente = useRef(communeUrl);
+  const dernierHash = useRef(location.hash);
   useEffect(() => {
     const h = ecrireUrl({ page: "elections", scrutin: idCourant, commune: communeUrl });
     if (h !== location.hash) {
-      const f = communeUrl !== precedente.current ? "pushState" : "replaceState";
-      history[f](null, "", h);
+      history[communeUrl !== precedente.current ? "pushState" : "replaceState"](null, "", h);
+      dernierHash.current = h;
     }
     precedente.current = communeUrl;
   }, [idCourant, communeUrl]);
 
-  // URL -> état (retour arrière, lien collé).
+  // URL -> état (retour arrière, lien collé) : la vue affichée est toujours celle de l'URL
+  // canonique ; scrutin inconnu ou absent = scrutin par défaut.
   useEffect(() => {
     const suivre = () => {
+      const chemin = location.hash.replace(/^#\/?/, "").split("?")[0] ?? "";
+      if (chemin !== "elections" && PAGES_URL.includes(chemin)) return; // autre page : App s'en charge
+      if (location.hash === dernierHash.current) return; // popstate + hashchange : un seul traitement
       const u = depuisUrl(manifeste);
       const i = manifeste.scrutins.findIndex((x) => x.id === u.scrutin);
-      setScrutin((a) => (i >= 0 ? i : a));
+      const cible = i >= 0 ? i : scrutinInitial(manifeste);
+      const h = ecrireUrl({ page: "elections", scrutin: manifeste.scrutins[cible]?.id, commune: u.commune });
+      if (h !== location.hash) history.replaceState(null, "", h);
+      dernierHash.current = h;
+      setScrutin(cible);
+      precedente.current = u.commune;
       setChoisie((c) => (u.commune ? (c?.code === u.commune ? c : { code: u.commune, nom: "" }) : null));
-      if (u.avertissements.length) setAvis(u.avertissements); // popstate + hashchange : ne pas effacer
+      setAvis(u.avertissements);
     };
     addEventListener("hashchange", suivre);
     addEventListener("popstate", suivre);
@@ -94,15 +106,17 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
     };
   }, [manifeste]);
 
-  const copier = () => {
-    navigator.clipboard
-      .writeText(location.href)
-      .then(() => setCopie(true))
-      .catch(() => setCopie(false));
+  const copier = async () => {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      setCopie("ok");
+    } catch {
+      setCopie("echec"); // presse-papiers absent ou refusé : l'adresse reste visible et sélectionnable
+    }
   };
   useEffect(() => {
-    if (!copie) return;
-    const t = setTimeout(() => setCopie(false), 2000);
+    if (copie !== "ok") return;
+    const t = setTimeout(() => setCopie(null), 2000);
     return () => clearTimeout(t);
   }, [copie]);
 
@@ -167,6 +181,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
   const c = codeChoisi ? details[`${codeChoisi}|${s.id}`] : undefined;
   const carChoisie = typeof c?.valeurs?.etat === "string" ? c.valeurs.etat : manifeste.codage.absent;
   const sans = manifeste.scrutins_sans_resultats;
+  const communeInconnue = !!c && c.nom === null && !c.erreur;
 
   return (
     <>
@@ -231,13 +246,22 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
         <button type="button" onClick={copier}>
           Copier le lien de cette vue
         </button>{" "}
-        <span role="status">{copie ? "Lien copié." : ""}</span>
+        <span role="status">
+          {copie === "ok" && "Lien copié."}
+          {copie === "echec" && (
+            <>
+              Copie impossible : sélectionnez l'adresse <code className="mono">{location.href}</code>
+            </>
+          )}
+        </span>
       </p>
-      {avis.map((a) => (
-        <p key={a} className="aide" role="status">
-          {a}
-        </p>
-      ))}
+      <div role="status" className="avis">
+        {[...avis, ...(communeInconnue ? [`Commune « ${choisie?.code} » inconnue dans les données.`] : [])].map((a) => (
+          <p key={a} className="aide">
+            {a}
+          </p>
+        ))}
+      </div>
 
       <section className="filtres recherche" aria-label="Choix d'une commune au clavier">
         <div className="champ">

@@ -13,6 +13,7 @@ for (let i = 0; i < 100; i++) {
 }
 
 const echecs = [];
+const location_ok = (h) => h.startsWith("#/elections?scrutin=") && !h.includes("commune");
 const verifie = (nom, ok, detail = "") => !ok && echecs.push(`${nom} ${detail}`);
 
 for (const [nom, type] of [["webkit", webkit], ["chromium", chromium]]) {
@@ -51,11 +52,36 @@ for (const [nom, type] of [["webkit", webkit], ["chromium", chromium]]) {
     await page.waitForFunction(() => location.hash.includes("commune=80021"));
     verifie(`${nom} avancer`, (await vue()).commune);
 
-    // 3. Valeurs invalides : jamais d'écran vide, messages discrets.
+    // 3. Valeurs invalides : jamais d'écran vide ; la vue affichée = scrutin par défaut = URL canonique.
+    const avis = page.locator(".avis p");
+    await page.goto(`${BASE}#/elections?scrutin=2022_pres_t2`);
+    await page.waitForFunction(() => document.querySelector("input[name=tour]:checked")?.value === "2");
+    verifie(`${nom} avis vide`, (await avis.count()) === 0 && (await page.locator(".avis[role=status]").count()) === 1);
     await page.goto(`${BASE}#/elections?scrutin=1999_xxx_t9&commune=1001`);
-    await pret();
-    await page.waitForTimeout(300);
-    verifie(`${nom} invalides`, (await page.locator("p.aide[role=status]").count()) === 2 && (await page.locator(".carte").count()) === 1);
+    await page.waitForFunction(() => !location.hash.includes("1999"));
+    const v4 = await vue();
+    verifie(`${nom} scrutin par défaut affiché`, v4.tour === "1" && location_ok(await page.evaluate(() => location.hash)), JSON.stringify(v4));
+    await avis.first().waitFor();
+    verifie(`${nom} avis`, (await avis.count()) === 2 && (await page.locator(".carte").count()) === 1);
+    // L'avis disparaît dès que l'URL est valide.
+    await page.goto(`${BASE}#/elections?scrutin=2022_pres_t2`);
+    await page.waitForFunction(() => document.querySelectorAll(".avis p").length === 0);
+
+    // 5. Code de 5 chiffres inconnu : avis « inconnue », pas de « Chargement… » infini.
+    await page.goto(`${BASE}#/elections?scrutin=2022_pres_t1&commune=99999`);
+    await page.getByText("inconnue dans les données").waitFor({ timeout: 10000 }).catch(() => echecs.push(`${nom} commune inconnue sans avis`));
+    verifie(`${nom} pas de chargement infini`, !((await page.locator(".commune-choisie").textContent()) ?? "").includes("Chargement"));
+
+    // 6. Page inconnue : hachage canonique.
+    await page.goto(`${BASE}#/nimporte`);
+    await page.waitForFunction(() => location.hash.startsWith("#/elections"));
+
+    // Copie impossible (presse-papiers absent) : message et adresse visible.
+    const p2 = await nav.newPage();
+    await p2.addInitScript(() => Object.defineProperty(navigator, "clipboard", { value: undefined }));
+    await p2.goto(`${BASE}#/elections?scrutin=2022_pres_t1`);
+    await p2.getByRole("button", { name: /Copier le lien/ }).click();
+    await p2.getByText("Copie impossible").waitFor({ timeout: 5000 }).catch(() => echecs.push(`${nom} copie impossible sans message`));
   } catch (e) {
     echecs.push(`${nom} exception ${e}`);
   } finally {
