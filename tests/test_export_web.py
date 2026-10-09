@@ -201,3 +201,43 @@ def test_zero_voix_nd(export: Path) -> None:
                 assert etat == "."
             if etat == "x":
                 assert total is None
+
+
+def test_fiches(export: Path, echantillon_con: duckdb.DuckDBPyConnection) -> None:
+    """Fiche commune : toutes les communes du département, économie `null` hors périmètre."""
+    m = json.loads((export / "manifest.json").read_text(encoding="utf-8"))
+    assert all(isinstance(s["ancien_decoupage"], bool) for s in m["scrutins"])
+    assert {"insee_pop", "datan", "senat"} <= set(m["sources"])
+    f = _lire(export / "departements" / "80" / "fiches.json.gz")
+    assert f["departement"]["code"] == "80"
+    com = _lire(export / "departements" / "80" / "communes.json.gz")
+    assert set(com["code_commune"]) <= set(f["communes"])
+    avec_eco = {
+        r[0]
+        for r in echantillon_con.execute(
+            "SELECT code_commune FROM v_economie_commune UNION "
+            "SELECT code_commune FROM v_economie_sociale_commune"
+        ).fetchall()
+    }
+    assert any(c["economie"] for c in f["communes"].values())
+    for code, c in f["communes"].items():
+        assert isinstance(code, str) and len(code) == 5
+        assert (c["economie"] is None) == (code not in avec_eco)
+        assert all(len(x) == 2 and (x[1] is None or x[1] > 0) for x in c["population"])
+        assert all(cir.startswith("80-") for cir in c["circos"])
+    assert all(e["chambre"] in {"AN", "SENAT"} for e in f["elus"])
+    assert all((e["circo"] is None) == (e["chambre"] == "SENAT") for e in f["elus"])
+
+
+def test_bureaux_somme_commune(export: Path) -> None:
+    """Pour chaque commune et chaque scrutin, la somme des bureaux de vote = la commune."""
+    com = _lire(export / "departements" / "80" / "communes.json.gz")
+    bur = _lire(export / "departements" / "80" / "bureaux.json.gz")
+    cols = ["inscrits", "votants", "exprimes", *COLONNES_VOIX]
+    somme: dict[tuple[int, str], list[int]] = {}
+    for i, cle in enumerate(zip(bur["scrutin"], bur["code_commune"], strict=True)):
+        s = somme.setdefault(cle, [0] * len(cols))
+        for j, c in enumerate(cols):
+            s[j] += bur[c][i] or 0
+    for i, cle in enumerate(zip(com["scrutin"], com["code_commune"], strict=True)):
+        assert somme.get(cle, [0] * len(cols)) == [com[c][i] or 0 for c in cols], cle
