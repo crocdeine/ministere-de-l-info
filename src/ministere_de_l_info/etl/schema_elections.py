@@ -1517,8 +1517,11 @@ PASSAGE_DDL = """
         code_ancien    VARCHAR(5) PRIMARY KEY,
         code_actuel    VARCHAR(5) NOT NULL,
         date_effet     DATE,         -- date de la dernière fusion de la chaîne
-        type_evenement VARCHAR       -- code MOD INSEE de cette fusion
-    )
+        type_evenement VARCHAR,      -- code MOD INSEE de cette fusion
+        libelle_ancien VARCHAR       -- nom de la commune disparue (LIBELLE_AV, fiche commune)
+    );
+    -- Bases antérieures au lot A3 : colonne ajoutée sans reconstruire la table.
+    ALTER TABLE communes_passage ADD COLUMN IF NOT EXISTS libelle_ancien VARCHAR;
 """
 
 
