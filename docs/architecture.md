@@ -164,11 +164,12 @@ Nouvelle interface, construite à côté de Streamlit (gelé) et appelée à le 
 base DuckDB (lecture seule)
   └─ scripts/export_web.py → src/ministere_de_l_info/export_web/  (agrégats SQL, tippecanoe)
        └─ web/public/data/  (non commité)
-            manifest.json              contrat (schéma 2) : SHA256 des fichiers et du JSON brut, sources, licences
+            manifest.json              contrat (schéma 3) : SHA256 des fichiers et du JSON brut, sources, licences
             communes.pmtiles           contours + état de chaque commune pour chaque tour (`s`)
             communes.json.gz           codes et noms (ordre de référence des colonnes)
             scrutins/<id>.json.gz      résultats par commune d'un tour (infobulle)
             departements/<dep>/{communes,bureaux}.json.gz   tous tours (fiche territoire, A3)
+            departements/<dep>/fiches.json.gz   identité, circonscriptions, population, économie, élus, communes rattachées (fiches.py)
             methodologie.json.gz       registre des sources + correspondances → bloc (panneau Méthodologie, A5)
   └─ web/  Vite + React + TypeScript, MapLibre  →  web/src-tauri/  application Mac (Tauri v2)
 ```
@@ -177,7 +178,12 @@ base DuckDB (lecture seule)
   `n` non classé, `.` n.d., `x` aucun scrutin ; voir `docs/schema-elections.md`) ; changement de tour par un seul
   `setPaintProperty` ; fondu croisé de 220 ms entre deux couches (deux sources), supprimé si la
   recoloration dépasse 100 ms ou si `prefers-reduced-motion` (`--duration-map-fade`).
-- L'interface ne calcule rien : participation et part du bloc en tête viennent de l'export.
+- L'interface ne calcule rien sur la carte : participation et part du bloc en tête viennent de
+  l'export. La fiche commune (`#/commune?code=80021`, `web/src/fiche.ts`) divise seulement les voix
+  par les exprimés (et les votants par les inscrits) et signale les ruptures entre scrutins
+  consécutifs (type, tour, grille, découpage 2010, communes rattachées, seuil de nuançage).
+- Circonscriptions d'une commune : intersection des contours (≥ 1 % de la surface communale,
+  sinon la plus grande part) ; Paris en compte 18, Amiens 2.
 - Méthodologie (A5) : texte source unique `docs/methodologie.md`, compilé au build
   (`web/src/markdown.ts`, sous-ensemble de Markdown, sans bibliothèque) et chargé à la demande ;
   panneau `<dialog>` ouvert par l'étiquette de méthode et les liens « Méthode » (`Legende.tsx`),

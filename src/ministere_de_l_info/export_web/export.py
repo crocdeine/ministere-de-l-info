@@ -11,7 +11,8 @@ Lit la base DuckDB en LECTURE SEULE (vues ``v_resultats_candidats_avec_bloc``,
 - ``scrutins/<id>.json.gz`` : résultats d'un scrutin par commune, colonnes alignées sur
   ``communes.json.gz`` (carte nationale, infobulle) ;
 - ``departements/<dep>/communes.json.gz`` et ``bureaux.json.gz`` : tous scrutins, par commune et
-  par bureau de vote (fiche territoire, lot A3) ;
+  par bureau de vote (fiche territoire, lot A3) ; ``fiches.json.gz`` : identité, population,
+  économie, élus et communes rattachées (``fiches.py``) ;
 - ``methodologie.json.gz`` : registre des sources (``sources.py``) et correspondances
   nuance (ou candidat) → bloc, avec leur justification (panneau Méthodologie, lot A5).
 
@@ -46,12 +47,13 @@ from ministere_de_l_info._blocs_politiques import (
     methode_classement,
 )
 from ministere_de_l_info.espace_disque import verifier_espace
+from ministere_de_l_info.export_web.fiches import ecrire_fiches
 from ministere_de_l_info.sources import SOURCES, mention
 from ministere_de_l_info.viz._display import COULEUR_ND
 
 logger = logging.getLogger(__name__)
 
-VERSION_SCHEMA: int = 2  # 2 : état « aucun scrutin », colonnes etat et total
+VERSION_SCHEMA: int = 3  # 2 : état « aucun scrutin », colonnes etat et total ; 3 : fiches (A3), avec methodologie.json.gz (A5)
 # Caractères de la propriété `s` des tuiles : a-f = blocs (ordre de BLOCS_ORDERED).
 CARACTERES: dict[str, str] = {b: "abcdef"[i] for i, b in enumerate(BLOCS_ORDERED)}
 # `.` n.d. : lignes de résultat sans voix exploitables (dont 0 voix dans la source) ;
@@ -79,6 +81,11 @@ TYPES_SCRUTIN: dict[str, str] = {
     "cant": "Cantonales",
     "muni": "Municipales",
 }
+# Sources citées par l'interface (carte, fiche commune).
+SOURCES_FICHE: tuple[str, ...] = (
+    *("elections", "ign", "circos", "insee_pop", "insee_filosofi_rp", "cnaf", "drees"),
+    *("datan", "senat"),
+)
 TAILLE_MAX_BRUTE: int = 8_000_000  # octets, avant compression (ADR-0015)
 LICENCE_BASE: dict[str, str] = {
     "nom": "ODbL 1.0",
@@ -327,7 +334,8 @@ def _manifeste(
     con: duckdb.DuckDBPyConnection, departements: list[str] | None, n_communes: int
 ) -> dict[str, Any]:
     scrutins = con.execute(
-        "SELECT id_election, type_scrutin, annee, tour, libelle FROM _scrutins ORDER BY 1"
+        "SELECT id_election, type_scrutin, annee, tour, libelle, ancien_decoupage "
+        "FROM _scrutins ORDER BY 1"
     ).fetchall()
     sans = con.execute(
         "SELECT id_election, libelle FROM elections "
@@ -348,7 +356,7 @@ def _manifeste(
                 "licence": SOURCES[cle].licence,
                 "url": SOURCES[cle].url,
             }
-            for cle in ("elections", "ign")
+            for cle in SOURCES_FICHE
         },
         "perimetre": {
             "departements": departements,
@@ -364,11 +372,13 @@ def _manifeste(
                 "annee": a,
                 "tour": tour,
                 "libelle": lib,
+                # Législatives 2002-2007 : découpage antérieur à celui de 2010.
+                "ancien_decoupage": bool(ancien),
                 "methode": methode_classement(t, a),
                 # Le panneau Méthodologie remplace le renvoi vers l'ADR (fichier du dépôt).
                 "legende": legende_classement_blocs(t, a).removesuffix(" " + RENVOI_METHODE),
             }
-            for i, t, a, tour, lib in scrutins
+            for i, t, a, tour, lib, ancien in scrutins
         ],
         # Écart de chargement : tours déclarés dans `elections` sans aucun résultat.
         "scrutins_sans_resultats": [{"id": i, "libelle": lib} for i, lib in sans],
@@ -494,6 +504,7 @@ def exporter(
             _ecrire_scrutins(con, prepa, fichiers)
             logger.info("Scrutins écrits (%.1f s)", time.perf_counter() - t0)
             _ecrire_departements(con, prepa, fichiers, departements)
+            ecarts_fiches = ecrire_fiches(con, prepa, lambda c, x: _json_gz(c, x, fichiers, prepa))
             _ecrire_methodologie(con, prepa, fichiers)
             logger.info("Départements écrits (%.1f s)", time.perf_counter() - t0)
             if tippecanoe:
@@ -501,6 +512,8 @@ def exporter(
                 fichiers["communes.pmtiles"] = {}
                 logger.info("Tuiles écrites (%.1f s)", time.perf_counter() - t0)
             manifeste = _manifeste(con, departements, communes.height)
+            # Données non affichées dans les fiches (élus hors communes, économie d'anciennes communes).
+            manifeste["perimetre"] |= ecarts_fiches
         finally:
             con.close()
         _empreintes(prepa, fichiers)

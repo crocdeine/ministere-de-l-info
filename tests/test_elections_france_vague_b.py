@@ -97,7 +97,7 @@ def con() -> Iterator[duckdb.DuckDBPyConnection]:
         t(code_insee, code_departement, code_region, nom)""")
     # Table de passage non vide (exigée en périmètre france) ; code fictif sans effet
     c.execute(se.PASSAGE_DDL)
-    c.execute("INSERT INTO communes_passage VALUES ('00000', '59350', NULL, '32')")
+    c.execute("INSERT INTO communes_passage VALUES ('00000', '59350', NULL, '32', NULL)")
     yield c
     c.close()
 
@@ -401,9 +401,29 @@ class TestCommunesFusionnees:
     def test_chaines_resolues_scissions_ignorees(self, con, tmp_path) -> None:
         assert self._passage(con, tmp_path) == 3
         rows = con.execute(
-            "SELECT code_ancien, code_actuel FROM communes_passage ORDER BY 1"
+            "SELECT code_ancien, code_actuel, libelle_ancien FROM communes_passage ORDER BY 1"
         ).fetchall()
-        assert rows == [("59997", "59350"), ("59998", "59350"), ("59999", "59350")]
+        # Nom de la commune disparue : celui de sa première fusion (fiche commune, lot A3).
+        assert rows == [
+            ("59997", "59350", "A"),
+            ("59998", "59350", "B"),
+            ("59999", "59350", "C"),
+        ]
+
+    def test_colonne_libelle_ajoutee_aux_bases_existantes(self) -> None:
+        import duckdb
+
+        from ministere_de_l_info.etl import schema_elections as se
+
+        c = duckdb.connect()
+        c.execute(
+            "CREATE TABLE communes_passage (code_ancien VARCHAR(5) PRIMARY KEY, "
+            "code_actuel VARCHAR(5) NOT NULL, date_effet DATE, type_evenement VARCHAR)"
+        )
+        c.execute(se.PASSAGE_DDL)
+        c.execute(se.PASSAGE_DDL)  # idempotent
+        cols = [r[0] for r in c.execute("DESCRIBE communes_passage").fetchall()]
+        assert cols[-1] == "libelle_ancien"
 
     def test_resultats_rattaches_avec_origine_et_bv_prefixe(self, con, tmp_path) -> None:
         self._passage(con, tmp_path)

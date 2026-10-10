@@ -3,7 +3,7 @@
 // ponytail: pas de bibliothèque Markdown ; étendre ici si le texte utilise d'autres syntaxes.
 
 /** Sections du panneau Méthodologie ouvertes depuis l'interface (vérifiées par les tests). */
-export const ANCRES = ["methode", "blocs", "ruptures", "bloc-en-tete", "valeurs-absentes", "sources"] as const;
+export const ANCRES = ["methode", "blocs", "ruptures", "bloc-en-tete", "valeurs-absentes", "sources", "limites"] as const;
 export type Ancre = (typeof ANCRES)[number];
 
 export type Bloc =

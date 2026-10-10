@@ -329,6 +329,33 @@ l'extérieur de l'application (pas de schéma d'URL macOS pour l'instant).
 
 ---
 
+## Application web (Mac) : fiche d'une commune
+
+Un clic sur une commune de la carte des élections, ou le lien **Ouvrir la fiche de la commune**
+sous la commune choisie au clavier, ouvre sa fiche (adresse `#/commune?code=80021`). La fiche
+présente, de haut en bas :
+
+- les **chiffres-clés** : population municipale, puis inscrits, participation et bloc en tête au
+  dernier scrutin chargé (nommé à côté de chaque chiffre) ;
+- l'**historique électoral** : choix du type de scrutin et du tour, graphique des voix par bloc
+  (en % des suffrages exprimés, échelle fixe de 0 à 100 %), graphique de la participation, puis
+  le tableau de toutes les valeurs (trié par un clic ou par la touche Entrée sur un en-tête).
+  Quand la grille de classement, le type de scrutin, le découpage des circonscriptions, le
+  périmètre de la commune (anciennes communes rattachées) ou le seuil de nuançage change entre
+  deux scrutins affichés, un bandeau **Comparaison limitée** l'indique, les lignes du graphique
+  s'interrompent et la colonne « Remarques » du tableau précise la rupture ;
+- le **détail par bureau de vote** (repliable, chargé à l'ouverture), pour un scrutin à la fois ;
+- **Représentée par** : député(s) de la ou des circonscriptions de la commune et sénateurs du
+  département, avec leur groupe et le bloc de ce groupe ;
+- le **territoire** (département, région, intercommunalité, populations légales) et
+  l'**économie** (Hauts-de-France uniquement pour l'instant ; ailleurs, la fiche l'indique).
+
+Une valeur absente s’affiche « n.d. ». Chaque bloc se termine par sa source et sa licence.
+
+Captures : `docs/captures/a3/fiche-amiens.jpg` (bureau), `docs/captures/a3/fiche-amiens-mobile.jpg` (390 px).
+
+---
+
 ## Comprendre les sources
 
 | Domaine | Source |
