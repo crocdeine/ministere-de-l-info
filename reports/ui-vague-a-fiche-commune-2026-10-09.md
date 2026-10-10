@@ -39,4 +39,4 @@ uv run python scripts/load_legislatif.py --source overrides
 # Puis réexport web
 uv run python scripts/export_web.py --tippecanoe /chemin/vers/tippecanoe
 ```
-`--source all` est à éviter : il recharge aussi le Sénat (composition postérieure au renouvellement du 27/09/2026, choix non tranché).
+`--source all` recharge aussi le Sénat (depuis le cache sans `--force`) : inutile pour ces deux corrections.
