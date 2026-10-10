@@ -20,7 +20,7 @@ import {
   raisonsSerie,
 } from "./fiche";
 import { GraphiqueEvolution } from "./GraphiqueEvolution";
-import { EtiquetteMethode } from "./Legende";
+import { EtiquetteMethode, LienMethode } from "./Legende";
 
 const NC = { code: "NC", libelle: "Non classé" };
 
@@ -263,7 +263,10 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
         </dl>
         <Source m={m} cles={["insee_pop", "elections"]}>
           Bloc en tête : bloc qui totalise le plus de voix (somme des voix de ses candidats ou listes), en % des
-          suffrages exprimés.
+          suffrages exprimés.{" "}
+          <LienMethode ancre="bloc-en-tete" className="lien-methode">
+            Méthode ↘
+          </LienMethode>
         </Source>
       </section>
 
@@ -303,7 +306,10 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
               <p className="limite" role="note">
                 <span className="limite-titre">Comparaison limitée</span> Entre certains scrutins affichés, changent :{" "}
                 {raisons.map((r) => LIBELLES_RAISONS[r]).join(" ; ")}. Les lignes du graphique sont interrompues à
-                chaque rupture ; le détail figure dans la colonne « Remarques » du tableau.
+                chaque rupture ; le détail figure dans la colonne « Remarques » du tableau.{" "}
+                <LienMethode ancre="ruptures" className="lien-methode">
+                  Ruptures entre scrutins ↘
+                </LienMethode>
               </p>
             )}
             <div className="titre-carte">
@@ -385,7 +391,10 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
         )}
         <p className="methode">
           Parts en % des suffrages exprimés ; participation = votants / inscrits. Blocs : classement propre à
-          chaque scrutin (colonne « Méthode » ; légende du classement dans la page Élections).
+          chaque scrutin (colonne « Méthode »).{" "}
+          <LienMethode ancre="valeurs-absentes" className="lien-methode">
+            Valeurs n.d. ↘
+          </LienMethode>
           {sansResultat > 0 &&
             ` Aucun résultat pour cette commune à ${entier(sansResultat)} des ${entier(m.scrutins.length)} tours chargés (second tour non organisé, commune hors du champ publié ou inexistante à cette date).`}
         </p>
@@ -510,7 +519,10 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
           Circonscriptions : intersection des contours de la commune et des circonscriptions (découpage de 2010) ;
           une circonscription est retenue si elle couvre au moins 1 % de la surface communale.
           {info.circos_origine === "resultats" &&
-            " Pour cette commune, sans contour commun avec une circonscription : circonscription de ses derniers résultats législatifs."}
+            " Pour cette commune, sans contour commun avec une circonscription : circonscription de ses derniers résultats législatifs."}{" "}
+          <LienMethode ancre="limites" className="lien-methode">
+            Limites ↘
+          </LienMethode>
         </Source>
       </section>
 
