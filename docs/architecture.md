@@ -170,6 +170,7 @@ base DuckDB (lecture seule)
             scrutins/<id>.json.gz      résultats par commune d'un tour (infobulle)
             departements/<dep>/{communes,bureaux}.json.gz   tous tours (fiche territoire, A3)
             departements/<dep>/fiches.json.gz   identité, circonscriptions, population, économie, élus, communes rattachées (fiches.py)
+            methodologie.json.gz       registre des sources + correspondances → bloc (panneau Méthodologie, A5)
   └─ web/  Vite + React + TypeScript, MapLibre  →  web/src-tauri/  application Mac (Tauri v2)
 ```
 
@@ -183,6 +184,10 @@ base DuckDB (lecture seule)
   consécutifs (type, tour, grille, découpage 2010, communes rattachées, seuil de nuançage).
 - Circonscriptions d'une commune : intersection des contours (≥ 1 % de la surface communale,
   sinon la plus grande part) ; Paris en compte 18, Amiens 2.
+- Méthodologie (A5) : texte source unique `docs/methodologie.md`, compilé au build
+  (`web/src/markdown.ts`, sous-ensemble de Markdown, sans bibliothèque) et chargé à la demande ;
+  panneau `<dialog>` ouvert par l'étiquette de méthode et les liens « Méthode » (`Legende.tsx`),
+  sans quitter la page ; ancres listées dans `ANCRES` et vérifiées par `methodologie.test.ts`.
 - Export publié atomiquement : écrit dans `.<sortie>.prepa/`, contrôlé (fichiers non vides,
   un fichier par tour, communes des tuiles), manifeste en dernier, puis substitué à la sortie.
 - Chaque JSON lu par l'interface est vérifié contre `sha256_brut` (empreinte du JSON

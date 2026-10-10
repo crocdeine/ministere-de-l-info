@@ -272,3 +272,6 @@ constat est vérifié par une requête ou un test avant d'être retenu.
   script e2e a son port (`fiche.mjs` 4175, `captures.mjs` 4177 ; `url.mjs` accepte `PORT=`).
 - `v_elus_actuels` porte les députés de Corse en `2a`/`2b` (minuscules, source Datan) : toute
   jointure par département doit comparer en capitales (`upper(code_departement)`).
+- Antigravity ignore silencieusement une règle `.agents/rules/*.md` sans frontmatter `trigger` : notre
+  `projet.md` n'était pas vue. Après tout changement de règle ou de skill, tester avec
+  `agy -p "Quelles règles vois-tu ?" --mode plan --model gemini-3.8-flash-low`.

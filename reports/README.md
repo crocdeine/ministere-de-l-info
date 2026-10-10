@@ -23,6 +23,7 @@ sommaire (`grep -n '^## ' <fichier>`) avant d'ouvrir une section.
 
 | Fichier | Objet | Taille |
 |---|---|---|
+| [ui-methodologie-2026-10-09.md](ui-methodologie-2026-10-09.md) | Vague A, lot A5 : texte `docs/methodologie.md`, panneau Méthodologie, export des correspondances, 3 questions | 5 Ko |
 | [ui-vague-a-socle-web-2026-10-07.md](ui-vague-a-socle-web-2026-10-07.md) | Vague A, lot A1 : export web France entière, application web (carte Élections), CI `web`, mesures du budget | 9 Ko |
 | [ui-vague-a-url-etat-2026-10-09.md](ui-vague-a-url-etat-2026-10-09.md) | Vague A, lot A2 : état de la vue dans l'URL, copier le lien, e2e WebKit/Chromium | 2 Ko |
 | [ui-vague-a-fiche-commune-2026-10-09.md](ui-vague-a-fiche-commune-2026-10-09.md) | Vague A, lot A3 : fiche commune web (historique, ruptures, bureaux de vote, élus, économie), export `fiches.json.gz`, schéma 3 | 4 Ko |

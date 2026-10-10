@@ -12,7 +12,9 @@ Lit la base DuckDB en LECTURE SEULE (vues ``v_resultats_candidats_avec_bloc``,
   ``communes.json.gz`` (carte nationale, infobulle) ;
 - ``departements/<dep>/communes.json.gz`` et ``bureaux.json.gz`` : tous scrutins, par commune et
   par bureau de vote (fiche territoire, lot A3) ; ``fiches.json.gz`` : identité, population,
-  économie, élus et communes rattachées (``fiches.py``).
+  économie, élus et communes rattachées (``fiches.py``) ;
+- ``methodologie.json.gz`` : registre des sources (``sources.py``) et correspondances
+  nuance (ou candidat) → bloc, avec leur justification (panneau Méthodologie, lot A5).
 
 Toutes les agrégations sont faites en SQL. Absence = ``null`` (affichée « n.d. »), jamais 0.
 Participation = Σ votants / Σ inscrits (même formule que ``v_participation_commune_pres``).
@@ -40,6 +42,7 @@ from ministere_de_l_info._blocs_politiques import (
     BLOCS_ORDERED,
     COULEURS_BLOCS,
     LIBELLES_BLOCS,
+    RENVOI_METHODE,
     legende_classement_blocs,
     methode_classement,
 )
@@ -50,7 +53,7 @@ from ministere_de_l_info.viz._display import COULEUR_ND
 
 logger = logging.getLogger(__name__)
 
-VERSION_SCHEMA: int = 3  # 2 : état « aucun scrutin », colonnes etat et total ; 3 : fiches (A3)
+VERSION_SCHEMA: int = 3  # 2 : état « aucun scrutin », colonnes etat et total ; 3 : fiches (A3), avec methodologie.json.gz (A5)
 # Caractères de la propriété `s` des tuiles : a-f = blocs (ordre de BLOCS_ORDERED).
 CARACTERES: dict[str, str] = {b: "abcdef"[i] for i, b in enumerate(BLOCS_ORDERED)}
 # `.` n.d. : lignes de résultat sans voix exploitables (dont 0 voix dans la source) ;
@@ -372,7 +375,8 @@ def _manifeste(
                 # Législatives 2002-2007 : découpage antérieur à celui de 2010.
                 "ancien_decoupage": bool(ancien),
                 "methode": methode_classement(t, a),
-                "legende": legende_classement_blocs(t, a),
+                # Le panneau Méthodologie remplace le renvoi vers l'ADR (fichier du dépôt).
+                "legende": legende_classement_blocs(t, a).removesuffix(" " + RENVOI_METHODE),
             }
             for i, t, a, tour, lib, ancien in scrutins
         ],
@@ -418,6 +422,41 @@ def _controler(
         dans_tuiles = nombre_communes_tuiles(sortie / "communes.pmtiles")
         if dans_tuiles != n_communes:
             raise ValueError(f"Tuiles : {dans_tuiles} communes pour {n_communes} attendues")
+
+
+def _ecrire_methodologie(
+    con: duckdb.DuckDBPyConnection, sortie: Path, fichiers: dict[str, dict[str, Any]]
+) -> None:
+    """Sources et correspondances → bloc, lues dans le registre et la base (jamais recopiées)."""
+    corr = con.execute(
+        """
+        -- origine : code de nuance (`nuances_harmonisees`) ou candidat / liste sans nuance
+        -- dans la source (`candidats_presidentielle` : présidentielles 2017-2022, européennes 2019).
+        SELECT annee, 'nuance' AS origine, nuance AS code, bloc, source_bloc AS justification
+        FROM nuances_harmonisees
+        UNION ALL
+        SELECT annee, 'candidat', COALESCE(libelle, nom), bloc, source_bloc
+        FROM candidats_presidentielle
+        ORDER BY annee, bloc, code
+        """
+    ).pl()
+    _json_gz(
+        sortie / "methodologie.json.gz",
+        {
+            "sources": [
+                {
+                    "donnees": s.donnees,
+                    "producteur": s.producteur,
+                    "licence": s.licence,
+                    "url": s.url,
+                }
+                for s in SOURCES.values()
+            ],
+            "correspondances": _colonnes(corr),
+        },
+        fichiers,
+        sortie,
+    )
 
 
 def _publier(prepa: Path, sortie: Path) -> None:
@@ -466,6 +505,7 @@ def exporter(
             logger.info("Scrutins écrits (%.1f s)", time.perf_counter() - t0)
             _ecrire_departements(con, prepa, fichiers, departements)
             ecarts_fiches = ecrire_fiches(con, prepa, lambda c, x: _json_gz(c, x, fichiers, prepa))
+            _ecrire_methodologie(con, prepa, fichiers)
             logger.info("Départements écrits (%.1f s)", time.perf_counter() - t0)
             if tippecanoe:
                 _ecrire_tuiles(con, prepa, tippecanoe, detail_bas)

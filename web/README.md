@@ -39,6 +39,7 @@ Options : `--strict` (échec au-delà des seuils de l'ADR-0015), `--changements 
 | `src/worker/details.ts` | résultats détaillés de l'infobulle, décodés hors du thread principal |
 | `src/FicheCommune.tsx`, `src/fiche.ts`, `src/GraphiqueEvolution.tsx` | fiche commune (`#/commune?code=…`) : historique, ruptures (logique pure, testée), graphique SVG, bureaux de vote chargés à l'ouverture |
 | `src/PageElections.tsx`, `src/Legende.tsx`, `src/App.tsx` | page, légende et étiquette de méthode, navigation |
+| `src/Methodologie.tsx`, `src/markdown.ts`, `src/methodologie.css` | panneau Méthodologie (texte `docs/methodologie.md` compilé au build, chargé à la demande ; tables de `methodologie.json.gz`), ouvert par `LienMethode` (`Legende.tsx`) |
 | `src/mesure.ts`, `perf/` | instrumentation (`?mesure=1`), budget de taille, mesures WebKit |
 
 Styles : `tokens.css` du skill `design-system-mi` importé tel quel + `src/styles.css` (uniquement

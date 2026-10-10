@@ -177,3 +177,7 @@ Voir `reports/recherche-ui-couleur-2026-10-07.md`, `reports/recherche-ux-experie
 Correction des notes de la release v1.0.1 (élections affichées : Hauts-de-France ; base : France entière).
 Tranché par le directeur : candidats par voix décroissantes ; carte d'écart à échelle fixe ±30 points ;
 questions préréglées sur l'Accueil.
+
+## Décisions du 2026-10-09 (Méthodologie)
+
+- 2026-10-09 : texte de la Méthodologie validé par Mathias ; entrée Méthodologie dans la navigation.
