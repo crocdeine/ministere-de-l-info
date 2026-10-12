@@ -19,6 +19,7 @@ import {
   mentionFusion,
   raisonsSerie,
 } from "./fiche";
+import { csvBureaux, csvHistorique, nomFichier, telecharger } from "./export-csv";
 import { GraphiqueEvolution } from "./GraphiqueEvolution";
 import { EtiquetteMethode, LienMethode } from "./Legende";
 
@@ -387,6 +388,12 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
                 </tbody>
               </table>
             </div>
+            <p className="aide">
+              <button type="button" onClick={() => telecharger(nomFichier("historique", code), csvHistorique(m, { code, nom: info.nom }, triees, colonnes, remarques))}>
+                Télécharger (CSV)
+              </button>{" "}
+              Source, licence, dates et méthode sont écrites en tête du fichier.
+            </p>
           </>
         )}
         <p className="methode">
@@ -462,6 +469,13 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
                     </tbody>
                   </table>
                 </div>
+              )}
+              {bv.length > 0 && (
+                <p className="aide">
+                  <button type="button" onClick={() => telecharger(nomFichier("bureaux-de-vote", `${code}_${bv[0]?.scrutin.id ?? ""}`), csvBureaux(m, { code, nom: info.nom }, bv, colonnes))}>
+                    Télécharger (CSV)
+                  </button>
+                </p>
               )}
               <Source m={m} cles={["elections"]}>
                 Niveau : bureau de vote. Parts en % des exprimés du bureau.
