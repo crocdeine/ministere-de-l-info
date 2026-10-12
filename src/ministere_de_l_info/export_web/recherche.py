@@ -36,16 +36,21 @@ def normaliser(texte: str) -> str:
     return " ".join(_MOTS.get(m, m) for m in mots)
 
 
-def _table_existe(con: duckdb.DuckDBPyConnection, nom: str) -> bool:
+def table_existe(con: duckdb.DuckDBPyConnection, nom: str) -> bool:
     r = con.execute(
         "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?", [nom]
     ).fetchone()
     return bool(r and r[0])
 
 
-def construire_index(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
-    """Index à partir des tables temporaires ``_communes`` et ``_circos`` (export en cours)."""
-    avec_cp = _table_existe(con, "codes_postaux")
+def construire_index(con: duckdb.DuckDBPyConnection) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Index et écarts, à partir des tables temporaires ``_communes`` et ``_circos`` (export en cours).
+
+    Écarts (comptés, journalisés, publiés dans le manifeste) : élus non indexés (aucune commune
+    exportée dans leur département), élus rattachés au département faute de circonscription
+    exportée, circonscriptions écartées.
+    """
+    avec_cp = table_existe(con, "codes_postaux")
     if not avec_cp:
         logger.warning("codes_postaux absente : recherche par code postal indisponible")
     # Commune de référence : la plus peuplée (dernière population connue), à égalité le code.
@@ -94,24 +99,34 @@ def construire_index(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
             "JOIN _pop p USING (code_insee)) GROUP BY 1"
         ).fetchall()
     )
+    circos_ecartees: list[str] = []
     for code, nom in con.execute(
         "SELECT code, nom FROM geographies_circonscriptions "
         "WHERE code_departement IN (SELECT DISTINCT code_departement FROM _communes) ORDER BY 1"
     ).fetchall():
-        if code in ref_circo:
+        if code not in ref_circo:
+            circos_ecartees.append(code)
+        else:
             libelle = nom or f"Circonscription {code}"
             norm = normaliser(f"{libelle} {code}")
             lignes.append(["e", code, libelle, norm, code.split("-")[0], "", ref_circo[code]])
 
-    ecartes = 0
+    non_indexes: dict[str, int] = {}
+    replis = 0
     for chambre, id_, prenom, nom, dep, num in con.execute(
         "SELECT chambre, id, prenom, nom, upper(code_departement), num_circo "
         "FROM v_elus_actuels ORDER BY chambre, nom, prenom, id"
     ).fetchall():
         circo = f"{dep}-{int(num):02d}" if chambre == "AN" and num is not None else None
-        ref = (ref_circo.get(circo) if circo else None) or ref_dep.get(dep)
+        ref = ref_circo.get(circo) if circo else None
         if ref is None:
-            ecartes += 1
+            ref = ref_dep.get(dep)
+            if ref is not None and chambre == "AN":
+                replis += (
+                    1  # député : commune la plus peuplée du département (circonscription inconnue)
+                )
+        if ref is None:
+            non_indexes[dep] = non_indexes.get(dep, 0) + 1
             continue
         titre = "Député" if chambre == "AN" else "Sénateur"
         lignes.append(
@@ -125,23 +140,45 @@ def construire_index(con: duckdb.DuckDBPyConnection) -> dict[str, Any]:
                 ref,
             ]
         )
-    if ecartes:
-        logger.warning("Recherche : %d élus hors périmètre exporté (non indexés)", ecartes)
-    return {
+    if non_indexes:
+        logger.warning(
+            "Recherche : %d élus non indexés (aucune commune exportée dans leur département) : %s",
+            sum(non_indexes.values()),
+            ", ".join(f"{d}={n}" for d, n in sorted(non_indexes.items())),
+        )
+    if replis:
+        logger.warning(
+            "Recherche : %d députés rattachés au département (circonscription inconnue)", replis
+        )
+    if circos_ecartees:
+        logger.warning(
+            "Recherche : %d circonscriptions écartées (aucune commune rattachée) : %s",
+            len(circos_ecartees),
+            ", ".join(circos_ecartees[:20]),
+        )
+    index = {
         "colonnes": COLONNES,
         "departements": {k: noms_dep.get(k, k) for k in sorted(ref_dep)},
         "codes_postaux": avec_cp,
         "lignes": lignes,
     }
+    ecarts = {
+        "elus_non_indexes": sum(non_indexes.values()),
+        "elus_non_indexes_par_departement": dict(sorted(non_indexes.items())),
+        "elus_rattaches_au_departement": replis,
+        "circonscriptions_ecartees": len(circos_ecartees),
+        "codes_postaux_charges": avec_cp,
+    }
+    return index, ecarts
 
 
 def ecrire_recherche(
     con: duckdb.DuckDBPyConnection, sortie: Path, ecrire: Callable[[Path, Any], None]
 ) -> dict[str, Any]:
-    """Écrit ``recherche.json.gz`` ; renvoie l'index (contrôles)."""
-    index = construire_index(con)
+    """Écrit ``recherche.json.gz`` ; renvoie les écarts (publiés dans le manifeste)."""
+    index, ecarts = construire_index(con)
     cles = [(r[0], r[1]) for r in index["lignes"]]
     if len(cles) != len(set(cles)):
         raise ValueError("Index de recherche : clés (type, code) en double")
     ecrire(sortie / "recherche.json.gz", index)
-    return index
+    return ecarts

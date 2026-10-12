@@ -2,7 +2,7 @@
 
 Usage :
     uv run python scripts/export_web.py [--db CHEMIN] [--out web/public/data]
-        [--departements 80,02] [--tippecanoe CHEMIN | --sans-tuiles]
+        [--departements 80,02] [--tippecanoe CHEMIN | --sans-tuiles] [--exiger-cp]
 
 La base est ouverte en lecture seule. Sortie non commitée (``web/public/data/``).
 """
@@ -26,6 +26,9 @@ def main() -> None:
     parser.add_argument("--departements", help="liste séparée par des virgules (échantillon)")
     parser.add_argument("--tippecanoe", default="tippecanoe", help="exécutable tippecanoe ≥ 2.17")
     parser.add_argument("--sans-tuiles", action="store_true", help="pas de communes.pmtiles")
+    parser.add_argument(
+        "--exiger-cp", action="store_true", help="échec si la table codes_postaux est absente"
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     exporter(
@@ -33,6 +36,7 @@ def main() -> None:
         args.out,
         tippecanoe=None if args.sans_tuiles else args.tippecanoe,
         departements=args.departements.split(",") if args.departements else None,
+        exiger_codes_postaux=args.exiger_cp,
     )
 
 

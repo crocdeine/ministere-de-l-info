@@ -49,7 +49,7 @@ from ministere_de_l_info._blocs_politiques import (
 )
 from ministere_de_l_info.espace_disque import verifier_espace
 from ministere_de_l_info.export_web.fiches import ecrire_fiches
-from ministere_de_l_info.export_web.recherche import ecrire_recherche
+from ministere_de_l_info.export_web.recherche import ecrire_recherche, table_existe
 from ministere_de_l_info.sources import SOURCES, mention
 from ministere_de_l_info.viz._display import COULEUR_ND
 
@@ -478,12 +478,14 @@ def exporter(
     tippecanoe: str | None = "tippecanoe",
     departements: list[str] | None = None,
     detail_bas: int = 10,
+    exiger_codes_postaux: bool = False,
 ) -> dict[str, Any]:
     """Écrit l'export complet dans ``sortie`` et renvoie le manifeste.
 
     Tout est écrit dans un dossier voisin, contrôlé, puis substitué à ``sortie`` (manifeste
     écrit en dernier) : un export interrompu ou invalide laisse l'export précédent intact.
     ``tippecanoe=None`` : pas de tuiles (tests). ``departements`` : échantillon.
+    ``exiger_codes_postaux`` : échec si la table ``codes_postaux`` manque (production).
     """
     t0 = time.perf_counter()
     sortie = sortie.resolve()
@@ -495,6 +497,11 @@ def exporter(
         con = duckdb.connect(str(db_path), read_only=True)  # lecture seule, jamais d'écriture
         try:
             con.execute("LOAD spatial")
+            if exiger_codes_postaux and not table_existe(con, "codes_postaux"):
+                raise ValueError(
+                    "Table codes_postaux absente : lancer scripts/load_codes_postaux.py "
+                    "(ou exporter sans --exiger-cp)."
+                )
             _preparer(con, departements)
             communes = con.execute("SELECT code_insee, nom FROM _communes ORDER BY 1").pl()
             _json_gz(
@@ -507,7 +514,9 @@ def exporter(
             logger.info("Scrutins écrits (%.1f s)", time.perf_counter() - t0)
             _ecrire_departements(con, prepa, fichiers, departements)
             ecarts_fiches = ecrire_fiches(con, prepa, lambda c, x: _json_gz(c, x, fichiers, prepa))
-            ecrire_recherche(con, prepa, lambda c, x: _json_gz(c, x, fichiers, prepa))
+            ecarts_recherche = ecrire_recherche(
+                con, prepa, lambda c, x: _json_gz(c, x, fichiers, prepa)
+            )
             _ecrire_methodologie(con, prepa, fichiers)
             logger.info("Départements écrits (%.1f s)", time.perf_counter() - t0)
             if tippecanoe:
@@ -516,7 +525,7 @@ def exporter(
                 logger.info("Tuiles écrites (%.1f s)", time.perf_counter() - t0)
             manifeste = _manifeste(con, departements, communes.height)
             # Données non affichées dans les fiches (élus hors communes, économie d'anciennes communes).
-            manifeste["perimetre"] |= ecarts_fiches
+            manifeste["perimetre"] |= ecarts_fiches | ecarts_recherche
         finally:
             con.close()
         _empreintes(prepa, fichiers)

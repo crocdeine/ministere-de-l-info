@@ -363,6 +363,8 @@ Mesure du 2026-10-06 : nuance renseignée pour 96 des 100 mandats AN non inscrit
 | Table | `codes_postaux(code_insee, code_postal)`, 35 511 couples distincts, 34 965 communes (toutes celles de `geographies_communes`) |
 | Loader | `etl/loaders/codes_postaux.py`, `scripts/load_codes_postaux.py` (cache `data/raw/laposte/`) |
 
+Contrôles du loader : erreur si une ligne est rejetée ou si moins de 35 000 couples ; 150 couples de COM (977, 978, 986, 987, 988, 989, 991) absents de `geographies_communes` sont conservés et journalisés. Production : `scripts/export_web.py --exiger-cp`.
+
 Usage : recherche par code postal de l'application web (index `recherche.json.gz`). Un code
 postal couvre souvent plusieurs communes et une commune plusieurs codes postaux : aucune
 interprétation. Paris, Lyon, Marseille : publiés par arrondissement (75101…), rattachés à la
