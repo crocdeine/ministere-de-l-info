@@ -24,7 +24,11 @@ const csp = Object.entries(
   .map(([k, v]) => `${k} ${v}`)
   .join("; ");
 
+// Version du projet (pyproject.toml) : écrite dans le lien de méthode des exports CSV (étiquette `v<VERSION>`).
+const version = /^version\s*=\s*"([^"]+)"/m.exec(readFileSync(new URL("../pyproject.toml", import.meta.url), "utf8"))?.[1] ?? "main";
+
 export default defineConfig({
+  define: { __VERSION_APP__: JSON.stringify(version) },
   plugins: [react(), vendorMapLibre],
   // Chemins relatifs : le build s'ouvre depuis n'importe quel dossier (Tauri, hébergement statique).
   base: "./",

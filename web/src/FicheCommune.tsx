@@ -168,6 +168,10 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
   const derniere = toutes.at(-1);
   const pop = info.population.filter((p) => p[1] !== null).at(-1);
   const raisons = raisonsSerie(serie);
+  const filtre =
+    type || tour
+      ? `type : ${type ? (m.types[type] ?? type) : "tous"}, tour : ${tour === 1 ? "1er tour" : tour === 2 ? "2e tour" : "les deux"}`
+      : undefined;
   const methodes = [...new Set(serie.map((l) => l.scrutin.methode))];
   const typesPresents = Object.entries(m.types).filter(([t]) => toutes.some((l) => l.scrutin.type === t));
   const sansResultat = m.scrutins.length - toutes.length;
@@ -389,7 +393,7 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
               </table>
             </div>
             <p className="aide">
-              <button type="button" onClick={() => telecharger(nomFichier("historique", code), csvHistorique(m, { code, nom: info.nom }, triees, colonnes, remarques))}>
+              <button type="button" aria-label="Télécharger l'historique (CSV)" onClick={() => telecharger(nomFichier("historique", code), csvHistorique(m, { code, nom: info.nom }, triees, colonnes, remarques, filtre))}>
                 Télécharger (CSV)
               </button>{" "}
               Source, licence, dates et méthode sont écrites en tête du fichier.
@@ -472,7 +476,7 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
               )}
               {bv.length > 0 && (
                 <p className="aide">
-                  <button type="button" onClick={() => telecharger(nomFichier("bureaux-de-vote", `${code}_${bv[0]?.scrutin.id ?? ""}`), csvBureaux(m, { code, nom: info.nom }, bv, colonnes))}>
+                  <button type="button" aria-label="Télécharger les bureaux de vote (CSV)" onClick={() => telecharger(nomFichier("bureaux-de-vote", `${code}_${bv[0]?.scrutin.id ?? ""}`), csvBureaux(m, { code, nom: info.nom }, bv, colonnes))}>
                     Télécharger (CSV)
                   </button>
                 </p>

@@ -53,6 +53,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
   const [carteAffichee, setCarteAffichee] = useState(false);
   const [worker, setWorker] = useState<Worker | null>(null);
   const [exportErreur, setExportErreur] = useState<string | null>(null);
+  const [exportEnCours, setExportEnCours] = useState(false);
   const [texte, setTexte] = useState("");
   const [trouvees, setTrouvees] = useState<ReponseRecherche | null>(null);
   const [choisie, setChoisie] = useState<{ code: string; nom: string } | null>(
@@ -71,6 +72,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
   // par l'utilisateur. Un changement venu de l'URL (suivre) écrit déjà le hachage canonique :
   // l'effet n'a alors rien à faire, donc jamais de pushState en retour arrière.
   const idCourant = manifeste.scrutins[scrutin]?.id;
+  useEffect(() => setExportErreur(null), [idCourant]);
   const communeUrl = choisie?.code;
   const precedente = useRef(communeUrl);
   const dernierHash = useRef(location.hash);
@@ -174,8 +176,9 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
 
   // Export du tour affiché : fichiers relus (et vérifiés) à la demande, hors du worker.
   const exporter = async () => {
-    if (!tour || !s) return;
+    if (!tour || !s || exportEnCours) return;
     setExportErreur(null);
+    setExportEnCours(true);
     try {
       const [c, t] = await Promise.all([
         lireJsonGz<{ codes: string[]; noms: string[] }>(communes.url, communes.sha256, communes.nom),
@@ -184,6 +187,8 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
       telecharger(nomFichier("scrutin", s.id), csvScrutin(manifeste, s, c.codes, c.noms, t, (car) => libelleEtat(etats, car)));
     } catch (e) {
       setExportErreur(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExportEnCours(false);
     }
   };
 
@@ -344,8 +349,8 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
         </figure>
         <Legende etats={etats} scrutin={s} rupture={rupture} />
         <p className="aide">
-          <button type="button" onClick={exporter}>
-            Télécharger (CSV)
+          <button type="button" aria-label="Télécharger le scrutin affiché (CSV)" disabled={exportEnCours} onClick={exporter}>
+            {exportEnCours ? "Préparation…" : "Télécharger (CSV)"}
           </button>{" "}
           Une ligne par commune pour ce tour ; source, licence, dates et méthode sont écrites en tête du fichier.{" "}
           <span role="status">{exportErreur && `Export impossible : ${exportErreur}`}</span>

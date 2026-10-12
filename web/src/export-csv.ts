@@ -6,8 +6,10 @@ import type { Ligne } from "./fiche";
 
 export type Cellule = string | number | null | undefined;
 
-/** Méthode publique (le CSV quitte l'application : le panneau n'est plus accessible). */
-export const URL_METHODE = "https://github.com/crocdeine/ministere-de-l-info/blob/main/docs/methodologie.md";
+declare const __VERSION_APP__: string; // vite.config.ts : version de pyproject.toml
+
+/** Méthode publique, à la version de l'application (le CSV quitte l'application). */
+export const URL_METHODE = `https://github.com/crocdeine/ministere-de-l-info/blob/v${__VERSION_APP__}/docs/methodologie.md`;
 
 const BOM = "﻿";
 const SEP = ";";
@@ -21,13 +23,15 @@ function nombre(n: number): string {
 export function cellule(v: Cellule): string {
   if (v == null) return "";
   if (typeof v === "number") return nombre(v);
-  const t = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  const t = /^[=+\-@\t\r\n]/.test(v) ? `'${v}` : v;
   return /[;"\r\n]/.test(t) ? `"${t.replaceAll('"', '""')}"` : t;
 }
 
 const ligneCsv = (cellules: Cellule[]) => cellules.map(cellule).join(SEP);
-// Ligne de commentaire : une seule cellule, donc ni « ; » ni saut de ligne dans le texte.
-const commentaire = (t: string) => `# ${t.replace(/\s*[\r\n]+\s*/g, " ").replaceAll(";", ",")}`;
+// Ligne de commentaire : une seule cellule, donc pas de saut de ligne ; les « ; » des textes
+// externes (mentions des producteurs, légendes) sont remplacés par « , » avec `ext`.
+const commentaire = (t: string) => `# ${t.replace(/\s*[\r\n]+\s*/g, " ")}`;
+const ext = (t: string) => t.replaceAll(";", ",");
 
 export type EnTete = {
   titre: string;
@@ -44,15 +48,15 @@ export type EnTete = {
 /** Fichier complet : BOM, lignes `#`, ligne de colonnes, lignes de données. */
 export function csv(e: EnTete, colonnes: string[], lignes: Cellule[][], maintenant = new Date()): string {
   const haut = [
-    `Titre : ${e.titre}`,
-    ...e.sources.map((s) => `Source : ${s}`),
-    `Licence : ${e.licence}`,
+    `Titre : ${ext(e.titre)}`,
+    ...e.sources.map((s) => `Source : ${ext(s)}`),
+    `Licence : ${ext(e.licence)}`,
     `Données du : ${e.donnees.slice(0, 10)}`,
     `Export du : ${jour(maintenant)}`,
     `Méthode : ${URL_METHODE}`,
-    "Format : UTF-8, séparateur « ; », décimale « , », en-tête de tableau = première ligne ne commençant pas par #. " +
+    "Format : UTF-8, séparateur point-virgule (;), décimale virgule (,), en-tête de tableau = première ligne ne commençant pas par #. " +
       "Cellule vide = donnée absente (n.d.), jamais 0. Codes INSEE en texte : importer la colonne en texte pour conserver les zéros initiaux.",
-    ...(e.notes ?? []),
+    ...(e.notes ?? []).map(ext),
   ].map(commentaire);
   return BOM + [...haut, ligneCsv(colonnes), ...lignes.map(ligneCsv)].join("\r\n") + "\r\n";
 }
@@ -96,11 +100,11 @@ const methode = (s: Scrutin) => (s.methode === "officielle" ? "Grille officielle
 function notesClassement(scrutins: Scrutin[]): string[] {
   const par = new Map<string, string[]>();
   for (const s of scrutins) par.set(s.legende, [...(par.get(s.legende) ?? []), s.libelle]);
-  return [...par].map(([legende, libelles]) => `Classement des blocs (${libelles.join(" ; ")}) : ${legende}`);
+  return [...par].map(([legende, libelles]) => `Classement des blocs (${libelles.join(" / ")}) : ${legende}`);
 }
 
 const notesBlocs = (m: Manifeste) =>
-  `Blocs : ${m.blocs.map((b) => `${b.code} = ${b.libelle}`).join(" ; ")} ; NC = Non classé. Parts en % des suffrages exprimés.`;
+  `Blocs (code = libellé) : ${m.blocs.map((b) => `${b.code} = ${b.libelle}`).join(" / ")} / NC = Non classé. Parts en % des suffrages exprimés.`;
 
 type Colonne = { code: string };
 
@@ -111,10 +115,13 @@ export function csvHistorique(
   lignes: Ligne[],
   colonnes: Colonne[],
   remarques: (l: Ligne) => (string | null)[],
+  /** Libellé du filtre actif (type, tour) ; absent = aucun filtre. */
+  filtre?: string,
   maintenant?: Date,
 ): string {
   return csv(
     enTete(m, `Historique électoral — ${commune.nom} (${commune.code})`, ["elections"], [
+      ...(filtre ? [`Filtre : ${filtre}`] : []),
       notesBlocs(m),
       ...notesClassement(lignes.map((l) => l.scrutin)),
     ]),

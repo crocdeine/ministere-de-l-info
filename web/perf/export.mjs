@@ -66,7 +66,7 @@ for (const [nom, type] of [["webkit", webkit], ["chromium", chromium]]) {
     await page.locator("h1", { hasText: "Amiens" }).waitFor({ timeout: 15000 });
     await page.selectOption("#fiche-type", "");
     await page.selectOption("#fiche-tour", "0");
-    const h = await telecharge(page, `${nom} historique`, () => page.getByRole("button", { name: "Télécharger (CSV)" }).first().click());
+    const h = await telecharge(page, `${nom} historique`, () => page.getByRole("button", { name: "Télécharger l'historique (CSV)" }).click());
     verifie(`${nom} historique colonnes`, h.table[0].slice(0, 4).join("|") === "Code INSEE|Commune|Scrutin|Méthode", h.table[0].join("|"));
     verifie(`${nom} historique lignes`, h.table.length > 10, String(h.table.length));
     verifie(`${nom} historique code`, h.table.slice(1).every((r) => r[0] === "80021" && r[1] === "Amiens"));
@@ -74,14 +74,14 @@ for (const [nom, type] of [["webkit", webkit], ["chromium", chromium]]) {
 
     await page.locator(".details-bv summary").click();
     await page.locator(".details-bv table").waitFor({ timeout: 10000 });
-    const b = await telecharge(page, `${nom} bureaux`, () => page.locator(".details-bv").getByRole("button", { name: "Télécharger (CSV)" }).click());
+    const b = await telecharge(page, `${nom} bureaux`, () => page.getByRole("button", { name: "Télécharger les bureaux de vote (CSV)" }).click());
     verifie(`${nom} bureaux lignes`, b.table.length > 50, String(b.table.length));
     verifie(`${nom} bureaux colonnes`, b.table[0][3] === "Bureau", b.table[0].join("|"));
 
     // 2. Élections : une ligne par commune, codes en texte (zéros conservés, 2A/2B), absences vides.
     await page.goto(`${BASE}#/elections?scrutin=2022_pres_t1`);
-    await page.getByRole("button", { name: "Télécharger (CSV)" }).waitFor({ timeout: 15000 });
-    const e = await telecharge(page, `${nom} scrutin`, () => page.getByRole("button", { name: "Télécharger (CSV)" }).click());
+    await page.getByRole("button", { name: "Télécharger le scrutin affiché (CSV)" }).waitFor({ timeout: 15000 });
+    const e = await telecharge(page, `${nom} scrutin`, () => page.getByRole("button", { name: "Télécharger le scrutin affiché (CSV)" }).click());
     verifie(`${nom} scrutin lignes`, e.table.length > 100, String(e.table.length));
     verifie(`${nom} scrutin Amiens`, e.table.some((r) => r[0] === "80021" && r[1] === "Amiens" && /^\d+,\d$|^\d+,\d\d$|^\d+$/.test(r[3])));
     verifie(`${nom} scrutin codes`, e.table.slice(1).every((r) => /^(\d{5}|2[AB]\d{3})$/.test(r[0])));

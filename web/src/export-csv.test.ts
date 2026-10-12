@@ -53,6 +53,7 @@ describe("cellule", () => {
   });
   it("neutralise une formule", () => {
     expect(cellule("=1+1")).toBe("'=1+1");
+    expect(cellule("\n=1+1")).toBe("\"'\n=1+1\"");
   });
 });
 
@@ -72,6 +73,13 @@ describe("csv", () => {
     expect(t).toContain("# Licence : Base sous ODbL 1.0 , contenus");
     expect(t).toContain("# Données du : 2026-10-10\r\n# Export du : 2026-10-12\r\n# Méthode : https://");
     expect(t.endsWith("\r\n")).toBe(true);
+  });
+  it("ligne Format exacte, sans « ; » parasite, méthode à la version", () => {
+    expect(t).toContain(
+      "# Format : UTF-8, séparateur point-virgule (;), décimale virgule (,), en-tête de tableau = première ligne ne commençant pas par #. " +
+        "Cellule vide = donnée absente (n.d.), jamais 0. Codes INSEE en texte : importer la colonne en texte pour conserver les zéros initiaux.\r\n",
+    );
+    expect(t).toMatch(/# Méthode : https:\/\/github\.com\/crocdeine\/ministere-de-l-info\/blob\/v\d+\.\d+\.\d+\/docs\/methodologie\.md\r\n/);
   });
   it("tableau relu à l'identique", () => {
     expect(lireCsv(t)).toEqual([
