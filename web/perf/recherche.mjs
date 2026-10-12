@@ -25,7 +25,7 @@ for (const [nom, type] of [["webkit", webkit], ["chromium", chromium]]) {
   try {
     const page = await nav.newPage({ viewport: { width: 1280, height: 900 } });
     const erreurs = [];
-    page.on("console", (m) => m.type() === "error" && erreurs.push(m.text()));
+    page.on("console", (m) => m.type() === "error" && !m.location().url.endsWith("favicon.ico") && erreurs.push(`${m.text()} ${m.location().url}`));
     page.on("pageerror", (e) => erreurs.push(String(e)));
     const champ = page.locator('input[role="combobox"]');
     const options = page.getByRole("option");
@@ -55,6 +55,7 @@ for (const [nom, type] of [["webkit", webkit], ["chromium", chromium]]) {
     verifie(`${nom} activedescendant`, !!actif && (await page.locator(`#${actif}`).getAttribute("aria-selected")) === "true");
     await page.keyboard.press("Enter");
     await page.locator("h1", { hasText: "Saint-Étienne" }).waitFor({ timeout: 15000 }).catch(() => echecs.push(`${nom} fiche Saint-Étienne`));
+    await page.waitForFunction(() => document.activeElement?.tagName === "H1", null, { timeout: 5000 }).catch(() => echecs.push(`${nom} focus sur le titre`));
     verifie(`${nom} URL`, page.url().includes("#/commune?code=42218"), page.url());
 
     // 4. Code postal : Amiens (80000), ouverture avec Entrée sans flèche.
@@ -86,7 +87,7 @@ for (const [nom, type] of [["webkit", webkit], ["chromium", chromium]]) {
     // 7. Aucun résultat : message, jamais de liste vide silencieuse.
     await page.keyboard.press("ControlOrMeta+k");
     await champ.fill("zzzzqx");
-    await page.getByText("Aucun résultat pour").waitFor({ timeout: 5000 }).catch(() => echecs.push(`${nom} aucun résultat`));
+    await page.locator("p[role=status]", { hasText: "Aucun résultat pour" }).waitFor({ timeout: 5000 }).catch(async () => { await page.screenshot({ path: `${process.env.TMPDIR}/a4-${nom}.png` }); echecs.push(`${nom} aucun résultat : champ « ${await champ.inputValue()} », focus ${await page.evaluate(() => document.activeElement?.tagName)}, statut « ${await page.locator("p[role=status]").textContent()} »`); });
 
     verifie(`${nom} console`, erreurs.length === 0, erreurs.join(" | ").slice(0, 300));
   } finally {

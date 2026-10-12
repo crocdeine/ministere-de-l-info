@@ -23,7 +23,9 @@ export function meta(r: Resultat, index: Index): string {
 export function Recherche({ manifeste }: { manifeste: Manifeste | null }) {
   const id = useId();
   const champ = useRef<HTMLInputElement>(null);
+  const attente = useRef<ReturnType<typeof setInterval>>(undefined);
   const [etat, setEtat] = useState<Etat>(null);
+  const [erreurIndex, setErreurIndex] = useState<string | null>(null);
   const [texte, setTexte] = useState("");
   const [ouvert, setOuvert] = useState(false);
   const [actif, setActif] = useState(-1);
@@ -32,17 +34,22 @@ export function Recherche({ manifeste }: { manifeste: Manifeste | null }) {
   const resultats = useMemo(() => (index ? chercher(index, texte) : []), [index, texte]);
 
   // Index chargé à la première utilisation (hors du chemin critique d'ouverture).
-  const charger = () => {
-    if (etat || !manifeste) return;
+  // Un échec remet l'état à null : nouvel essai au prochain focus (`relancer`).
+  const charger = (relancer = false) => {
+    if (etat || !manifeste || (erreurIndex && !relancer)) return;
     const f = manifeste.fichiers[FICHIER];
     if (!f) {
-      setEtat({ erreur: "index absent de l'export (réexporter les données)." });
+      setErreurIndex("index absent de l'export (réexporter les données).");
       return;
     }
+    setErreurIndex(null);
     setEtat("chargement");
     lireJsonGz<BrutIndex>(urlDonnees(FICHIER), f.sha256_brut, FICHIER)
       .then((brut) => setEtat({ index: decoderIndex(brut) }))
-      .catch((e: unknown) => setEtat({ erreur: e instanceof Error ? e.message : String(e) }));
+      .catch((e: unknown) => {
+        setEtat(null);
+        setErreurIndex(e instanceof Error ? e.message : String(e));
+      });
   };
 
   useEffect(() => {
@@ -64,7 +71,22 @@ export function Recherche({ manifeste }: { manifeste: Manifeste | null }) {
     setTexte("");
     setOuvert(false);
     setActif(-1);
-    champ.current?.blur();
+    // Focus sur le titre de la fiche dès qu'elle est affichée (lecteurs d'écran, clavier).
+    const nom = index?.communes.get(r.cible);
+    let essais = 0;
+    clearInterval(attente.current);
+    const attendre = (attente.current = setInterval(() => {
+      const h1 = document.querySelector<HTMLElement>("main h1");
+      if ((nom && h1?.textContent?.includes(nom)) || ++essais > 50) {
+        clearInterval(attendre);
+        // Pas de vol de focus si l'utilisateur a déjà repris la saisie.
+        const reprise = document.activeElement === champ.current && champ.current?.value !== "";
+        if (h1 && nom && h1.textContent?.includes(nom) && !reprise) {
+          h1.tabIndex = -1;
+          h1.focus();
+        }
+      }
+    }, 100));
   };
 
   const surTouche = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -86,13 +108,28 @@ export function Recherche({ manifeste }: { manifeste: Manifeste | null }) {
         e.preventDefault();
         setOuvert(false);
         setActif(-1);
-      } else setTexte("");
+      } else {
+        e.preventDefault(); // le champ « search » s'effacerait aussi de lui-même
+        setTexte("");
+      }
     }
   };
 
   const saisi = texte.trim().length >= 2;
   const liste = `${id}-liste`;
-  const erreur = etat && typeof etat === "object" && "erreur" in etat ? etat.erreur : null;
+  const affiche = ouvert && saisi;
+  // Messages hors de la listbox (qui ne contient que des options), annoncés par le role=status.
+  const message = !affiche
+    ? ""
+    : !index
+      ? erreurIndex
+        ? `Recherche indisponible : ${erreurIndex}`
+        : "Chargement de l'index…"
+      : resultats.length === 0
+        ? `Aucun résultat pour « ${texte.trim()} ». Vérifier l'orthographe ou essayer un code ${
+            index.codesPostaux ? "postal ou INSEE" : "INSEE (codes postaux non chargés)"
+          }.`
+        : `${resultats.length} résultat${resultats.length > 1 ? "s" : ""}`;
   const placeholder = index && !index.codesPostaux ? "Commune, code INSEE, département, élu" : "Commune, code postal, département, élu";
   return (
     <div className="recherche-globale" role="search">
@@ -113,11 +150,12 @@ export function Recherche({ manifeste }: { manifeste: Manifeste | null }) {
         aria-activedescendant={ouvert && actif >= 0 ? `${id}-o${actif}` : undefined}
         value={texte}
         onFocus={() => {
-          charger();
+          charger(true);
           if (texte) setOuvert(true);
         }}
         onBlur={() => setOuvert(false)}
         onChange={(e) => {
+          clearInterval(attente.current); // l'utilisateur a repris la saisie : pas de focus forcé
           setTexte(e.target.value);
           setOuvert(true);
           setActif(-1);
@@ -133,7 +171,7 @@ export function Recherche({ manifeste }: { manifeste: Manifeste | null }) {
         role="listbox"
         aria-label="Résultats de la recherche"
         className="resultats-recherche"
-        hidden={!(ouvert && saisi)}
+        hidden={!affiche || resultats.length === 0}
         onMouseDown={(e) => e.preventDefault()}
       >
         {resultats.map((r, i) => (
@@ -149,20 +187,9 @@ export function Recherche({ manifeste }: { manifeste: Manifeste | null }) {
             <span className="r-meta">{meta(r, index as Index)}</span>
           </li>
         ))}
-        {ouvert && saisi && index && resultats.length === 0 && (
-          <li role="presentation" className="r-vide">
-            Aucun résultat pour « {texte.trim()} ». Vérifier l'orthographe ou essayer un code{" "}
-            {index.codesPostaux ? "postal ou INSEE" : "INSEE (codes postaux non chargés)"}.
-          </li>
-        )}
-        {ouvert && saisi && !index && (
-          <li role="presentation" className="r-vide">
-            {erreur ? `Recherche indisponible : ${erreur}` : "Chargement de l'index…"}
-          </li>
-        )}
       </ul>
-      <p className="sr-seul" role="status" aria-live="polite">
-        {ouvert && saisi && index ? `${resultats.length} résultat${resultats.length > 1 ? "s" : ""}` : ""}
+      <p className={index && resultats.length > 0 ? "sr-seul" : "r-statut"} role="status" aria-live="polite">
+        {message}
       </p>
     </div>
   );

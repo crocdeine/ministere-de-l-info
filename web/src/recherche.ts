@@ -96,7 +96,7 @@ export function chercher(index: Index, texte: string, max = 10): Resultat[] {
   if (t.length < 2) return [];
   const mots = t.split(" ");
   const chiffres = /^\d+$/.test(t);
-  const trouves: { rang: number; r: Resultat }[] = [];
+  const trouves: Candidat[] = [];
   for (const e of index.entrees) {
     let rang = e.norm === t ? 0 : e.norm.startsWith(t) ? 1 : mots.every((m) => e.norm.includes(m)) ? 2 : -1;
     // Circonscription saisie par son code (« 80-01 » → « 80 01 »), en fin de libellé normalisé.
@@ -116,14 +116,25 @@ export function chercher(index: Index, texte: string, max = 10): Resultat[] {
         }
       }
     }
-    if (rang >= 0) trouves.push({ rang, r: { entree: e, cible: e.ref ?? e.code, codePostal } });
+    if (rang >= 0) garder(trouves, { rang, r: { entree: e, cible: e.ref ?? e.code, codePostal } }, max);
   }
-  trouves.sort(
-    (a, b) =>
-      a.rang - b.rang ||
-      a.r.entree.libelle.localeCompare(b.r.entree.libelle, "fr") ||
-      ORDRE_TYPE[a.r.entree.type] - ORDRE_TYPE[b.r.entree.type] ||
-      a.r.entree.code.localeCompare(b.r.entree.code),
-  );
-  return trouves.slice(0, max).map((x) => x.r);
+  return trouves.map((x) => x.r);
+}
+
+const collateur = new Intl.Collator("fr");
+type Candidat = { rang: number; r: Resultat };
+const comparer = (a: Candidat, b: Candidat) =>
+  a.rang - b.rang ||
+  collateur.compare(a.r.entree.libelle, b.r.entree.libelle) ||
+  ORDRE_TYPE[a.r.entree.type] - ORDRE_TYPE[b.r.entree.type] ||
+  collateur.compare(a.r.entree.code, b.r.entree.code);
+
+/** Insère dans une liste triée bornée à `max` éléments (sans trier tous les candidats). */
+function garder(liste: Candidat[], c: Candidat, max: number): void {
+  const dernier = liste[liste.length - 1];
+  if (liste.length >= max && dernier && comparer(c, dernier) >= 0) return;
+  let i = liste.length;
+  while (i > 0 && comparer(c, liste[i - 1] as Candidat) < 0) i--;
+  liste.splice(i, 0, c);
+  if (liste.length > max) liste.pop();
 }
