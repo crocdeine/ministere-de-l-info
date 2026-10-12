@@ -82,6 +82,8 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
   const [tri, setTri] = useState<Tri>({ cle: "rang", sens: 1 });
   const [copie, setCopie] = useState<"ok" | "echec" | null>(null);
   const [bureaux, setBureaux] = useState<Bureaux | null>(null);
+  const [exportErreur, setExportErreur] = useState<string | null>(null);
+  const enregistrer = async (nom: string, contenu: string) => setExportErreur(await telecharger(nom, contenu));
   const [rangBv, setRangBv] = useState<number | null>(null);
 
   useEffect(() => {
@@ -393,10 +395,11 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
               </table>
             </div>
             <p className="aide">
-              <button type="button" aria-label="Télécharger l'historique (CSV)" onClick={() => telecharger(nomFichier("historique", code), csvHistorique(m, { code, nom: info.nom }, triees, colonnes, remarques, filtre))}>
+              <button type="button" aria-label="Télécharger l'historique (CSV)" onClick={() => enregistrer(nomFichier("historique", code), csvHistorique(m, { code, nom: info.nom }, triees, colonnes, remarques, filtre))}>
                 Télécharger (CSV)
               </button>{" "}
-              Source, licence, dates et méthode sont écrites en tête du fichier.
+              Source, licence, dates et méthode sont écrites en tête du fichier.{" "}
+              <span role="status">{exportErreur}</span>
             </p>
           </>
         )}
@@ -476,9 +479,10 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
               )}
               {bv.length > 0 && (
                 <p className="aide">
-                  <button type="button" aria-label="Télécharger les bureaux de vote (CSV)" onClick={() => telecharger(nomFichier("bureaux-de-vote", `${code}_${bv[0]?.scrutin.id ?? ""}`), csvBureaux(m, { code, nom: info.nom }, bv, colonnes))}>
+                  <button type="button" aria-label="Télécharger les bureaux de vote (CSV)" onClick={() => enregistrer(nomFichier("bureaux-de-vote", `${code}_${bv[0]?.scrutin.id ?? ""}`), csvBureaux(m, { code, nom: info.nom }, bv, colonnes))}>
                     Télécharger (CSV)
-                  </button>
+                  </button>{" "}
+                  <span role="status">{exportErreur}</span>
                 </p>
               )}
               <Source m={m} cles={["elections"]}>

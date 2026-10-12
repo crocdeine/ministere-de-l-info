@@ -181,3 +181,7 @@ questions préréglées sur l'Accueil.
 ## Décisions du 2026-10-09 (Méthodologie)
 
 - 2026-10-09 : texte de la Méthodologie validé par Mathias ; entrée Méthodologie dans la navigation.
+
+## Décisions du 2026-10-12 (exports CSV)
+
+- 2026-10-12 : enregistrement des CSV dans l'application Mac par la permission la plus restreinte : `tauri-plugin-dialog` côté Rust seulement, une commande `enregistrer_csv` (boîte « Enregistrer sous », écriture au seul chemin choisi, 32 Mio au plus) ; ni plugin `fs`, ni permission `fs:*`, ni changement de CSP.

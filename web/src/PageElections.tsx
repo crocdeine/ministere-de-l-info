@@ -184,7 +184,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
         lireJsonGz<{ codes: string[]; noms: string[] }>(communes.url, communes.sha256, communes.nom),
         lireJsonGz<ColonnesScrutin>(tour.url, tour.sha256, tour.nom),
       ]);
-      telecharger(nomFichier("scrutin", s.id), csvScrutin(manifeste, s, c.codes, c.noms, t, (car) => libelleEtat(etats, car)));
+      setExportErreur(await telecharger(nomFichier("scrutin", s.id), csvScrutin(manifeste, s, c.codes, c.noms, t, (car) => libelleEtat(etats, car))));
     } catch (e) {
       setExportErreur(e instanceof Error ? e.message : String(e));
     } finally {

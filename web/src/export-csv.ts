@@ -84,14 +84,30 @@ export function enTete(m: Manifeste, titre: string, cles: string[], notes: strin
   };
 }
 
-/** Déclenche l'enregistrement (lien `download` sur un blob) ; l'application Mac demande un traitement propre. */
-export function telecharger(nom: string, contenu: string): void {
+type Tauri = { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> };
+
+/**
+ * Enregistre le fichier. Application Mac : commande Rust `enregistrer_csv` (boîte « Enregistrer sous »,
+ * le WebKit embarqué ignore les liens `download` sur `blob:`). Navigateur : lien `download`.
+ * Retourne un message d'erreur, ou `null` (succès ou annulation par l'utilisateur).
+ */
+export async function telecharger(nom: string, contenu: string): Promise<string | null> {
+  const tauri = (globalThis as { __TAURI_INTERNALS__?: Tauri }).__TAURI_INTERNALS__;
+  if (tauri) {
+    try {
+      await tauri.invoke("enregistrer_csv", { nomSuggere: nom, contenu });
+      return null;
+    } catch (e) {
+      return `Enregistrement impossible : ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
   const url = URL.createObjectURL(new Blob([contenu], { type: "text/csv;charset=utf-8" }));
   const a = Object.assign(document.createElement("a"), { href: url, download: nom });
   document.body.append(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  return null;
 }
 
 const methode = (s: Scrutin) => (s.methode === "officielle" ? "Grille officielle" : "Reconstruit");

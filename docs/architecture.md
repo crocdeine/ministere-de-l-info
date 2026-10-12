@@ -195,6 +195,13 @@ base DuckDB (lecture seule)
   mémoire (Tauri) est vérifiée contre `sha256`.
 - MapLibre est servi depuis ses fichiers ESM d'origine (`public/vendor/`, copiés par
   `vite.config.ts`) pour ne pas dupliquer son code commun dans le worker.
+- Exports CSV (A6, `web/src/export-csv.ts`) : UTF-8 avec BOM, `;`, décimale `,`, en-tête `#` (source,
+  licence ODbL, dates, méthode à l'étiquette `v<version de pyproject.toml>`), absence = cellule vide.
+  Dans l'application Mac, enregistrement par la seule commande Rust `enregistrer_csv`
+  (`web/src-tauri/src/main.rs`, `tauri-plugin-dialog` côté Rust) : boîte « Enregistrer sous », écriture au
+  seul chemin choisi, contenu borné à 32 Mio, nom assaini. Permission : `allow-enregistrer-csv`
+  uniquement (`capabilities/default.json`, fenêtre `main`) ; aucun plugin `fs`, aucune permission
+  `dialog:*` ni `fs:*`, CSP inchangée. Navigateur : lien `download` sur `blob:`.
 - Commandes : `web/README.md`.
 
 ## Navigation et thème
