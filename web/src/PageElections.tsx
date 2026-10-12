@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Carte, type Rendu, type Survol, token } from "./Carte";
 import { type ColonnesScrutin, date, entier, lireJsonGz, type Manifeste, pct, urlDonnees } from "./donnees";
 import { annees, choisir, type Etat, etats as listeEtats, libelleEtat, scrutinInitial, tours } from "./etats";
-import { csvScrutin, nomFichier, telecharger } from "./export-csv";
+import { enregistrerExport, exportScrutin, type Format } from "./export-csv";
 import { ecrireUrl, lireUrl } from "./etat-url";
 import { EtiquetteMethode, Legende, LienMethode } from "./Legende";
 import { journal, noter } from "./mesure";
@@ -175,7 +175,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
   }, [worker, communes, texte]);
 
   // Export du tour affiché : fichiers relus (et vérifiés) à la demande, hors du worker.
-  const exporter = async () => {
+  const exporter = async (format: Format) => {
     if (!tour || !s || exportEnCours) return;
     setExportErreur(null);
     setExportEnCours(true);
@@ -184,7 +184,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
         lireJsonGz<{ codes: string[]; noms: string[] }>(communes.url, communes.sha256, communes.nom),
         lireJsonGz<ColonnesScrutin>(tour.url, tour.sha256, tour.nom),
       ]);
-      setExportErreur(await telecharger(nomFichier("scrutin", s.id), csvScrutin(manifeste, s, c.codes, c.noms, t, (car) => libelleEtat(etats, car))));
+      setExportErreur(await enregistrerExport(exportScrutin(manifeste, s, c.codes, c.noms, t, (car) => libelleEtat(etats, car)), format));
     } catch (e) {
       setExportErreur(e instanceof Error ? e.message : String(e));
     } finally {
@@ -349,11 +349,13 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
         </figure>
         <Legende etats={etats} scrutin={s} rupture={rupture} />
         <p className="aide">
-          <button type="button" aria-label="Télécharger le scrutin affiché (CSV)" disabled={exportEnCours} onClick={exporter}>
-            {exportEnCours ? "Préparation…" : "Télécharger (CSV)"}
-          </button>{" "}
-          Une ligne par commune pour ce tour ; source, licence, dates et méthode sont écrites en tête du fichier.{" "}
-          <span role="status">{exportErreur && `Export impossible : ${exportErreur}`}</span>
+          {(["xlsx", "csv"] as const).map((f) => (
+            <button key={f} type="button" aria-label={`Télécharger le scrutin affiché (${f === "xlsx" ? "Excel" : "CSV"})`} disabled={exportEnCours} onClick={() => exporter(f)}>
+              {exportEnCours ? "Préparation…" : f === "xlsx" ? "Télécharger (Excel)" : "CSV"}
+            </button>
+          ))}{" "}
+          Une ligne par commune pour ce tour ; source, licence, dates et méthode : onglet « Notes » (Excel) ou fin du fichier (CSV).{" "}
+          <span role="status">{exportErreur}</span>
         </p>
         <div className="source">
           <p className="source-titre">Source</p>

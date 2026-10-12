@@ -19,7 +19,7 @@ import {
   mentionFusion,
   raisonsSerie,
 } from "./fiche";
-import { csvBureaux, csvHistorique, nomFichier, telecharger } from "./export-csv";
+import { enregistrerExport, type Export, exportBureaux, exportHistorique, type Format } from "./export-csv";
 import { GraphiqueEvolution } from "./GraphiqueEvolution";
 import { EtiquetteMethode, LienMethode } from "./Legende";
 
@@ -83,7 +83,12 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
   const [copie, setCopie] = useState<"ok" | "echec" | null>(null);
   const [bureaux, setBureaux] = useState<Bureaux | null>(null);
   const [exportErreur, setExportErreur] = useState<string | null>(null);
-  const enregistrer = async (nom: string, contenu: string) => setExportErreur(await telecharger(nom, contenu));
+  const [exportEnCours, setExportEnCours] = useState(false);
+  const enregistrer = async (construire: () => Export, format: Format) => {
+    setExportEnCours(true);
+    setExportErreur(await enregistrerExport(construire(), format));
+    setExportEnCours(false);
+  };
   const [rangBv, setRangBv] = useState<number | null>(null);
 
   useEffect(() => {
@@ -395,10 +400,12 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
               </table>
             </div>
             <p className="aide">
-              <button type="button" aria-label="Télécharger l'historique (CSV)" onClick={() => enregistrer(nomFichier("historique", code), csvHistorique(m, { code, nom: info.nom }, triees, colonnes, remarques, filtre))}>
-                Télécharger (CSV)
-              </button>{" "}
-              Source, licence, dates et méthode sont écrites en tête du fichier.{" "}
+              {(["xlsx", "csv"] as const).map((f) => (
+                <button key={f} type="button" disabled={exportEnCours} aria-label={`Télécharger l'historique (${f === "xlsx" ? "Excel" : "CSV"})`} onClick={() => enregistrer(() => exportHistorique(m, { code, nom: info.nom }, triees, remarques, filtre), f)}>
+                  {f === "xlsx" ? "Télécharger (Excel)" : "CSV"}
+                </button>
+              ))}{" "}
+              Source, licence, dates et méthode : onglet « Notes » (Excel) ou fin du fichier (CSV).{" "}
               <span role="status">{exportErreur}</span>
             </p>
           </>
@@ -479,9 +486,11 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
               )}
               {bv.length > 0 && (
                 <p className="aide">
-                  <button type="button" aria-label="Télécharger les bureaux de vote (CSV)" onClick={() => enregistrer(nomFichier("bureaux-de-vote", `${code}_${bv[0]?.scrutin.id ?? ""}`), csvBureaux(m, { code, nom: info.nom }, bv, colonnes))}>
-                    Télécharger (CSV)
-                  </button>{" "}
+                  {(["xlsx", "csv"] as const).map((f) => (
+                    <button key={f} type="button" disabled={exportEnCours} aria-label={`Télécharger les bureaux de vote (${f === "xlsx" ? "Excel" : "CSV"})`} onClick={() => enregistrer(() => exportBureaux(m, { code, nom: info.nom }, bv), f)}>
+                      {f === "xlsx" ? "Télécharger (Excel)" : "CSV"}
+                    </button>
+                  ))}{" "}
                   <span role="status">{exportErreur}</span>
                 </p>
               )}

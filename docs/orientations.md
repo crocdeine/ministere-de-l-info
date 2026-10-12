@@ -182,6 +182,7 @@ questions préréglées sur l'Accueil.
 
 - 2026-10-09 : texte de la Méthodologie validé par Mathias ; entrée Méthodologie dans la navigation.
 
-## Décisions du 2026-10-12 (exports CSV)
+## Décisions du 2026-10-12 (exports Excel et CSV)
 
 - 2026-10-12 : enregistrement des CSV dans l'application Mac par la permission la plus restreinte : `tauri-plugin-dialog` côté Rust seulement, une commande `enregistrer_csv` (boîte « Enregistrer sous », écriture au seul chemin choisi, 32 Mio au plus) ; ni plugin `fs`, ni permission `fs:*`, ni changement de CSP.
+- 2026-10-12 : après lecture du premier CSV (« pas très clair »), Mathias retient **Excel (.xlsx) + CSV brut** : tableau dès la ligne 1, notes dans un onglet « Notes » (Excel) ou à la fin du CSV ; colonnes sans objet retirées ; voix, votants et exprimés ajoutés ; « Méthode » renommée « Classement des blocs ». La commande Tauri devient `enregistrer_export` (octets, `.csv` ou `.xlsx` seulement), même capability restreinte.

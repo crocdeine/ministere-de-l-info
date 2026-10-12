@@ -71,6 +71,8 @@ export type Ligne = {
   exprimes: number | null;
   /** Votants / inscrits, en %. */
   participation: number | null;
+  /** Voix par bloc (et `NC`) ; `null` = n.d. */
+  voix: Record<string, number | null>;
   /** Part des exprimés par bloc (et `NC`, non classé), en % ; `null` = n.d. */
   parts: Record<string, number | null>;
   /** Somme des voix supérieure aux exprimés (scrutin plurinominal) : parts non calculées. */
@@ -105,6 +107,7 @@ function ligne(m: Manifeste, cols: ColonnesDep, i: number, anciennes: (rang: num
     votants,
     exprimes,
     participation: inscrits && votants !== null ? (100 * votants) / inscrits : null,
+    voix: Object.fromEntries(voix.map((c, j) => [c, v[j] ?? null])),
     parts: Object.fromEntries(
       voix.map((c, j) => [c, calculable && v[j] !== null ? (100 * (v[j] as number)) / (exprimes as number) : null]),
     ),

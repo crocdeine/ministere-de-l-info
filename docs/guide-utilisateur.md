@@ -205,6 +205,26 @@ nuance → bloc (filtre par année). Fermeture : bouton « Fermer », touche Éc
 panneau. Le même texte est aussi une page à part entière, entrée « 05 — Méthodologie » de la
 navigation (adresse `#/methodologie`). Captures : `docs/captures/a5/`. Texte source : `docs/methodologie.md`.
 
+### Nouvelle application : exporter un tableau (Excel ou CSV)
+
+Sous la carte de la page Élections, et sous les tableaux de la fiche commune (historique, bureaux
+de vote), deux boutons : **Télécharger (Excel)** et **CSV**. Dans l'application Mac, une boîte
+« Enregistrer sous » s'ouvre ; dans un navigateur, le fichier va dans le dossier de téléchargement.
+
+- **Excel (.xlsx)** : l'onglet « Données » contient le tableau dès la première ligne (en-têtes en
+  gras et figés) ; les nombres sont de vrais nombres, les codes INSEE et de bureau sont du texte (le
+  zéro initial de « 01001 » est conservé). Une cellule vide signifie « donnée absente », jamais 0.
+  L'onglet « Notes » donne le titre, les sources et leurs licences, la licence ODbL de la base, la
+  date des données et de l'export, le filtre actif, la définition des blocs, le classement de
+  chaque scrutin (« Grille officielle » ou « Reconstruction documentée »), le lien vers la méthode
+  et la définition de chaque colonne.
+- **CSV** : même tableau dès la première ligne, puis une ligne vide et les mêmes notes, chacune
+  préfixée de « # ». Encodage UTF-8 avec BOM, séparateur point-virgule, virgule décimale (lecture
+  directe dans un tableur français). Pour garder les zéros initiaux des codes, importer les colonnes
+  de codes en texte ; le format Excel évite cette étape.
+- Les colonnes sans objet sont retirées (par exemple « Voix NC » quand aucune voix n'est non
+  classée). Les voix par bloc, les votants et les exprimés accompagnent les parts.
+
 ---
 
 ## Législatif

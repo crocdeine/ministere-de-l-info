@@ -1,16 +1,19 @@
-# Exports CSV (vague A, lot A6), 2026-10-12
+# Exports Excel et CSV (vague A, lot A6), 2026-10-12
 
 ## Résumé exécutif
-- Module `web/src/export-csv.ts` : UTF-8 avec BOM, séparateur `;`, décimale `,` (2 décimales au plus), CRLF, absence = cellule vide (jamais 0).
-- En-tête de lignes `# …` : titre, source(s) (mentions du manifeste), licence (ODbL + contenus sous licence producteur), « Données du », « Export du », méthode (docs/methodologie.md sur GitHub), format, blocs, légende de classement de chaque scrutin (officielle ou reconstruit).
-- Trois exports : historique électoral de la fiche (ordre et filtres de l'écran), bureaux de vote de la fiche, une ligne par commune pour le tour affiché de la page Élections.
-- Codes INSEE et codes de bureau en texte (zéros conservés) ; texte commençant par `= + - @` préfixé d'une apostrophe (injection de formule).
-- Nom : `ministere-info_{vue}_{identifiant}_{AAAA-MM-JJ}.csv`.
-- Vérifications : tsc, vitest (40 tests dont format CSV), build, budget (398,9 Ko gzip, tenu), npm audit, e2e url, fiche et nouveau `e2e:export` (téléchargement réel puis relecture, WebKit et Chromium).
-- Non vérifié : ouverture dans Numbers/LibreOffice (à faire par Mathias) ; téléchargement dans le `.app` Tauri (pas de recompilation).
+- Décision de Mathias (2026-10-12), après lecture du premier CSV (« pas très clair ») : **Excel (.xlsx) + CSV brut**.
+- Excel : onglet « Données » (tableau dès la ligne 1, en-têtes en gras et figés, nombres numériques, pourcentages à 2 décimales, entiers avec séparateur de milliers, codes INSEE et de bureau en cellules texte, cellule absente pour n.d.) ; onglet « Notes » (clé / valeur : titre, sources, licence ODbL, dates, filtre, blocs, classement par scrutin, méthode, définition de chaque colonne).
+- CSV : même tableau dès la ligne 1, puis ligne vide et les mêmes notes préfixées « # » ; UTF-8 avec BOM, `;`, décimale `,`.
+- Contenu : colonnes sans objet retirées (Voix et Part NC seulement s'il y a des non classés, Remarques si vide) ; Votants, Exprimés et voix par bloc ajoutés ; « Méthode » devient « Classement des blocs » (« Grille officielle » / « Reconstruction documentée ») ; artefacts « , » et répétition « Classement des blocs : » supprimés ; libellés avec unités.
+- Bibliothèque : `fflate` 0.8 (MIT, zéro dépendance, écriture seule), classeur XML écrit à la main ; import dynamique : **+1,7 Ko gzip** chargés à la demande, **+≈ 6 Ko gzip** dans le JS initial (code d'export), total 405,3 Ko (cible 450). Paquet `xlsx` écarté. `npm audit` : 0 vulnérabilité.
+- Tauri : commande `enregistrer_export` (octets bruts, nom en en-tête, `.csv` ou `.xlsx` seulement, 32 Mio, boîte « Enregistrer sous »), permission unique `allow-enregistrer-export`, ni `fs` ni `dialog:*`, CSP inchangée. Renommage de `enregistrer_csv` (qui n'est plus limité au CSV).
+- Vérifications : tsc, vitest (42), build, budget, audit, e2e url, fiche et export (télécharge puis relit Excel et CSV, WebKit et Chromium), clippy sans avertissement, `cargo test` (2).
+- Non vérifié : ouverture dans Excel, Numbers, LibreOffice (à faire par Mathias) ; enregistrement réel dans le `.app` (corps binaire de l'IPC Tauri, non exécutable sans fenêtre).
 
-## Tauri : point bloquant probable
-Aucune capability ni plugin dans `web/src-tauri`. Le lien `<a download>` sur un `blob:` est connu pour ne rien faire dans le WKWebView de Tauri 2 sans traitement côté Rust ; à confirmer sur un `.app`. Option la plus restreinte : `tauri-plugin-dialog` côté Rust seulement, avec une commande `enregistrer_csv(nom, contenu)` qui ouvre la boîte « Enregistrer sous » et n'écrit que le chemin choisi. Pas de plugin `fs`, pas de permission `fs:*`, pas de changement de CSP. Côté web : appel `invoke` si `window.__TAURI_INTERNALS__` existe, sinon blob.
+## Colonnes
+Historique (fiche) : Code INSEE, Commune, Scrutin, Classement des blocs, Inscrits, Votants, Exprimés, Participation (% des inscrits), Voix par bloc, Part par bloc (% des exprimés), Remarques. Bureaux : idem avec « Bureau de vote » à la place du classement. Scrutin (page Élections) : Code INSEE, Commune, Bloc en tête, Part du bloc en tête (% des exprimés), effectifs, voix par bloc.
 
-## Hors lot
-Population et économie de la fiche, listes d'élus (non exportés : petits blocs, pas de tableau de données). Variante « LISEZMOI à côté » écartée : l'en-tête `#` reste dans le fichier.
+## Limites
+- Valeurs en % stockées en points (68,21) avec format `0.00` et unité dans le titre de colonne, pas en fraction Excel.
+- Population, économie et élus de la fiche ne sont pas exportés.
+- Lien de méthode : tag `v<version>` du dépôt public ; il doit contenir `docs/methodologie.md`.
