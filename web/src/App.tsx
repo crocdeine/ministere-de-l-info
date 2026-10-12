@@ -3,6 +3,7 @@ import { chargerManifeste, type Manifeste } from "./donnees";
 import { FicheCommune } from "./FicheCommune";
 import { PageMethodologie } from "./Legende";
 import { PageElections } from "./PageElections";
+import { Recherche } from "./ChampRecherche";
 
 // Navigation : 5 entrées de l'application Streamlit + Méthodologie. Pages non portées : renvoi vers
 // la version Streamlit. Numérotation « 0X — » (ADR-0016 : pas de code couleur par module).
@@ -58,6 +59,7 @@ export function App() {
             ))}
           </ul>
         </nav>
+        <Recherche manifeste={manifeste} />
       </header>
       <main className="page">
         {page === "methodologie" ? (

@@ -14,7 +14,8 @@ Lit la base DuckDB en LECTURE SEULE (vues ``v_resultats_candidats_avec_bloc``,
   par bureau de vote (fiche territoire, lot A3) ; ``fiches.json.gz`` : identité, population,
   économie, élus et communes rattachées (``fiches.py``) ;
 - ``methodologie.json.gz`` : registre des sources (``sources.py``) et correspondances
-  nuance (ou candidat) → bloc, avec leur justification (panneau Méthodologie, lot A5).
+  nuance (ou candidat) → bloc, avec leur justification (panneau Méthodologie, lot A5) ;
+- ``recherche.json.gz`` : index de la recherche globale (``recherche.py``, lot A4).
 
 Toutes les agrégations sont faites en SQL. Absence = ``null`` (affichée « n.d. »), jamais 0.
 Participation = Σ votants / Σ inscrits (même formule que ``v_participation_commune_pres``).
@@ -48,6 +49,7 @@ from ministere_de_l_info._blocs_politiques import (
 )
 from ministere_de_l_info.espace_disque import verifier_espace
 from ministere_de_l_info.export_web.fiches import ecrire_fiches
+from ministere_de_l_info.export_web.recherche import ecrire_recherche
 from ministere_de_l_info.sources import SOURCES, mention
 from ministere_de_l_info.viz._display import COULEUR_ND
 
@@ -505,6 +507,7 @@ def exporter(
             logger.info("Scrutins écrits (%.1f s)", time.perf_counter() - t0)
             _ecrire_departements(con, prepa, fichiers, departements)
             ecarts_fiches = ecrire_fiches(con, prepa, lambda c, x: _json_gz(c, x, fichiers, prepa))
+            ecrire_recherche(con, prepa, lambda c, x: _json_gz(c, x, fichiers, prepa))
             _ecrire_methodologie(con, prepa, fichiers)
             logger.info("Départements écrits (%.1f s)", time.perf_counter() - t0)
             if tippecanoe:

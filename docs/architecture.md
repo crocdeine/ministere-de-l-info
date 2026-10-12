@@ -171,6 +171,7 @@ base DuckDB (lecture seule)
             departements/<dep>/{communes,bureaux}.json.gz   tous tours (fiche territoire, A3)
             departements/<dep>/fiches.json.gz   identité, circonscriptions, population, économie, élus, communes rattachées (fiches.py)
             methodologie.json.gz       registre des sources + correspondances → bloc (panneau Méthodologie, A5)
+            recherche.json.gz          index de la recherche globale (A4, `recherche.py`) : communes (nom, INSEE, codes postaux La Poste si `codes_postaux` est chargée), départements, circonscriptions, élus ; départements, circonscriptions et élus renvoient à la commune la plus peuplée de leur périmètre
   └─ web/  Vite + React + TypeScript, MapLibre  →  web/src-tauri/  application Mac (Tauri v2)
 ```
 
