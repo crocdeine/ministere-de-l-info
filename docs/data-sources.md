@@ -353,6 +353,23 @@ Mesure du 2026-10-06 : nuance renseignée pour 96 des 100 mandats AN non inscrit
 
 ---
 
+## La Poste — Base officielle des codes postaux (hexasmal)
+
+| Aspect | Valeur |
+|--------|--------|
+| Fiche | `https://www.data.gouv.fr/datasets/base-officielle-des-codes-postaux/` (producteur La Poste) |
+| Fichier | `https://data.laposte.fr/data-fair/api/v1/datasets/laposte-hexasmal/raw` (CSV latin-1, `;`, 39 192 lignes au 2026-10-12, maj 2026-10-08) |
+| Licence | Licence Ouverte 2.0 (vérifiée le 2026-10-12), compatible avec l'ODbL de la base |
+| Table | `codes_postaux(code_insee, code_postal)`, 35 511 couples distincts, 34 965 communes (toutes celles de `geographies_communes`) |
+| Loader | `etl/loaders/codes_postaux.py`, `scripts/load_codes_postaux.py` (cache `data/raw/laposte/`) |
+
+Usage : recherche par code postal de l'application web (index `recherche.json.gz`). Un code
+postal couvre souvent plusieurs communes et une commune plusieurs codes postaux : aucune
+interprétation. Paris, Lyon, Marseille : publiés par arrondissement (75101…), rattachés à la
+commune (75056, 69123, 13055). Le code postal n'est jamais pris pour un code INSEE (gotcha 4).
+
+---
+
 ## Sources abandonnées
 
 | Source | Module | Raison | Code |

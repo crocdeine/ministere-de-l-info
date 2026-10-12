@@ -102,6 +102,13 @@ SOURCES: dict[str, Source] = {
         "https://www.data.gouv.fr/datasets/donnees-des-elections-agregees/",
         (),
     ),
+    "laposte_cp": Source(
+        "Codes postaux des communes (Base officielle des codes postaux, hexasmal)",
+        "La Poste (data.laposte.fr)",
+        LO2,
+        "https://www.data.gouv.fr/datasets/base-officielle-des-codes-postaux/",
+        ("codes_postaux",),
+    ),
     "datan": Source(
         "Députés et scores d'activité (d'après l'AN)",
         "Datan",
