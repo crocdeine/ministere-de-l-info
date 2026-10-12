@@ -1,0 +1,95 @@
+/* Recherche globale du bandeau (lot A4) : uniquement des var(--…) de tokens.css. */
+
+.sr-seul {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.recherche-globale {
+  position: relative;
+  flex: 1 1 18rem;
+  max-width: 28rem;
+}
+
+.recherche-globale input[type="search"] {
+  width: 100%;
+  padding-right: var(--space-12);
+}
+
+.raccourci {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  padding: 0 var(--space-1);
+  border: var(--border-w) solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-meta-warm);
+  pointer-events: none;
+}
+
+.resultats-recherche {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--paper);
+  border: var(--border-w) solid var(--ink);
+}
+
+.resultats-recherche[hidden] {
+  display: none;
+}
+
+.resultats-recherche li {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-w) solid var(--rule-soft);
+  cursor: pointer;
+}
+
+.resultats-recherche li[aria-selected="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.resultats-recherche .r-meta {
+  font-size: var(--text-sm);
+  color: var(--text-meta-warm);
+}
+
+.resultats-recherche li[aria-selected="true"] .r-meta {
+  color: var(--paper);
+}
+
+.recherche-globale .r-statut {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--paper);
+  border: var(--border-w) solid var(--ink);
+  font-size: var(--text-sm);
+  color: var(--text-meta-warm);
+}
+
+.recherche-globale .r-statut:empty {
+  display: none;
+}

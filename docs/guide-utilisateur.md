@@ -205,6 +205,17 @@ nuance → bloc (filtre par année). Fermeture : bouton « Fermer », touche Éc
 panneau. Le même texte est aussi une page à part entière, entrée « 05 — Méthodologie » de la
 navigation (adresse `#/methodologie`). Captures : `docs/captures/a5/`. Texte source : `docs/methodologie.md`.
 
+### Nouvelle application : recherche
+
+Le champ de recherche du bandeau (raccourci `⌘K` ou `Ctrl+K`, ou `/` hors d'un champ) trouve une
+commune (nom, code INSEE ou **code postal**), un département, une circonscription législative
+(« 80-01 ») ou un député ou sénateur en exercice. Accents, tirets et « St » pour « Saint » sont
+tolérés. Les résultats sont classés dans l'ordre alphabétique (exact, puis début, puis
+contenu) ; le département distingue les homonymes. Flèches pour choisir, `Entrée` pour ouvrir,
+`Échap` pour fermer. Un département, une circonscription ou un élu ouvre la fiche de la commune
+la plus peuplée de son périmètre (indiqué dans la ligne de résultat) : ces entités n'ont pas
+encore de page propre. Un code postal peut couvrir plusieurs communes : toutes sont proposées.
+
 ---
 
 ## Législatif

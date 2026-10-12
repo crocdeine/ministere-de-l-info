@@ -18,6 +18,7 @@ Toute réutilisation doit citer les sources ci-dessous.
 | Populations légales | INSEE | Licence Ouverte 2.0 |
 | Code officiel géographique (mouvements des communes) | INSEE | Licence Ouverte 2.0 |
 | Filosofi et recensement (fichier republié) | INSEE, republié par T. Szczurek-Gayant sur data.gouv.fr | Licence Ouverte 2.0 |
+| Codes postaux des communes (Base officielle des codes postaux) | La Poste | Licence Ouverte 2.0 |
 | Foyers allocataires du RSA | CNAF | Licence Ouverte 2.0 |
 | Accessibilité potentielle localisée (APL) | DREES | Licence Ouverte 2.0 |
 | Établissements et effectifs salariés | URSSAF | ODbL 1.0 |
