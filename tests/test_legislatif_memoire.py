@@ -736,3 +736,17 @@ class TestPage:
         assert not at.exception, at.exception
         assert any("Rang" in c.value for c in at.caption)
         assert len(at.metric) >= 4
+
+
+def test_corse_en_capitales(tmp_path: Path) -> None:
+    """Datan publie « 2a »/« 2b » : la base garde les codes INSEE 2A/2B (fiche commune, A3)."""
+    d = tmp_path / "raw"
+    _ecrire_datan(d, [*_DEPUTES, ("RN", 17, "2a", True)])
+    _ecrire_senat(d, _SENATEURS)
+    c = duckdb.connect()
+    try:
+        _charger(c, d)
+        codes = {r[0] for r in c.execute("SELECT code_departement FROM v_elus_actuels").fetchall()}
+        assert "2A" in codes and "2a" not in codes
+    finally:
+        c.close()

@@ -2,7 +2,7 @@
 // lecture des JSON gzip et formats français. Aucun accès au DOM : utilisable dans un worker.
 
 /** Version de schéma comprise par cette interface (VERSION_SCHEMA côté Python). */
-export const VERSION_SCHEMA = 2;
+export const VERSION_SCHEMA = 3;
 
 export type Bloc = { code: string; car: string; libelle: string; couleur: string };
 
@@ -14,6 +14,8 @@ export type Scrutin = {
   libelle: string;
   methode: "officielle" | "reconstruit";
   legende: string;
+  /** Législatives 2002-2007 : découpage des circonscriptions antérieur à 2010. */
+  ancien_decoupage: boolean;
 };
 
 export type Source = { mention: string; producteur: string; licence: string; url: string };
@@ -23,7 +25,7 @@ export type Manifeste = {
   schema: number;
   date_export: string;
   licence_base: { nom: string; url: string; mention: string };
-  sources: Record<"elections" | "ign", Source>;
+  sources: Record<"elections" | "ign", Source> & Record<string, Source | undefined>;
   perimetre: { departements: string[] | null; communes: number; communes_sans_contour: number };
   types: Record<string, string>;
   scrutins: Scrutin[];

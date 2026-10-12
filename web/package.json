@@ -12,6 +12,7 @@
     "budget": "node perf/budget.mjs",
     "mesure": "node perf/mesure.mjs",
     "e2e:url": "node perf/url.mjs",
+    "e2e:fiche": "node perf/fiche.mjs",
     "tauri:dev": "tauri dev",
     "tauri:build": "node verifier-espace.mjs && tauri build"
   },

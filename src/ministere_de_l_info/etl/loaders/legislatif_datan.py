@@ -170,7 +170,8 @@ def load_legislatif_datan(
         elif bloc is None:
             non_classes[(groupe_abrev, legislature)] += 1
 
-        code_dep = (row.get("departementCode") or "XX").strip()
+        # Datan écrit la Corse « 2a »/« 2b » : codes INSEE en capitales (2A, 2B).
+        code_dep = (row.get("departementCode") or "XX").strip().upper()
         nom_dep = (row.get("departementNom") or "").strip()
         circo_raw = (row.get("circo") or "").strip()
         num_circo = int(circo_raw) if circo_raw.isdigit() else None

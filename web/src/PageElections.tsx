@@ -32,8 +32,8 @@ function Resultats({ m, etats, car, v, erreur }: { m: Manifeste; etats: Etat[]; 
   );
 }
 
-// Doit suivre PAGES (App.tsx) : une page absente serait réécrite en #/elections.
-const PAGES_URL = ["accueil", "geographie", "elections", "economie", "legislatif", "methodologie"];
+// Doit suivre PAGES (App.tsx) et la fiche commune : une page absente serait réécrite en #/elections.
+const PAGES_URL = ["accueil", "geographie", "elections", "economie", "legislatif", "methodologie", "commune"];
 const depuisUrl = (m: Manifeste) =>
   lireUrl(location.hash, PAGES_URL, m.scrutins.map((x) => x.id), "elections");
 
@@ -301,6 +301,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
                 {c?.nom || choisie.nom || choisie.code} <span className="mono">{choisie.code}</span> — {s.libelle}
               </strong>
               {c ? <Resultats m={manifeste} etats={etats} car={carChoisie} v={c.valeurs} erreur={c.erreur} /> : <span>Chargement…</span>}
+              {!communeInconnue && <a href={`#/commune?code=${choisie.code}`}>Ouvrir la fiche de la commune</a>}
             </>
           )}
         </div>
@@ -315,10 +316,12 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
           <Carte manifeste={manifeste} etats={etats} scrutin={scrutin} onSurvol={setSurvol} onRendu={rendu} />
           {survol && (
             // Infobulle de la souris : non annoncée (aria-hidden) ; au clavier, champ « Commune ».
+            // Un clic sur la commune ouvre sa fiche (Carte.tsx).
             <div className="infobulle" aria-hidden="true" style={{ left: survol.x, top: survol.y }}>
               <strong>{d?.nom ?? survol.code}</strong>
               <span className="mono">{survol.code}</span>
               <Resultats m={manifeste} etats={etats} car={car} v={d?.valeurs} erreur={d?.erreur} />
+              <span>Cliquer pour ouvrir la fiche ↘</span>
             </div>
           )}
         </figure>

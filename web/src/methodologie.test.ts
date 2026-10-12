@@ -10,8 +10,10 @@ describe("Méthodologie (docs/methodologie.md)", () => {
   it("définit chaque ancre ouverte par l'interface", () => {
     for (const a of ANCRES) expect(definies).toContain(a);
     // Ancres citées dans les composants (ancre="…") : toutes dans ANCRES, donc définies.
-    const legende = readFileSync(new URL("./Legende.tsx", import.meta.url), "utf8");
-    for (const [, a] of legende.matchAll(/ancre="([\w-]+)"/g)) expect(definies).toContain(a);
+    for (const f of ["./Legende.tsx", "./PageElections.tsx", "./FicheCommune.tsx"]) {
+      const source = readFileSync(new URL(f, import.meta.url), "utf8");
+      for (const [, a] of source.matchAll(/ancre="([\w-]+)"/g)) expect(definies).toContain(a);
+    }
   });
 
   it("a des ancres uniques et des liens internes valides", () => {

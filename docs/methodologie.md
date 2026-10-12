@@ -183,7 +183,7 @@ Sources : schéma de la base électorale, « Bloc en tête d'une commune » 
 
 ## Ruptures entre scrutins {#ruptures}
 
-Comparer deux scrutins demande de la prudence. L'application affiche une mention « Limite » quand on passe d'un type de scrutin à un autre, ou d'une grille officielle à un classement reconstruit.
+Comparer deux scrutins demande de la prudence. L'application affiche une mention « Limite » quand on passe d'un type de scrutin à un autre, ou d'une grille officielle à un classement reconstruit. Sur la fiche d'une commune, un bandeau « Comparaison limitée » énumère les ruptures entre les scrutins affichés (type, tour, grille, découpage de 2010, anciennes communes rattachées, seuil de nuançage) ; les lignes du graphique s'interrompent à chaque rupture.
 
 - **Types de scrutin.** Mode de scrutin, offre électorale et nombre de tours diffèrent d'une élection à l'autre.
 - **Changements de grille.** Une même formation peut changer de bloc d'une grille à l'autre. La France insoumise est classée à gauche dans les grilles de 2020 et de 2023, et à l'extrême gauche dans celle de 2026. L'UDI est classée au centre en 2020 et en 2026, à droite en 2023.
@@ -201,6 +201,10 @@ Sources : schéma de la base électorale, « Classements — blocs politiques�
 - **Scissions de communes.** Elles sont recensées, mais les voix ne sont jamais réparties entre les communes issues de la scission.
 - **Électeurs écartés.** Français de l'étranger et collectivités d'outre-mer absentes du référentiel des communes (Pacifique, Saint-Martin, Saint-Barthélemy).
 - **Clé des correspondances.** Elle combine le code et l'année, sans le type de scrutin. Un contrôle empêche qu'une année de municipales soit partagée avec une présidentielle ou des législatives.
+- **Élus sans commune.** Les fiches communales ne montrent pas les 37 élus en cours de mandat élus hors du référentiel des communes (Français de l'étranger, Nouvelle-Calédonie, Polynésie française, Wallis-et-Futuna, Saint-Martin, Saint-Barthélemy). Ils sont comptés dans les données exportées (mesure du 9 octobre 2026).
+- **Économie des anciennes communes.** Les indicateurs économiques publiés sous le code de 7 communes disparues ne sont pas repris dans les fiches : des taux ne s'additionnent pas d'une commune à l'autre. Ils sont comptés dans les données exportées (mesure du 9 octobre 2026).
+- **Circonscriptions sur la fiche.** Une circonscription est rattachée à une commune si elle couvre au moins 1 % de sa surface. Sans contour commun (îles, Saint-Pierre-et-Miquelon), la fiche reprend la circonscription des derniers résultats législatifs de la commune.
+- **Chômage 2015-2016.** Les millésimes 2015 et 2016 du taux de chômage, reconstitués pour la page Économie, ne sont pas repris dans les fiches.
 - **Écologistes 2022.** Le code ECO des législatives 2022 inclut EELV dans la circulaire, mais la plupart des candidats EELV étaient nuancés NUP. Son classement à gauche reste à confirmer au vu des candidats concernés.
 
 Sources : schéma de la base électorale, « Rattachement des communes fusionnées », « Contrôles de chargement » et vues législatives ; registre des sources du projet (contours des circonscriptions) ; ADR-0010, § e, points 2 et 3.

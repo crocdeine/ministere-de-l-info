@@ -327,12 +327,16 @@ La même nuance peut désigner des formations différentes selon l'année. La cl
 ## Rattachement des communes fusionnées (décision Mathias 2026-10-07)
 
 Table **`communes_passage`** (`code_ancien` PK, `code_actuel`, `date_effet`,
-`type_evenement`), construite par `scripts/load_communes_passage.py` depuis le fichier
+`type_evenement`, `libelle_ancien`), construite par `scripts/load_communes_passage.py` depuis le fichier
 des mouvements des communes du COG INSEE 2026 (Licence Ouverte 2.0) : arêtes des
 fusions (MOD 31-34), changements de code (41) et de département (50), arête la plus
 récente par code, chaîne suivie jusqu'à un code de `geographies_communes`
 (4 234 codes anciens). Les loaders lisent la source via `source_rattachee_sql()` :
 
+- `libelle_ancien` = nom de la commune disparue (`LIBELLE_AV` de sa première fusion),
+  affiché par la fiche commune (« Inclut les résultats de l'ancienne commune Yaucourt-Bussus
+  (80830) ») ; colonne ajoutée aux bases existantes par `ALTER TABLE … ADD COLUMN IF NOT
+  EXISTS` et remplie au prochain `load_communes_passage.py` (lot A3, 2026-10-09) ;
 - `code_commune` = commune actuelle ; **`code_commune_origine`** (nouvelle colonne des
   deux tables de résultats) = code d'origine, NULL si inchangé ;
 - `code_bv` préfixé du code d'origine (`74011-0001`) : pas de collision avec les bureaux
@@ -623,3 +627,14 @@ Deux tables séparées par source, structure large cohérente avec les tables
 | `v_evolution_economie_hdf` | An | Agrégats régionaux (moyennes HdF) |
 
 </details>
+
+## Fiche commune : données non affichées (export web, lot A3)
+
+L'export `departements/<dep>/fiches.json.gz` (`export_web/fiches.py`) compte dans
+`manifest.json` (`perimetre`) ce qu'il ne montre pas, sans le répartir :
+
+- `elus_hors_perimetre` : élus de `v_elus_actuels` dont le département n'a aucune commune dans
+  le référentiel (099, 999, 977, 978, 986-988) — **37** au 2026-10-09 ;
+- `economie_communes_anciennes` : codes de `v_economie_commune` / `v_economie_sociale_commune`
+  absents de `geographies_communes` (communes disparues) — **7** au 2026-10-09 (27 dans
+  `economie_rp`, dont 20 déjà écartés par la vue). Les taux ne s'additionnent pas : non repris.

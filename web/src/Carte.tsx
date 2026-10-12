@@ -188,6 +188,11 @@ export function Carte({ manifeste, etats, scrutin, onSurvol, onRendu }: Props) {
         };
         carte.on("mousemove", [...COUCHES], survol);
         carte.on("mouseleave", [...COUCHES], () => rappels.current.onSurvol(null));
+        // Clic : fiche de la commune (lot A3) ; au clavier, lien de la commune choisie.
+        carte.on("click", [...COUCHES], (e: MapLayerMouseEvent) => {
+          const code = e.features?.[0]?.properties?.code;
+          if (typeof code === "string") location.hash = `#/commune?code=${code}`;
+        });
       })
       .catch((e: unknown) => setErreur(`MapLibre non chargé (${String(e)}).`));
     return () => {

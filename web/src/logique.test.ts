@@ -28,7 +28,7 @@ const s = (id: string, methode: "officielle" | "reconstruit" = "reconstruit") =>
 };
 
 const M = {
-  schema: 2,
+  schema: 3,
   scrutins: [s("2017_pres_t1"), s("2017_pres_t2"), s("2020_muni_t1", "officielle"), s("2022_pres_t1"), s("2022_pres_t2"), s("2024_legi_t1")],
   blocs: ["EXG", "GAU", "DIV", "CENT", "DTE", "EXD"].map((code, i) => ({
     code,
@@ -42,9 +42,9 @@ const M = {
 
 describe("contrat de données", () => {
   it("refuse une version de schéma inconnue", () => {
-    expect(() => verifierManifeste({ schema: 1 })).toThrow(ErreurDonnees);
+    expect(() => verifierManifeste({ schema: 2 })).toThrow(ErreurDonnees);
     expect(() => verifierManifeste(null)).toThrow(/Version des données/);
-    expect(verifierManifeste({ schema: 2 }).schema).toBe(2);
+    expect(verifierManifeste({ schema: 3 }).schema).toBe(3);
   });
 
   it("décode un JSON gzip, ou déjà décompressé par le serveur", async () => {

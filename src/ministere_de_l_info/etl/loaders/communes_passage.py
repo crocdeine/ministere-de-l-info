@@ -70,9 +70,10 @@ def construire_passage(con: duckdb.DuckDBPyConnection, csv_mvt: Path) -> int:
     fusions = ", ".join(f"'{m}'" for m in _MODS_FUSION)
     con.execute(f"""
         CREATE OR REPLACE TEMP TABLE _aretes AS
-        SELECT code_ancien, code_suivant, date_effet, mod FROM (
+        SELECT code_ancien, code_suivant, date_effet, mod, libelle_ancien FROM (
             SELECT COM_AV AS code_ancien, COM_AP AS code_suivant,
                    CAST(DATE_EFF AS DATE) AS date_effet, MOD AS mod,
+                   LIBELLE_AV AS libelle_ancien,
                    ROW_NUMBER() OVER (PARTITION BY COM_AV
                                       ORDER BY CAST(DATE_EFF AS DATE) DESC, COM_AP) AS rang
             FROM read_csv('{csv_mvt}', all_varchar = true, header = true)
@@ -82,12 +83,13 @@ def construire_passage(con: duckdb.DuckDBPyConnection, csv_mvt: Path) -> int:
     """)  # noqa: S608
     con.execute(f"""
         CREATE OR REPLACE TEMP TABLE _chaines AS
-        WITH RECURSIVE ch(code_ancien, code_courant, date_effet, mod, etape) AS (
-            SELECT a.code_ancien, a.code_suivant, a.date_effet, a.mod, 1
+        WITH RECURSIVE ch(code_ancien, code_courant, date_effet, mod, etape, libelle_ancien) AS (
+            SELECT a.code_ancien, a.code_suivant, a.date_effet, a.mod, 1, a.libelle_ancien
             FROM _aretes a
             WHERE a.code_ancien NOT IN (SELECT code_insee FROM geographies_communes)
             UNION ALL
-            SELECT ch.code_ancien, a.code_suivant, a.date_effet, a.mod, ch.etape + 1
+            SELECT ch.code_ancien, a.code_suivant, a.date_effet, a.mod, ch.etape + 1,
+                   ch.libelle_ancien
             FROM ch JOIN _aretes a ON a.code_ancien = ch.code_courant
             WHERE ch.code_courant NOT IN (SELECT code_insee FROM geographies_communes)
               AND ch.etape < {_PROFONDEUR_MAX}
@@ -99,7 +101,8 @@ def construire_passage(con: duckdb.DuckDBPyConnection, csv_mvt: Path) -> int:
         con.execute("DELETE FROM communes_passage")
         con.execute("""
             INSERT INTO communes_passage
-            SELECT code_ancien, code_courant, date_effet, mod
+                (code_ancien, code_actuel, date_effet, type_evenement, libelle_ancien)
+            SELECT code_ancien, code_courant, date_effet, mod, libelle_ancien
             FROM _chaines
             WHERE code_courant IN (SELECT code_insee FROM geographies_communes)
             QUALIFY ROW_NUMBER() OVER (PARTITION BY code_ancien ORDER BY etape) = 1
