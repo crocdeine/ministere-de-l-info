@@ -19,6 +19,7 @@ npm run build         # tsc --noEmit puis build dans dist/
 npm run budget        # JS initial gzip < 450 Ko (bloquant en CI)
 npm run e2e:url       # état dans l'URL : lien, rechargement, retour arrière (WebKit + Chromium)
 npm run e2e:fiche     # fiche commune : URL, carte, ruptures, bureaux de vote (données : dép. 80 et 75)
+npm run e2e:export    # exports Excel et CSV : téléchargement réel, relecture (tableau ligne 1, notes, codes en texte, n.d. vide)
 npm run mesure        # WebKit sans fenêtre : ouverture, données, changement de tour, mémoire
 ```
 
@@ -38,6 +39,7 @@ Options : `--strict` (échec au-delà des seuils de l'ADR-0015), `--changements 
 | `src/maplibre.ts` | chargement de MapLibre (fichiers ESM d'origine), lecture de l'archive en mémoire sous Tauri |
 | `src/worker/details.ts` | résultats détaillés de l'infobulle, décodés hors du thread principal |
 | `src/FicheCommune.tsx`, `src/fiche.ts`, `src/GraphiqueEvolution.tsx` | fiche commune (`#/commune?code=…`) : historique, ruptures (logique pure, testée), graphique SVG, bureaux de vote chargés à l'ouverture |
+| `src/export-csv.ts`, `src/export-xlsx.ts` | exports (lot A6) : Excel (.xlsx, écrit à la main + `fflate`, chargé à la demande) et CSV brut (UTF-8 avec BOM, « ; », décimale « , ») ; tableau dès la ligne 1, notes (source, licence ODbL, dates, méthode, définitions) en onglet « Notes » ou en fin de CSV ; absence = cellule vide ; boutons de la fiche et de la page Élections |
 | `src/PageElections.tsx`, `src/Legende.tsx`, `src/App.tsx` | page, légende et étiquette de méthode, navigation |
 | `src/Methodologie.tsx`, `src/markdown.ts`, `src/methodologie.css` | panneau Méthodologie (texte `docs/methodologie.md` compilé au build, chargé à la demande ; tables de `methodologie.json.gz`), ouvert par `LienMethode` (`Legende.tsx`) |
 | `src/mesure.ts`, `perf/` | instrumentation (`?mesure=1`), budget de taille, mesures WebKit |

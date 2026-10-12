@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Carte, type Rendu, type Survol, token } from "./Carte";
-import { date, entier, type Manifeste, pct, urlDonnees } from "./donnees";
+import { type ColonnesScrutin, date, entier, lireJsonGz, type Manifeste, pct, urlDonnees } from "./donnees";
 import { annees, choisir, type Etat, etats as listeEtats, libelleEtat, scrutinInitial, tours } from "./etats";
+import { enregistrerExport, exportScrutin, type Format } from "./export-csv";
 import { ecrireUrl, lireUrl } from "./etat-url";
 import { EtiquetteMethode, Legende, LienMethode } from "./Legende";
 import { journal, noter } from "./mesure";
@@ -51,6 +52,8 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
   const [details, setDetails] = useState<Record<string, ReponseCommune>>({});
   const [carteAffichee, setCarteAffichee] = useState(false);
   const [worker, setWorker] = useState<Worker | null>(null);
+  const [exportErreur, setExportErreur] = useState<string | null>(null);
+  const [exportEnCours, setExportEnCours] = useState(false);
   const [texte, setTexte] = useState("");
   const [trouvees, setTrouvees] = useState<ReponseRecherche | null>(null);
   const [choisie, setChoisie] = useState<{ code: string; nom: string } | null>(
@@ -69,6 +72,7 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
   // par l'utilisateur. Un changement venu de l'URL (suivre) écrit déjà le hachage canonique :
   // l'effet n'a alors rien à faire, donc jamais de pushState en retour arrière.
   const idCourant = manifeste.scrutins[scrutin]?.id;
+  useEffect(() => setExportErreur(null), [idCourant]);
   const communeUrl = choisie?.code;
   const precedente = useRef(communeUrl);
   const dernierHash = useRef(location.hash);
@@ -169,6 +173,24 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
     const t = setTimeout(() => worker.postMessage({ type: "rechercher", communes, texte } satisfies Demande), 150);
     return () => clearTimeout(t);
   }, [worker, communes, texte]);
+
+  // Export du tour affiché : fichiers relus (et vérifiés) à la demande, hors du worker.
+  const exporter = async (format: Format) => {
+    if (!tour || !s || exportEnCours) return;
+    setExportErreur(null);
+    setExportEnCours(true);
+    try {
+      const [c, t] = await Promise.all([
+        lireJsonGz<{ codes: string[]; noms: string[] }>(communes.url, communes.sha256, communes.nom),
+        lireJsonGz<ColonnesScrutin>(tour.url, tour.sha256, tour.nom),
+      ]);
+      setExportErreur(await enregistrerExport(exportScrutin(manifeste, s, c.codes, c.noms, t, (car) => libelleEtat(etats, car)), format));
+    } catch (e) {
+      setExportErreur(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExportEnCours(false);
+    }
+  };
 
   const rendu = (r: Rendu) => {
     if (r.type === "premiere") setCarteAffichee(true);
@@ -326,6 +348,15 @@ export function PageElections({ manifeste, numero }: { manifeste: Manifeste; num
           )}
         </figure>
         <Legende etats={etats} scrutin={s} rupture={rupture} />
+        <p className="aide">
+          {(["xlsx", "csv"] as const).map((f) => (
+            <button key={f} type="button" aria-label={`Télécharger le scrutin affiché (${f === "xlsx" ? "Excel" : "CSV"})`} disabled={exportEnCours} onClick={() => exporter(f)}>
+              {exportEnCours ? "Préparation…" : f === "xlsx" ? "Télécharger (Excel)" : "CSV"}
+            </button>
+          ))}{" "}
+          Une ligne par commune pour ce tour ; source, licence, dates et méthode : onglet « Notes » (Excel) ou fin du fichier (CSV).{" "}
+          <span role="status">{exportErreur}</span>
+        </p>
         <div className="source">
           <p className="source-titre">Source</p>
           <p>

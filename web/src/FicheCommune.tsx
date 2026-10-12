@@ -19,6 +19,7 @@ import {
   mentionFusion,
   raisonsSerie,
 } from "./fiche";
+import { enregistrerExport, type Export, exportBureaux, exportHistorique, type Format } from "./export-csv";
 import { GraphiqueEvolution } from "./GraphiqueEvolution";
 import { EtiquetteMethode, LienMethode } from "./Legende";
 
@@ -81,6 +82,13 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
   const [tri, setTri] = useState<Tri>({ cle: "rang", sens: 1 });
   const [copie, setCopie] = useState<"ok" | "echec" | null>(null);
   const [bureaux, setBureaux] = useState<Bureaux | null>(null);
+  const [exportErreur, setExportErreur] = useState<string | null>(null);
+  const [exportEnCours, setExportEnCours] = useState(false);
+  const enregistrer = async (construire: () => Export, format: Format) => {
+    setExportEnCours(true);
+    setExportErreur(await enregistrerExport(construire(), format));
+    setExportEnCours(false);
+  };
   const [rangBv, setRangBv] = useState<number | null>(null);
 
   useEffect(() => {
@@ -167,6 +175,10 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
   const derniere = toutes.at(-1);
   const pop = info.population.filter((p) => p[1] !== null).at(-1);
   const raisons = raisonsSerie(serie);
+  const filtre =
+    type || tour
+      ? `type : ${type ? (m.types[type] ?? type) : "tous"}, tour : ${tour === 1 ? "1er tour" : tour === 2 ? "2e tour" : "les deux"}`
+      : undefined;
   const methodes = [...new Set(serie.map((l) => l.scrutin.methode))];
   const typesPresents = Object.entries(m.types).filter(([t]) => toutes.some((l) => l.scrutin.type === t));
   const sansResultat = m.scrutins.length - toutes.length;
@@ -387,6 +399,15 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
                 </tbody>
               </table>
             </div>
+            <p className="aide">
+              {(["xlsx", "csv"] as const).map((f) => (
+                <button key={f} type="button" disabled={exportEnCours} aria-label={`Télécharger l'historique (${f === "xlsx" ? "Excel" : "CSV"})`} onClick={() => enregistrer(() => exportHistorique(m, { code, nom: info.nom }, triees, remarques, filtre), f)}>
+                  {f === "xlsx" ? "Télécharger (Excel)" : "CSV"}
+                </button>
+              ))}{" "}
+              Source, licence, dates et méthode : onglet « Notes » (Excel) ou fin du fichier (CSV).{" "}
+              <span role="status">{exportErreur}</span>
+            </p>
           </>
         )}
         <p className="methode">
@@ -462,6 +483,16 @@ export function FicheCommune({ manifeste: m }: { manifeste: Manifeste }) {
                     </tbody>
                   </table>
                 </div>
+              )}
+              {bv.length > 0 && (
+                <p className="aide">
+                  {(["xlsx", "csv"] as const).map((f) => (
+                    <button key={f} type="button" disabled={exportEnCours} aria-label={`Télécharger les bureaux de vote (${f === "xlsx" ? "Excel" : "CSV"})`} onClick={() => enregistrer(() => exportBureaux(m, { code, nom: info.nom }, bv), f)}>
+                      {f === "xlsx" ? "Télécharger (Excel)" : "CSV"}
+                    </button>
+                  ))}{" "}
+                  <span role="status">{exportErreur}</span>
+                </p>
               )}
               <Source m={m} cles={["elections"]}>
                 Niveau : bureau de vote. Parts en % des exprimés du bureau.
