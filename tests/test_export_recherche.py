@@ -10,7 +10,7 @@ from typing import Any
 import duckdb
 import pytest
 
-from ministere_de_l_info.etl.loaders.codes_postaux import charger
+from ministere_de_l_info.etl.loaders.codes_postaux import charger, telecharger
 from ministere_de_l_info.export_web import exporter
 from ministere_de_l_info.export_web.recherche import COLONNES, normaliser
 
@@ -28,7 +28,7 @@ def test_charger_codes_postaux_plm(tmp_path: Path) -> None:
     lignes = ["#Code_commune_INSEE;Nom_de_la_commune;Code_postal;Libellé;Ligne_5"]
     lignes += [f"{c};X;{cp};X;" for c, cp in [("01001", "01400"), ("75101", "75001")]]
     lignes += [f"{c};X;{cp};X;" for c, cp in [("75116", "75116"), ("2A004", "20000")]]
-    lignes += [f"99999;X;{i:05d};X;" for i in range(30000)]  # volume minimal du contrôle
+    lignes += [f"99999;X;{i:05d};X;" for i in range(35000)]  # volume minimal du contrôle
     csv.write_text("\n".join(lignes), encoding="latin-1")
     con = duckdb.connect()
     charger(con, csv)
@@ -45,9 +45,32 @@ def test_charger_refuse_fichier_vide(tmp_path: Path) -> None:
         charger(duckdb.connect(), csv)
 
 
+def test_charger_refuse_lignes_rejetees(tmp_path: Path) -> None:
+    csv = tmp_path / "h.csv"
+    lignes = [
+        "#Code_commune_INSEE;Nom_de_la_commune;Code_postal;Libellé;Ligne_5",
+        "01001;X;1400;X;",
+    ]
+    lignes += [f"99999;X;{i:05d};X;" for i in range(35000)]
+    csv.write_text("\n".join(lignes), encoding="latin-1")
+    with pytest.raises(RuntimeError, match="rejetées"):
+        charger(duckdb.connect(), csv)
+
+
+def test_cache_html_refuse(tmp_path: Path) -> None:
+    (tmp_path / "laposte").mkdir()
+    (tmp_path / "laposte" / "hexasmal.csv").write_text("<html>erreur</html>")
+    with pytest.raises(RuntimeError, match="entête"):
+        telecharger(tmp_path)
+
+
 @pytest.mark.spatial
 def test_index_echantillon(echantillon_db_path: Path, tmp_path: Path) -> None:
-    exporter(echantillon_db_path, tmp_path, tippecanoe=None, departements=["80"])
+    m = exporter(echantillon_db_path, tmp_path, tippecanoe=None, departements=["80"])
+    assert m["perimetre"]["codes_postaux_charges"] is False  # base d'échantillon sans la table
+    assert {"elus_non_indexes_par_departement", "circonscriptions_ecartees"} <= set(m["perimetre"])
+    with pytest.raises(ValueError, match="codes_postaux"):
+        exporter(echantillon_db_path, tmp_path / "x", tippecanoe=None, exiger_codes_postaux=True)
     idx: dict[str, Any] = json.loads(gzip.decompress((tmp_path / "recherche.json.gz").read_bytes()))
     assert idx["colonnes"] == COLONNES
     lignes = [dict(zip(COLONNES, r, strict=True)) for r in idx["lignes"]]
